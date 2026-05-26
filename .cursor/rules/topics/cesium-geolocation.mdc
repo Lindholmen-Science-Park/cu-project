@@ -1,0 +1,127 @@
+---
+description: Cesium geolocation — GeoCoordinateService, WGS84↔USD conversion, tileset alignment, performance freeze, NavMesh/picking exclusion
+globs:
+  - "**/geo_coordinate_service*"
+  - "**/cesium.omniverse/**"
+  - "**/geo_poi_extension/**"
+  - "**/geo_layer/**"
+alwaysApply: false
+---
+
+# Cesium geolocation & coordinate conversion
+
+Two purposes for Cesium in this project:
+1. **Geospatial coordinate mapping** — convert WGS84 lat/lon ↔ USD scene positions (POIs, real-world features)
+2. **Visual background** — satellite imagery beyond the city tiles (optional in streaming)
+
+## Alignment workflow (Composer)
+
+The city model geometry lives under `/World` and cannot be moved (sublayer transforms break). Instead, Cesium is calibrated to the city:
+
+1. Set `CesiumGeoreferencePrim` origin to an anchor GPS (Skandinavium: `57.69924, 11.98767`)
+2. Move **only** `/Cesium_World_Terrain` until satellite imagery aligns visually with the city tiles
+3. The tileset's `xformOp:translate` becomes the calibration offset
+
+The tileset translate was set to match the Skandinavium prim translate under `/World` — both represent the same physical location.
+
+## GeoCoordinateService
+
+**File**: `younite.usd_viewer_stage_core_extension/services/core_services/geo_coordinate_service.py`
+**Lifecycle**: created in `StageCoreExtension.on_startup()`, `load_from_stage()` called in `_finalize_scene_load()`
+**Access**: `from younite.usd_viewer_stage_core_extension import get_geo_coordinate_service`
+
+### Conversion math
+
+Uses local tangent plane (ENU) approximation with WGS84 ellipsoid — accurate <1 m within ~10 km of origin.
+
+- Reads `CesiumGeoreferencePrim` origin (lat, lon, height) → defines the "zero point"
+- Reads `Cesium_World_Terrain` `xformOp:translate` → tileset offset `(ox, oy, oz)`
+- `metersPerUnit` from stage metadata → scale factor (typically 100 for cm scenes)
+
+**latlon_to_usd(lat, lon, height)**:
+```
+d_lat, d_lon = lat - origin_lat, lon - origin_lon
+east_m  = d_lon × m_per_deg_lon
+north_m = d_lat × m_per_deg_lat
+x = east_m  × scale + ox
+y = height  × scale + oy
+z = -north_m × scale + oz
+```
+
+**usd_to_latlon(x, y, z)**: inverse — subtracts tileset offset, divides by scale, adds to origin.
+
+### Player geo position (convenience accessor)
+
+`PlayerLocationService.get_player_geo_position()` returns the player's current position as `(lat, lon, height)` in WGS84, or `None` if the player position or geo service is unavailable. It wraps `get_player_world_position()` → `GeoCoordinateService.usd_to_latlon()` in a single call, so any extension that needs the player's real-world coordinates doesn't need to handle the conversion itself.
+
+**File**: `younite.usd_viewer_player_core_extension/services/player_location_service.py`
+**Access**: `get_player_location_service().get_player_geo_position()`
+**Used by**: `younite.ai_agent_extension` (logs lat/lon on each chat request)
+
+### Event API
+
+Other extensions and web UI can request conversions via events:
+
+| Event | Payload | Response event |
+|---|---|---|
+| `younite.geo.latlonToUsd` | `{ lat, lon, height, requestId }` | `younite.geo.latlonToUsdResult` |
+| `younite.geo.usdToLatlon` | `{ x, y, z, requestId }` | `younite.geo.usdToLatlonResult` |
+
+## POI markers
+
+**Extension**: `younite.geo_poi_extension` (order 1200)
+**Depends on**: `younite.usd_viewer_stage_core_extension` (for `GeoCoordinateService`)
+**Data**: `source/data/geo_layer/example_geo_data.json`
+
+`GeoDataService` reads POI lat/lon from JSON, calls `GeoCoordinateService.latlon_to_usd()`, creates `UsdGeom.Cube` marker poles under `/World/GeoDataLayer/POIs/`.
+
+Visibility toggled via `poiMarkersToggle` event. Markers lazy-load on first enable.
+
+## Performance (streaming app)
+
+### CesiumTileOrchestrator
+
+**File**: `younite.usd_viewer_stage_core_extension/services/core_services/cesium_tile_orchestrator.py`
+
+Controls `cesium:suspendUpdate` on all `CesiumTilesetPrim` prims based on the active camera view mode. Listens to `younite.camera.viewTypeChanged` events.
+
+| Phase | Behaviour |
+|---|---|
+| **Initial load** (12 s after `scene.loaded`) | Tiles fully unsuspended so terrain streams in |
+| **Bird's eye** | Tiles unsuspended — Cesium runs every frame for sharp terrain while panning |
+| **First person** | Tiles fully suspended (`cesium:suspendUpdate = True`) — zero streaming overhead |
+
+### UI settings
+
+In `younite.usd_viewer_streaming_dev.kit` under `[settings.exts."cesium.omniverse"]`:
+
+| Setting | Value | Effect |
+|---|---|---|
+| `showOnStartup` | `false` | No Cesium UI windows |
+| `showCreditsOnScreen` | `false` | No credits overlay |
+
+If only coordinate conversion is needed (no visual background), `cesium.omniverse` can be removed from streaming `.kit` dependencies entirely — keep only `cesium.usd.plugins` for USD schema support.
+
+## NavMesh & picking exclusion
+
+- **NavMesh**: `NavMeshExcludeAPI` applied to `/Cesium_World_Terrain` in `navigation_layer.usda`
+- **Picking**: `_is_cesium_prim()` filter in `picking_extension` rejects hits on paths starting with `/Cesium` or containing `cesium_world_terrain`
+- **Frame delta time**: player `runtime/update_loop.py` reads `event.payload["dt"]` for auto-move / bird-eye (see `events-api.mdc` § Delta time). If Cesium causes large frame spikes, consider clamping `dt` after the payload read (e.g. `min(dt, 0.1)`) in that loop only — not implemented today.
+
+## Key files
+
+| File | Role |
+|---|---|
+| `geo_coordinate_service.py` | WGS84 ↔ USD conversion service |
+| `player_location_service.py` | `get_player_geo_position()` convenience accessor |
+| `cesium_tile_orchestrator.py` | View-mode-aware tile suspend/unsuspend |
+| `younite.usd_viewer_streaming_dev.kit` | Streaming UI overrides |
+| `geo_poi_extension/geo_data_service.py` | POI marker creation |
+| `example_geo_data.json` | POI lat/lon data |
+| `navigation_layer.usda` | NavMesh exclusion for Cesium |
+
+## Related
+
+- OSM navigation: `.cursor/rules/topics/osm-navigation.mdc`
+- NavMesh areas: `.cursor/rules/topics/navmesh-areas.mdc`
+- Stage init / loading phases: `.cursor/rules/topics/stage-init.mdc`

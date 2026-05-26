@@ -1,0 +1,326 @@
+---
+description: OSM city navigation — Dijkstra over OpenStreetMap roads + railway (schema v3), terrain bake, mode-aware costs (walking/car/tram/train), route visualization
+globs:
+  - "**/osm_navigation_extension/**"
+  - "**/osm/**"
+  - "**/OsmNavigateWidget*"
+alwaysApply: false
+---
+
+# OSM city-scale navigation
+
+City-scale macro navigation using a pre-baked OpenStreetMap graph (**highways + selected `railway=*` ways** from a single Overpass union in `generate_roads.py`). Separate from the NavMesh system (local/indoor pathfinding). The City Navigate widget uses **walking / wheelchair / car** on **road** edges only; **tram** and **train** modes exist on `OsmGraphService` for Kit features such as the live transit overlay. Routes are shortest-path (Dijkstra) between a map click and a POI, drawn as a BasisCurves line in bird's-eye view.
+
+**Extension**: `younite.osm_navigation_extension` (order 1210)
+**Depends on**: `younite.messaging_core_extension`, `younite.picking_extension`, `younite.geo_poi_extension`, `younite.usd_viewer_stage_core_extension`
+
+## Data pipeline (offline)
+
+**Two steps** (both are needed for production terrain-aligned routes):
+
+1. **`generate_roads.py`** — fetches Overpass data (highway ∪ railway), writes `osm_cache.json`, ellipsoid-height `gothenburg_roads.usda`, and `gothenburg_graph.json` with **flat Y** until step 2 runs. Use `python generate_roads.py --force` or set `OSM_FORCE_REFETCH=1` once when the Overpass query or filters change so the cache is not reused.
+2. **`bake_roads.bat`** — from `kit-app-template-main/source/data/osm/` (or invoke that path from anywhere). The batch **`pushd`s to `kit-app-template-main` root**, runs `repo.bat build`, then launches Kit headlessly with `--exec source\data\osm\bake_terrain_roads.py`. **Working directory must be the Kit app root** so `repo.bat` and the `--exec` path resolve; do not run `--exec` from the repo parent folder alone or Kit reports *Can't find a file to execute*.
+
+`bake_terrain_roads.py` raycasts **every node** in `osm_cache.json` (roads and rail) onto terrain meshes; the graph meta gets `"terrain_baked": true`.
+
+### Flat generation (`generate_roads.py` only)
+
+**Script**: `kit-app-template-main/source/data/osm/generate_roads.py`  
+**Run**: `python generate_roads.py` from `source/data/osm/` (needs `pxr` / USD Python).  
+**Outputs**: `osm_cache.json`; `gothenburg_roads.usda` and `gothenburg_graph.json` at **WGS-84 ellipsoid Y** — routes float until the terrain bake updates Y.
+
+### Terrain-following bake (required for ground-aligned Y)
+
+**Script**: `source/data/osm/bake_terrain_roads.py` (Kit `--exec`)  
+**Run**: **`bake_roads.bat`** (recommended) as above; it sets cwd correctly.
+**What it does**:
+1. Opens the scene in Kit (headless via `--no-window`, RTX rendering disabled for speed)
+2. Applies `PhysicsCollisionAPI` to all mesh prims under `*_Terrain` Xforms on the session layer (temporary colliders, batched in groups of 50 with pauses to avoid GPU cooking crashes)
+3. Disables all pre-existing non-terrain colliders (arena walls, etc.) on the session layer so raycasts only hit terrain surfaces
+4. Starts physics simulation and polls for PhysX readiness
+5. Reads Cesium `ecefToUsdTransform` from the live stage
+6. Loads `osm_cache.json`, converts all cached way nodes (highway + railway) to scene coords
+7. Raycasts each node downward via PhysX using **multi-pass penetration**: fires up to 5 `raycast_closest` calls per node, each starting below the previous hit, to find the **lowest** terrain surface (bypasses bridges/overpasses in favour of actual ground). Only accepts hits on prims with `Terrain` in their path.
+8. **Iterative grade-based spike removal** (max 10% slope): flags consecutive road nodes whose Y difference implies >10% grade; the higher node is removed. Runs iteratively to erode elevated segments (bridges, ramps) from their edges inward. Removed nodes are then repaired by averaging surviving road-neighbor Y values (cascading repair fills in gaps).
+9. Subdivides long road segments (max 10 m) with **linear Y interpolation** between nodes (no runtime raycasts for subdivision points)
+10. Writes `gothenburg_roads.usda` and `gothenburg_graph.json` with terrain-following Y values
+11. Shuts down Kit
+
+**Outputs**:
+- `source/data/osm/gothenburg_roads.usda` — visual BasisCurves colour-coded by road category, terrain-following Y
+- `source/data/osm/gothenburg_graph.json` — pathfinding graph with terrain Y values, `"terrain_baked": true` in meta
+- `source/data/osm/osm_cache.json` — cached raw Overpass API response (shared with flat generation)
+
+**To regenerate**: `python generate_roads.py [--force]` when Overpass output or styling should change; then `bake_roads.bat` (or `bake_roads.bat <scene_name>`) so Y matches terrain. Terrain bake reuses the existing `osm_cache.json`.
+
+**When to re-bake**: after terrain tiles change, after a new `generate_roads.py` run, or after changing the Cesium georeference.
+
+**Scale** (order of magnitude, ~3 km Gothenburg): node counts are **tens of thousands** and grow when railway ways are included; exact raycast hit / spike / repair counts depend on terrain mesh and cache contents — inspect the bake log rather than relying on fixed numbers in docs.
+
+### Coordinate system
+
+**Graph data uses Cesium-aligned world-space coordinates (generated offline):**
+- WGS-84 lat/lon → ECEF → USD via `cesium:ecefToUsdTransform` from `/CesiumGeoreference`
+- +X = East, +Z = South (−North), +Y = Up, 1 unit = 1 cm
+- Y values are terrain ground-level height (from multi-pass PhysX raycast + grade-based spike filter) when terrain-baked, or ellipsoid height when flat
+
+**POI conversion** uses `GeoCoordinateService` from `younite.usd_viewer_stage_core_extension` — same WGS84 ENU tangent-plane math as all other extensions.
+
+### Road & rail categories (visual USDA)
+
+Defined in `ROAD_STYLES` / `RAILWAY_VALUE_TO_VISUAL` in `generate_roads.py`. Colours are approximate RGB descriptions.
+
+| Visual key | OSM source | Colour (approx) | Width (cm) | Y offset |
+|---|---|---|---|---|
+| motorway | `highway=motorway` | Red | 1400 | 0 |
+| trunk | `trunk` | Orange | 1000 | 20 |
+| primary | `primary` | Yellow | 700 | 40 |
+| secondary | `secondary` | Blue | 600 | 60 |
+| tertiary | `tertiary` | Green | 500 | 80 |
+| residential | `residential`, `living_street`, `unclassified` | Grey | 400 | 100 |
+| pedestrian | `footway`, `pedestrian`, `path`, `cycleway` | Purple | 250 | 120 |
+| steps | `steps` | Brown | 150 | 130 |
+| rail_tram | `railway=tram` | Yellow-gold | 120 | 5 |
+| rail_light_rail | `railway=light_rail` | Cyan | 130 | 5 |
+| rail_subway | `railway=subway` | Purple | 200 | 0 |
+| rail_main | `railway=rail`, `narrow_gauge`, `preserved`, `monorail`, `construction`, … | Brown-grey | 220 | 0 |
+
+Y offsets stagger categories to reduce z-fighting. Terrain-baked output adds a small hover above the mesh (see script constants).
+
+### Routing classes (mode-aware)
+
+Road visuals map to five **road** classes; rail visuals map to three **rail** classes (`CLASS_OF_CATEGORY` in `generate_roads.py`):
+
+| Class | Source visual keys / OSM |
+|---|---|
+| `pedestrian` | pedestrian |
+| `steps` | steps |
+| `residential` | tertiary, residential |
+| `arterial` | primary, secondary |
+| `highway` | motorway, trunk |
+| `tram` | rail_tram (`railway=tram`) |
+| `light_rail` | rail_light_rail |
+| `rail_heavy` | rail_subway, rail_main (subway, mainline, narrow_gauge, preserved, monorail, construction, …) |
+
+### Mode cost table
+
+Each edge weight in Dijkstra is `dist_cm × MODE_COSTS[mode][class] × MODE_ACCESS_RULES[mode][wheelchair_tag]`. A `None` multiplier **hard-excludes** the edge.
+
+| Class | walking | wheelchair | car | tram | train |
+|---|---|---|---|---|---|
+| pedestrian | 1.0 | 1.0 | **None** | **None** | **None** |
+| steps | 1.2 | **None** | **None** | **None** | **None** |
+| residential | 3.0 | 3.0 | 1.5 | **None** | **None** |
+| arterial | 10.0 | 10.0 | 1.0 | **None** | **None** |
+| highway | 100.0 | 100.0 | 0.8 | **None** | **None** |
+| tram | **None** | **None** | **None** | 1.0 | **None** |
+| light_rail | **None** | **None** | **None** | 1.0 | 1.0 |
+| rail_heavy | **None** | **None** | **None** | **None** | 1.0 |
+
+`MODE_ACCESS_RULES` is keyed by the native OSM `wheelchair=*` tag per way (rail edges typically untagged — neutral `None`):
+
+| Access tag | walking | wheelchair | car | tram | train |
+|---|---|---|---|---|---|
+| `yes` | 1.0 | 0.9 (preference) | 1.0 | 1.0 | 1.0 |
+| `limited` | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 |
+| `no` | 1.0 | **None** (excluded) | 1.0 | 1.0 | 1.0 |
+| (untagged) | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 |
+
+**walking** / **wheelchair** / **car** never use rail edges (all `None`). **tram** uses `tram` + `light_rail` only (street tram / light rail). **train** uses `light_rail` + `rail_heavy` and excludes pure `tram` street trunks. The City Navigate UI only exposes walking / wheelchair / car; **tram** / **train** are for Kit code (e.g. transit overlay). See `transit-live-overlay.mdc` for tram routing on the graph.
+
+### Scene integration
+
+Roads are in the scene composition but **deactivated** by default (`active = false`):
+- `source/data/scenes/sublayers/osm_layer.usda` is a sublayer of `main_scene.usda`
+- `/World/OSM_Roads` has `active = false` — composed but not traversed/rendered at startup
+- The extension calls `prim.SetActive(True/False)` to toggle on demand
+- With terrain-baked roads, the prim translate is `(0, 0, 0)` — roads are already in world space
+
+## Graph data (`gothenburg_graph.json`)
+
+Current **`schema_version`: 3** with **`includes_railway`: true** when the Overpass union included `way[railway~"..."]` ways. Meta also records `terrain_baked` after `bake_terrain_roads.py`.
+
+```json
+{
+  "meta": {
+    "schema_version": 3,
+    "includes_railway": true,
+    "terrain_baked": true,
+    "adjacency_tuple": "[neighbour_id, dist_cm, class, wheelchair_access_or_null]"
+  },
+  "nodes": { "<osm_node_id>": [x, y, z], ... },
+  "adjacency": {
+    "<osm_node_id>": [
+      ["<neighbour_id>", dist_cm, "pedestrian", null],
+      ["<neighbour_id>", dist_cm, "tram", null],
+      ["<neighbour_id>", dist_cm, "residential", "yes"],
+      ...
+    ],
+    ...
+  }
+}
+```
+
+- Coordinates are in scene units (cm)
+- Edges are bidirectional (each direction stored explicitly)
+- Edge weights are Euclidean distance in cm between connected nodes
+- Adjacency tuples are `[neighbour_id, dist_cm, class, access]`:
+  - `class` ∈ road classes above **or** `tram` / `light_rail` / `rail_heavy`
+  - `access` ∈ `yes` / `no` / `limited` / `null` (native OSM `wheelchair=*` on the way, mostly on highways)
+- `OsmGraphService.load()` remains backward-compatible with older 2- and 3-tuple adjacency rows (legacy warning once).
+
+> **Cache / schema**: If you change Overpass filters (e.g. add railway, new highway tags), run `generate_roads.py --force` or set `OSM_FORCE_REFETCH=1` so `osm_cache.json` is not stale. For historical note: graphs before per-mode costs needed a cache flush when introducing `highway=steps` and `wheelchair=*`; v3 similarly needs a fresh fetch when rail is first introduced.
+
+## Kit extension architecture
+
+### OsmGraphService (`osm_graph_service.py`)
+
+Core pathfinding service. Stateless after loading — safe to call from any context. Every query takes an optional `mode=` (default `walking`). Valid modes are exactly the keys of `MODE_COSTS`: `walking`, `wheelchair`, `car`, `tram`, `train`.
+
+**Key methods:**
+
+- **`load(graph_path=None)`** — loads `gothenburg_graph.json`; auto-discovers path if None. Precomputes per-mode valid-node sets and connected-component labels (so `nearest_node` in car mode cannot snap onto a footway-only node, etc.).
+- **`nearest_node(x, z, *, mode='walking', component=None) -> str | None`** — brute-force nearest **mode-reachable** node by Euclidean XZ distance. When `component` is given, it is resolved against the mode-scoped labelling.
+- **`shortest_path(start_id, end_id, *, mode='walking') -> (list[str], float)`** — mode-aware Dijkstra. Edge weight is `dist_cm × MODE_COSTS[mode][class] × MODE_ACCESS_RULES[mode][access]`; `None` in either table skips the edge. The returned distance is **true metric distance in cm** (unweighted sum), so walking-time estimates stay accurate regardless of the cost multipliers.
+- **`edge_class(a, b) -> str | None`** — class string of the edge a→b (used by `OsmLegPlanner` to attach per-segment classes to the returned polyline).
+- **`path_to_coords(path) -> list[tuple[float,float,float]]`** / **`path_to_edge_classes(path) -> list[str]`** — parallel lists for the polyline and its per-edge class tags.
+- **`main_component_id(mode='walking') -> int | None`** / **`component_of(nid, mode='walking') -> int | None`** — connected-component queries, mode-scoped.
+- **`available_modes()`** — classmethod returning all modes from `MODE_COSTS` (includes `tram` and `train` after rail graph support).
+- **`estimate_walk_time(distance_cm) -> float`** — seconds at `DEFAULT_WALK_SPEED_M_PER_S = 1.3`
+- **`node_coords(nid) -> tuple | None`** — single node coordinate lookup
+- **`is_loaded`** — property, True after successful `load()`
+
+### osm_route_drawer (`osm_route_drawer.py`)
+
+Draws/clears the calculated route as a `UsdGeom.BasisCurves` ribbon on the **session layer** (keeps main scene clean).
+
+**Constants:**
+- `ROUTE_PRIM_PATH = "/World/OSM_Route"`
+- `ROUTE_COLOR = Gf.Vec3f(0.0, 0.95, 0.95)` — bright cyan
+- `ROUTE_WIDTH = 250.0` cm
+- `ROUTE_HOVER = 200.0` — route floats 2 m above terrain surface
+
+**Terrain following:** Route points use the Y values from the graph (terrain-baked via `bake_terrain_roads.py`) plus a `ROUTE_HOVER` offset. No runtime raycasts needed — the graph already contains accurate terrain surface heights. Subdivision between graph nodes uses linear Y interpolation.
+
+**Functions:**
+- **`draw_route(stage, coords)`** — creates a single linear BasisCurves prim; replaces any existing route
+- **`clear_route(stage)`** — removes the route prim from the session layer
+
+### OsmNavigationExtension (`extension.py`)
+
+Orchestrates the full flow: loads graph + POIs, listens for events, calculates routes, manages road network visibility.
+
+**Startup:**
+1. Creates `OsmGraphService` instance (does **not** load the graph — deferred to first use)
+2. Subscribes to events
+3. Nothing else — roads are not in the scene, graph is not loaded, POIs are not converted
+4. Graph (large node count — same order as `gothenburg_graph.json`) and POIs lazy-load on first `osmNavigateSetPoi` event (when user selects a POI in the city navigate widget)
+
+**Road network management (active/inactive):**
+- Road network (`/World/OSM_Roads`) is `active = false` in the USD layer — composed but not rendered at startup
+- The extension calls `prim.SetActive(True)` when the user toggles the road map on
+- Calls `prim.SetActive(False)` when toggling off, clearing the route, or closing the widget
+- Route calculation does **not** auto-activate the road network — only the cyan route line appears over the terrain
+- No payload orchestrator involvement for OSM roads — `prim.SetActive()` on `/World/OSM_Roads` only
+- Internal `_map_visible` flag tracks current state
+
+**Prim offset compensation:**
+The `/World/OSM_Roads` prim may have a USD translate. The extension reads this translate at route-calculation time via `_get_roads_offset()` and applies it:
+- Subtracts the offset from click/POI world coordinates before `nearest_node()` lookup (world → graph space)
+- Adds the offset back to graph path coordinates before drawing the route (graph → world space)
+With terrain-baked roads, the translate is `(0, 0, 0)` and offset compensation is a no-op — graph coords = world coords. The mechanism is preserved for backward compatibility if someone repositions the prim in Composer.
+
+## Event flow
+
+### Calculate route
+1. Web: user opens City Navigate widget, picks a movement mode (`By foot` / `Wheelchair` / `Car`), selects POI from dropdown
+2. Web sends `osmNavigateSetMode { mode }` → Kit stores `self._mode`
+3. Web sends `osmNavigateSetPoi { poiId }` → Kit stores target POI
+4. Web: user clicks on map → `younite.pick.request { intent: "osmNavigate", ndcX, ndcY }`
+5. Picking extension raycasts, dispatches `younite.pick.result` with `intent: "osmNavigate"` and world coords
+6. Kit: `_calculate_route(start_x, start_z)` (also re-runs on later `osmNavigateSetMode` via the cached `_last_click_xz`):
+   - Finds nearest **mode-reachable** graph nodes to click point and POI destination (`nearest_node(mode=self._mode)`)
+   - Runs mode-aware Dijkstra (`shortest_path(mode=self._mode)`)
+   - Draws cyan route line via `osm_route_drawer.draw_route()`
+   - Dispatches `osmRouteResult` to web with true metric distance/time
+
+### Clear route
+1. Web: user clicks "Clear Route" or closes widget → sends `osmNavigateClear {}`
+2. Kit: clears route prim; if the road map was visible, deactivates `/World/OSM_Roads` via `SetActive(false)` (same path as toggle — not the Payload Orchestrator)
+
+## Events
+
+| Event | Direction | Payload | Purpose |
+|---|---|---|---|
+| `osmNavigateSetPoi` | Web → Kit | `{ poiId: string }` | Set destination POI |
+| `osmNavigateSetMode` | Web → Kit | `{ mode: "walking" \| "wheelchair" \| "car" \| … }` | Set movement mode (dev widget: foot / wheelchair / car). Payload must be in `OsmGraphService.available_modes()`; Kit recomputes the current route if one is drawn. |
+| `osmNavigateClear` | Web → Kit | `{}` | Clear route, reset mode to `walking`, deactivate road network |
+| `osmNavigateToggleMap` | Web → Kit | `{ visible: bool }` | Activate / deactivate road network prim |
+| `younite.pick.result` | Kit internal | `{ intent: "osmNavigate", hit: { world: {x,y,z} } }` | Click position for route start |
+| `osmRouteResult` | Kit → Web | `{ success, distanceMeters, estimatedTimeSeconds, poiId }` | Route calculation result |
+| `playerPathClassChange` | Kit → Web (outbound) | `{ prev, next, segIdx, routeId }` | Fired by `PointClickAutoMover` on every path-class transition as the player walks a route (navmesh → bridge → pedestrian → residential → …). Logged to the console behind `_LOG_PATH_CLASS = True` in `auto_mover.py`. Currently emitted but unsubscribed — the channel is pre-wired for future context-aware behaviours (street-traffic SFX, entrance affordances, mode-aware camera). |
+
+## Frontend files
+
+- **`OsmNavigateWidget.tsx`** — floating panel: three-button mode toggle (`By foot` / `Wheelchair` / `Car` — internal values `walking` / `wheelchair` / `car`), POI dropdown, route info (distance + walk time), clear button
+- **`useOsmNavigation.ts`** — state: `osmNavigateOpen`, `osmSelectedPoiId`, `osmSelectedMode`, `osmRouteInfo`, `osmMapVisible`; handlers: `handleOsmPoiSelect`, `handleOsmModeSelect`, `handleOsmClear`, `handleOsmNavigateClose`, `handleOsmToggleMap`. `osmSelectedMode` defaults to `walking` and resets on clear/close.
+- **`useCustomEventHandler.ts`** — processes `osmRouteResult` events
+- **`StreamOnlyWindow.tsx`** — renders widget when `osmNavigateOpen`, passes `osmNavigateActive` to `AppStream`
+- **`AppStream.tsx`** — sends pick requests with `intent: "osmNavigate"` when `osmNavigateActive`
+- **`UIControls.tsx`** — "City navigate" button in hamburger menu toggles the widget
+
+> **Display labels vs. internal identifiers**: the City Navigate UI labels (`By foot`, `Wheelchair`, `Car`) map to `walking`, `wheelchair`, `car`. Those three identifiers are shared with dual-mode NavMesh (`NavMeshModeCache`, `RouteConfig.get_navmesh_mode()`) and must not be renamed. **`tram` and `train`** exist on the graph service for Kit-side callers (e.g. transit); they are not exposed in the City Navigate widget.
+
+## Production CU accessibility mode
+
+The existing production CU accessibility toggle (`By foot` / `Wheelchair`, wired through `NavMeshModeCache`) is automatically honoured on OSM legs — no separate production UI is needed:
+
+- `RouteComposer` resolves the active mode via `self._mode_cache.get_active_mode()` (`_active_osm_mode()` helper, defaults to `walking` if unavailable) and threads it into every `OsmLegPlanner.plan()` call site (navmesh→osm, osm→navmesh, cross-navmesh, osm→osm).
+- `bird_eye_pin_service.osm.BirdEyePinOsmSnap.snap_click()` reads the same mode when snapping a click to an OSM node, so outside-the-arena taps in wheelchair mode snap onto a wheelchair-reachable node and are routed over step-free paths.
+- The dev-widget `osmNavigateSetMode` event only affects the standalone dev route; it does not override production CU state.
+
+## Expanding this feature
+
+### Adding new POIs
+Add entries to `source/data/geo_layer/example_geo_data.json` with `id`, `lat`, `lon`. Also add to the `POIS` array in `OsmNavigateWidget.tsx`.
+
+### Extending the road or rail network
+Edit the Overpass query / `HIGHWAY_FILTER` / railway `RAILWAY_VALUE_TO_VISUAL` / `ROAD_STYLES` in `generate_roads.py`, then **`python generate_roads.py --force`** (or `OSM_FORCE_REFETCH=1`) and **`bake_roads.bat`**. Skipping the bake leaves ellipsoid Y in the graph.
+
+### Re-baking after terrain changes
+Run `bake_roads.bat` (optionally `<scene_name>`). The batch navigates to `kit-app-template-main`, builds, launches Kit headlessly, applies temporary terrain colliders, disables non-terrain colliders, raycasts all cached nodes with multi-pass penetration and grade-based spike removal, and writes `gothenburg_roads.usda` + `gothenburg_graph.json`. Reuses `osm_cache.json`. Runtime is typically a few minutes on a workstation (Kit may exit with a non-zero code on PhysX teardown while files are valid — see batch file notes).
+
+### Using OsmGraphService from other extensions
+```python
+from younite.osm_navigation_extension.osm_graph_service import OsmGraphService
+
+graph = OsmGraphService()
+graph.load()
+
+mode = "wheelchair"
+start = graph.nearest_node(scene_x, scene_z, mode=mode)
+end = graph.nearest_node(dest_x, dest_z, mode=mode)
+path, dist_cm = graph.shortest_path(start, end, mode=mode)
+coords = graph.path_to_coords(path)
+classes = graph.path_to_edge_classes(path)
+walk_seconds = graph.estimate_walk_time(dist_cm)
+```
+
+### Custom route visualization
+Use `osm_route_drawer` as a reference or call it directly:
+```python
+from younite.osm_navigation_extension import osm_route_drawer
+osm_route_drawer.draw_route(stage, coords)
+osm_route_drawer.clear_route(stage)
+```
+
+## Related
+
+- Live transit (tram routes on OSM graph, env vars): `.cursor/rules/topics/transit-live-overlay.mdc`
+- Cesium geolocation & coordinate service: `.cursor/rules/topics/cesium-geolocation.mdc`
+- NavMesh local pathfinding: `.cursor/rules/topics/navmesh-areas.mdc`
+- Route measurement (NavMesh-based): `.cursor/rules/topics/route-measurement.mdc`
+- Geo POI data: `younite.geo_poi_extension`, `source/data/geo_layer/example_geo_data.json`
+- Coordinate conversion: `GeoCoordinateService` in `younite.usd_viewer_stage_core_extension`
+- Payload orchestrator (visibility): `.cursor/rules/topics/payload-orchestrator.mdc`
+- Bird-eye pin anywhere (OSM bridge when user taps outside the arena NavMesh — reuses `OsmGraphService` for entrance-to-click routing and drives auto-move via synthetic `navmeshRouteWaypoints`): `.cursor/rules/topics/bird-eye-pin-anywhere.mdc`

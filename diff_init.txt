@@ -1,0 +1,181 @@
+08fd061d Added dual navmesh mode
+diff --git a/kit-app-template-main/source/extensions/younite.navmesh_route_extension/younite/navmesh_route_extension/services/kit_services/route_engine.py b/kit-app-template-main/source/extensions/younite.navmesh_route_extension/younite/navmesh_route_extension/services/kit_services/route_engine.py
+index d7a0a00d..0b9c20bb 100644
+--- a/kit-app-template-main/source/extensions/younite.navmesh_route_extension/younite/navmesh_route_extension/services/kit_services/route_engine.py
++++ b/kit-app-template-main/source/extensions/younite.navmesh_route_extension/younite/navmesh_route_extension/services/kit_services/route_engine.py
+@@ -66,6 +66,13 @@ class RouteConfig:
+     recalc_interval: float = 5.0
+     position_recalc_threshold: float = 10.0
+     via_points: List[Tuple[float, float, float]] = None  # type: ignore[assignment]
++    # Callable returning the INavMesh handle this route should query (or None
++    # for "use Kit's active navmesh"). Supplied by NavMeshRouteService so
++    # wheelchair/walking POI meshes can be selected instantly per mode.
++    get_navmesh_override: Optional[Callable[[], Optional[object]]] = None
++    # Callable returning the active mode name ('walking' | 'wheelchair') for
++    # logging only. Returns None if the mode cache isn't wired up.
++    get_navmesh_mode: Optional[Callable[[], Optional[str]]] = None
+ 
+     def __post_init__(self):
+         if self.via_points is None:
+@@ -178,6 +185,29 @@ class RouteInstance:
+     def _is_prim_path(ref: Any) -> bool:
+         return isinstance(ref, str)
+ 
++    def _resolve_navmesh_override(self) -> Optional[object]:
++        """Return the cached ``INavMesh`` handle this route should query, or None."""
++        cb = self._cfg.get_navmesh_override
++        if cb is None:
++            return None
++        try:
++            return cb()
++        except Exception:
++            return None
++
++    def _mode_log_tag(self) -> str:
++        """Return a short ' mesh=<mode>' suffix for log lines, or '' if unknown."""
++        cb = self._cfg.get_navmesh_mode
++        if cb is None:
++            return ""
++        try:
++            mode = cb()
++        except Exception:
++            return ""
++        if not mode:
++            return ""
++        return f" mesh={mode}"
++
+     def _wants_validated_straighten(self) -> bool:
+         """Validated XZ straightening for walking routes (player, seat, exit, restroom, etc.)."""
+         return True
+@@ -193,6 +223,7 @@ class RouteInstance:
+         end_ref: Vec3Ref,
+         start_use_ground: bool,
+         all_costs: Dict[str, float],
++        navmesh_override: Optional[object] = None,
+     ) -> Tuple[bool, List[Tuple[float, float, float]], Optional[str], Optional[RouteMeasure]]:
+         """Run on a worker thread. Checks gen before the expensive native call."""
+         try:
+@@ -205,6 +236,7 @@ class RouteInstance:
+                 camera_area_costs=all_costs if all_costs else None,
+                 apply_navmesh_validated_straighten=True,
+                 is_stale=lambda: my_gen != self._player_calc_gen,
++                navmesh_override=navmesh_override,
+             )
+             if my_gen != self._player_calc_gen:
+                 return False, [], "superseded", None
+@@ -230,7 +262,7 @@ class RouteInstance:
+         if not ok:
+             self._dirty = False
+             self._dispatch_waypoints(self._cfg.route_id, False, [], err or "Path calculation failed", measure)
+-            print(f"[NAVMESH_ROUTE:{self._cfg.route_id}] Initial calc failed: {err}")
++            print(f"[NAVMESH_ROUTE:{self._cfg.route_id}] Initial calc failed: {err}{self._mode_log_tag()}")
+             return
+         if self._cfg.draw_path and points:
+             from pxr import Gf
+@@ -242,7 +274,7 @@ class RouteInstance:
+         self._cache_positions()
+         self._dirty = False
+         self._dispatch_waypoints(self._cfg.route_id, True, points, None, measure)
+-        print(f"[NAVMESH_ROUTE:{self._cfg.route_id}] Path calculated: {len(points)} waypoints (draw={self._cfg.draw_path})")
++        print(f"[NAVMESH_ROUTE:{self._cfg.route_id}] Path calculated: {len(points)} waypoints (draw={self._cfg.draw_path}){self._mode_log_tag()}")
+ 
+     async def _do_player_compute_for_gen(self, my_gen: int) -> None:
+         """Run pathfind in a thread with a 1s timeout safety cap."""
+@@ -259,6 +291,7 @@ class RouteInstance:
+         if sc:
+             merged.update(sc)
+         loop = asyncio.get_running_loop()
++        override = self._resolve_navmesh_override()
+         thread_call = functools.partial(
+             self._player_compute_in_thread,
+             my_gen,
+@@ -266,6 +299,7 @@ class RouteInstance:
+             self._cfg.end_ref,
+             bool(self._cfg.start_use_ground),
+             merged,
++            override,
+         )
+         try:
+             result = await asyncio.wait_for(
+@@ -391,6 +425,7 @@ class RouteInstance:
+     def _compute_multi_segment(
+         self,
+         all_costs: Dict[str, float],
++        navmesh_override: Optional[object] = None,
+     ) -> Tuple[bool, List[Tuple[float, float, float]], Optional[str]]:
+         """Compute a multi-segment path through via_points and concatenate."""
+         try:
+@@ -414,6 +449,7 @@ class RouteInstance:
+                 start_use_ground=self._cfg.start_use_ground,
+                 camera_area_costs=all_costs if all_costs else None,
+                 apply_navmesh_validated_straighten=False,
++                navmesh_override=navmesh_override,
+             )
+             if not ok:
+                 return False, [], err
+@@ -434,6 +470,7 @@ class RouteInstance:
+                 start_use_ground=use_ground,
+                 camera_area_costs=all_costs if all_costs else None,
+                 apply_navmesh_validated_straighten=False,
++                navmesh_override=navmesh_override,
+             )
+             if not ok:
+                 return False, [], f"Segment {seg_idx} failed: {err}"
+@@ -456,11 +493,12 @@ class RouteInstance:
+         if snd_costs:
+             all_costs.update(snd_costs)
+         do_measure = (self._cfg.route_id != "player") and self._get_route_measure_enabled()
++        override = self._resolve_navmesh_override()
+ 
+         has_via = bool(self._cfg.via_points)
+ 
+         if has_via:
+-            success, points, error = self._compute_multi_segment(all_costs)
++            success, points, error = self._compute_multi_segment(all_costs, navmesh_override=override)
+             measure = None
+             if success and do_measure and points:
+                 from ...scripts.navmesh_shortest_path import path_length_cm, estimate_walk_time_seconds
+@@ -482,6 +520,7 @@ class RouteInstance:
+                 sound_area_costs=snd_costs if snd_costs else None,
+                 include_base=True,
+                 speed_m_per_s=DEFAULT_WALK_SPEED_M_PER_S,
++                navmesh_override=override,
+             )
+         else:
+             success, points_gf, error = calculate_path_points(
+@@ -490,6 +529,7 @@ class RouteInstance:
+                 start_use_ground=self._cfg.start_use_ground,
+                 camera_area_costs=all_costs if all_costs else None,
+                 apply_navmesh_validated_straighten=self._wants_validated_straighten(),
++                navmesh_override=override,
+             )
+             points = [(float(p[0]), float(p[1]), float(p[2])) for p in points_gf] if success and points_gf else []
+             measure = None
+@@ -643,8 +683,13 @@ class RouteInstance:
+         try:
+             from .navmesh_bake_utils import wait_for_navmesh_ready
+ 
+-            if not await wait_for_navmesh_ready(log_prefix=f"NAVMESH_ROUTE:{self._cfg.route_id}"):
+-                print(f"[NAVMESH_ROUTE:{self._cfg.route_id}] Timeout waiting for navmesh bake; attempting anyway...")
++            # If the mode cache already has a handle for this route, skip the
++            # blocking wait entirely ÔÇö the cached mesh is valid even if a
++            # concurrent orchestrator rebake is in flight for the "active"
++            # NavMesh; routing continues on the existing cached meshes.
++            if self._resolve_navmesh_override() is None:
++                if not await wait_for_navmesh_ready(log_prefix=f"NAVMESH_ROUTE:{self._cfg.route_id}"):
++                    print(f"[NAVMESH_ROUTE:{self._cfg.route_id}] Timeout waiting for navmesh bake; attempting anyway...")
+             if self._cfg.route_id == "player":
+                 g = self._next_player_calc_gen()
+                 await self._do_player_compute_for_gen(g)
+@@ -652,9 +697,9 @@ class RouteInstance:
+             ok, points, err, measure = self._compute_and_optionally_draw()
+             self._dispatch_waypoints(self._cfg.route_id, ok, points, err, measure)
+             if ok:
+-                print(f"[NAVMESH_ROUTE:{self._cfg.route_id}] Path calculated: {len(points)} waypoints (draw={self._cfg.draw_path})")
++                print(f"[NAVMESH_ROUTE:{self._cfg.route_id}] Path calculated: {len(points)} waypoints (draw={self._cfg.draw_path}){self._mode_log_tag()}")
+             else:
+-                print(f"[NAVMESH_ROUTE:{self._cfg.route_id}] Initial calc failed: {err}")
++                print(f"[NAVMESH_ROUTE:{self._cfg.route_id}] Initial calc failed: {err}{self._mode_log_tag()}")
+         except asyncio.CancelledError:
+             raise
+         except Exception as e:

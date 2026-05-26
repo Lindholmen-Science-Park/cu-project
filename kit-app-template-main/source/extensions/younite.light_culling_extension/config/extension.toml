@@ -1,0 +1,22 @@
+[package]
+title = "Younite Light Culling Extension"
+description = "Distance-based light visibility culling with per-group cull distances"
+version = "0.1.0"
+authors = ["Younite"]
+keywords = ["light", "culling", "performance", "visibility"]
+category = "Performance"
+
+[dependencies]
+"omni.usd" = {}
+"younite.messaging_core_extension" = {}
+"younite.usd_viewer_stage_core_extension" = {}
+"younite.usd_viewer_player_core_extension" = {}
+
+[[python.module]]
+name = "younite.light_culling_extension"
+
+[build]
+include = [
+    "younite/**/*.py",
+    "config/*.toml",
+]

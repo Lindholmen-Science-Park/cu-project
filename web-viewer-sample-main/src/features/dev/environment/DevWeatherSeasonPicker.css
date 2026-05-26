@@ -1,0 +1,129 @@
+.dev-weather-season-widget {
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    width: 300px;
+    background: rgba(0, 0, 0, 0.9);
+    border: 2px solid #76b900;
+    border-radius: 12px;
+    padding: 0;
+    z-index: 1000;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(10px);
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    color: #ffffff;
+    user-select: none;
+}
+
+.dev-weather-season-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 20px;
+    border-bottom: 1px solid #333;
+    background: linear-gradient(135deg, #76b900, #5a9a00);
+    border-radius: 10px 10px 0 0;
+}
+
+.dev-weather-season-title {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 600;
+    color: #000000;
+    text-shadow: 0 1px 2px rgba(255, 255, 255, 0.3);
+}
+
+.dev-weather-season-close {
+    background: none;
+    border: none;
+    color: #ffffff;
+    font-size: 18px;
+    font-weight: bold;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: background-color 0.2s ease;
+    line-height: 1;
+}
+
+.dev-weather-season-close:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+}
+
+.dev-weather-season-content {
+    padding: 16px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.dev-weather-season-section-label {
+    font-size: 13px;
+    font-weight: 500;
+    color: #aaa;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin: 0;
+}
+
+.dev-weather-season-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.dev-weather-season-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border: 1px solid #555;
+    border-radius: 8px;
+    background: #222;
+    color: #ccc;
+    cursor: pointer;
+    font-size: 13px;
+    font-family: inherit;
+    transition: background 0.2s, border-color 0.2s, color 0.2s, transform 0.15s;
+}
+
+.dev-weather-season-btn:hover {
+    background: #333;
+    border-color: #76b900;
+    color: #fff;
+}
+
+.dev-weather-season-btn.active {
+    background: #76b900;
+    border-color: #76b900;
+    color: #000;
+    font-weight: 600;
+}
+
+.dev-weather-season-btn.active:hover {
+    background: #8dd400;
+}
+
+.dev-weather-season-btn:active {
+    transform: scale(0.96);
+}
+
+.dev-weather-season-btn-icon {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+@media (max-width: 768px) {
+    .dev-weather-season-widget {
+        top: 10px;
+        left: 10px;
+        right: 10px;
+        width: auto;
+        max-width: 350px;
+    }
+}

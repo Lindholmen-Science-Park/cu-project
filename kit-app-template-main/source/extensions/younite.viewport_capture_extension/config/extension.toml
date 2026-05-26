@@ -1,0 +1,18 @@
+[package]
+title = "Younite Viewport Capture Extension"
+description = "Captures the Kit viewport at full GPU resolution and sends the image to the web client"
+version = "0.1.0"
+authors = ["Younite"]
+keywords = ["viewport", "capture", "screenshot"]
+category = "Feature"
+
+[dependencies]
+"younite.messaging_core_extension" = {}
+"omni.usd" = {}
+"omni.kit.viewport.utility" = {}
+
+[[python.module]]
+name = "younite.viewport_capture_extension"
+
+[build]
+include = ["younite/**/*.py", "*.toml"]

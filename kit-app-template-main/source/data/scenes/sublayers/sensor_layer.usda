@@ -1,0 +1,26 @@
+#usda 1.0
+
+over "OmniverseKit_Persp"
+{
+    custom uniform vector3d omni:kit:centerOfInterest = (0, 0, -282.9879304909134)
+}
+
+over "World"
+{
+    def Camera "sensor_camera_01" (
+        prepend apiSchemas = ["OmniRtxCameraAutoExposureAPI_1", "OmniRtxCameraExposureAPI_1"]
+    )
+    {
+        float2 clippingRange = (1, 10000000)
+        float exposure:responsivity = 1.1026709
+        float exposure:time = 0.02
+        float focalLength = 18.147562
+        float focusDistance = 400
+        custom uniform vector3d omni:kit:centerOfInterest = (0, 0, -400)
+        double3 xformOp:rotateYXZ = (2.4506419457682966, -97.93233118458218, -17.059862811919004)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (-2158.141969474642, 2500.553222656252, -4141.745310160889)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateYXZ", "xformOp:scale"]
+    }
+}
+

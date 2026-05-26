@@ -1,0 +1,23 @@
+[package]
+title = "Younite Messaging Core Extension"
+description = "Core Events 2.0 messaging bridge + outbound registration utilities"
+version = "0.1.0"
+authors = ["Younite"]
+keywords = ["messaging", "webrtc", "livestream", "events"]
+category = "Core"
+
+[dependencies]
+"omni.kit.livestream.messaging" = {}  # REQUIRED: wrapper events + outbound forwarding registration
+"omni.kit.livestream.app" = {}  # optional (streaming app)
+"omni.kit.livestream.webrtc" = {}  # optional (transport)
+
+[[python.module]]
+name = "younite.messaging_core_extension"
+
+[build]
+include = [
+    "younite/**/*.py",
+    "*.md",
+    "*.toml",
+]
+

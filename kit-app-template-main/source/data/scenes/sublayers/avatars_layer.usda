@@ -1,0 +1,25 @@
+#usda 1.0
+(
+    customLayerData = {
+        string description = "Avatars layer for main_scene."
+    }
+)
+
+over "World"
+{
+    def Xform "Red" (
+        displayName = "Red"
+    )
+    {
+        quatf xformOp:orient = (0.69889325, -1.9970475e-16, -0.715226, -6.743139e-17)
+        float3 xformOp:scale = (0.8250234, 0.8250234, 1)
+        double3 xformOp:translate = (-4203.029447903849, 2255.534545377493, -6104.411544911045)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
+    }
+}
+
+over "OmniverseKit_Persp"
+{
+    custom uniform vector3d omni:kit:centerOfInterest = (0, 0, -468.3872580151628)
+}
+

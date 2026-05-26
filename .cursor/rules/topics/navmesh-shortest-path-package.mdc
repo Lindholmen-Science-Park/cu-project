@@ -1,0 +1,22 @@
+---
+description: NavMesh shortest path Python package — split modules for pathfinding, metrics, FP sphere trail, and route-end flag; public import surface unchanged.
+---
+
+# NavMesh shortest path package (Kit)
+
+**Location**: `younite/navmesh_route_extension/scripts/navmesh_shortest_path/` (package; import `from ...scripts.navmesh_shortest_path import …` as before).
+
+| Module | Responsibility |
+|--------|----------------|
+| `constants.py` | Tunables (sphere spacing, straighten budgets, flag names, offsets). |
+| `types.py` | `Vec3Ref` (prim path, triple, or USD vec). |
+| `position_resolve.py` | `resolve_position`, `get_world_translation`, `get_ground_position`. |
+| `path_metrics.py` | `path_length_cm`, `estimate_walk_time_seconds`, `smooth_path_xz`. |
+| `navmesh_pathfind.py` | `calculate_path_points`, `navmesh_path_length_cm`, area costs, validated straightening. |
+| `route_end_flag.py` | Flag asset cache, `set_route_flag_data_root`, `update_route_end_flag`. |
+| `path_visualization.py` | `draw_path_curve`, `remove_path_curve`, standalone `calculate_path` / `main`. |
+| `__init__.py` | Re-exports the public API. |
+
+**Related topics**: path refinement stages → `navmesh-path-refinement.mdc`; end marker → `route-end-flag.mdc`; unified A→B planner → `route-composer.mdc`; distance/time helpers → `route-measurement.mdc`.
+
+**Logging**: Standalone `calculate_path(..., verbose=True)` prints one line per outcome (`start` / `end` / `prim` / `nav_points`). Route-end flag startup lines remain in `set_route_flag_data_root`. Failures in `remove_path_curve` go to `carb.log_warn`.

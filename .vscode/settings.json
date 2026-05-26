@@ -1,0 +1,30 @@
+{
+  /* Pulled Nucleus paths are .gitignored; Quick Open skips them unless search.useIgnoreFiles is false.
+     We set false and list heavy dirs in search.exclude so node_modules / dist / extscache stay excluded. */
+  "git.ignoreLimitWarning": true,
+  "search.useIgnoreFiles": false,
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/node_modules/**": true,
+    "**/bower_components": true,
+    "**/.git": true,
+    "**/__pycache__": true,
+    "**/__pycache__/**": true,
+    "**/*.pyc": true,
+    "web-viewer-sample-main/dist": true,
+    "web-viewer-sample-main/dist/**": true,
+    "web-viewer-sample-main/dist-ssr": true,
+    "web-viewer-sample-main/dist-ssr/**": true,
+    "kit-app-template-main/source/extscache": true,
+    "kit-app-template-main/source/extscache/**": true,
+    "kit-app-template-main/_*": true,
+    "_tmp_*": true,
+    "_tmp_*/**": true,
+    "**/.env": true,
+    "**/.env.*": true,
+    "**/*.etli": true,
+    "logs": true,
+    "**/logs": true,
+    "**/logs/**": true
+  }
+}

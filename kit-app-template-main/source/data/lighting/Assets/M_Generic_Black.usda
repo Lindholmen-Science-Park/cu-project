@@ -1,0 +1,54 @@
+#usda 1.0
+(
+    defaultPrim = "M_Generic_Black"
+    upAxis = "Z"
+)
+
+def Material "M_Generic_Black"
+{
+    token inputs:stPrimvarName = "st"
+    token outputs:surface.connect = </M_Generic_Black/SurfaceShader.outputs:surface>
+    token outputs:unreal:surface.connect = </M_Generic_Black/UnrealShader.outputs:out>
+
+    def Shader "UnrealShader"
+    {
+        uniform token info:implementationSource = "sourceAsset"
+        uniform asset info:unreal:sourceAsset = @/Game/4_Materials/Generic/M_Generic_Black.M_Generic_Black@
+        token outputs:out
+    }
+
+    def Shader "SurfaceShader"
+    {
+        uniform token info:id = "UsdPreviewSurface"
+        float inputs:anisotropy = 0
+        color3f inputs:diffuseColor = (0.03688945, 0.03688945, 0.03688945)
+        color3f inputs:emissiveColor = (0, 0, 0)
+        float inputs:metallic = 0
+        normal3f inputs:normal = (0.49803925, -0.49803925, 1)
+        float inputs:occlusion = 1
+        float inputs:roughness.connect = </M_Generic_Black/roughnessTexture.outputs:r>
+        float inputs:specular = 0.49803925
+        normal3f inputs:tangent = (1, -0.49803925, 0.49803925)
+        token outputs:surface
+    }
+
+    def Shader "PrimvarReader"
+    {
+        uniform token info:id = "UsdPrimvarReader_float2"
+        string inputs:varname.connect = </M_Generic_Black.inputs:stPrimvarName>
+        token outputs:result
+    }
+
+    def Shader "roughnessTexture"
+    {
+        uniform token info:id = "UsdUVTexture"
+        float4 inputs:fallback = (0.5, 0.5, 0.5, 1)
+        asset inputs:file = @Textures/M_Generic_Black_Roughness.png@
+        token inputs:sourceColorSpace = "raw"
+        float2 inputs:st.connect = </M_Generic_Black/PrimvarReader.outputs:result>
+        token inputs:wrapS = "repeat"
+        token inputs:wrapT = "repeat"
+        float outputs:r
+    }
+}
+

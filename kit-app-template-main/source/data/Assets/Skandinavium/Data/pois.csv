@@ -1,0 +1,162 @@
+﻿id;category;label;plan_copy;dxf_x_mm;dxf_y_mm;dxf_layer;text_height_mm;source_entity;raw_text
+hall_main_001;hall;FOAJÉ;main;-34354.32;37354.04;A120-300;500.03;MTEXT;FOAJÉ
+hall_main_002;hall;FOAJÉ;main;32673.54;37293.54;A120-300;500.03;MTEXT;FOAJÉ
+storage_main_001;storage;FÖRRÅD;main;43849.94;11495.2;A120-300;500.03;MTEXT;FÖRRÅD
+storage_main_002;storage;FÖRRÅD;main;45490.66;6008.64;A120-300;500.03;MTEXT;FÖRRÅD
+storage_main_003;storage;FÖRRÅD;main;43780.97;-11121.43;A120-300;500.03;MTEXT;FÖRRÅD
+restroom_accessible_main_001;restroom_accessible;HWC;main;39919.86;-21325.17;A120-300;500.03;MTEXT;HWC
+storage_main_004;storage;FÖRRÅD;main;33750.8;-24718.13;A120-300;500.03;MTEXT;FÖRRÅD
+hall_main_003;hall;FOAJÉ;main;32629.15;-37817.92;A120-300;500.03;MTEXT;FOAJÉ
+restroom_women_main_001;restroom_women;DAMTOALETT;main;22287.39;-31082.5;A120-300;500.03;MTEXT;DAMTOALETT
+storage_main_005;storage;FÖRRÅD;main;16392.99;-28942.59;A120-300;500.03;MTEXT;FÖRRÅD
+storage_main_006;storage;FÖRRÅD;main;18148.0;-32431.99;A120-300;500.03;MTEXT;FÖRRÅD
+restroom_generic_main_001;restroom_generic;WC;main;15830.75;-30293.35;A120-300;500.03;MTEXT;WC
+restroom_generic_main_002;restroom_generic;WC;main;17359.65;-30756.75;A120-300;500.03;MTEXT;WC
+hall_main_004;hall;FOAJÉ;main;-34369.37;-37817.92;A120-300;500.03;MTEXT;FOAJÉ
+restroom_women_main_002;restroom_women;DAMTOALETT;main;4889.31;-34659.46;A120-300;500.03;MTEXT;DAMTOALETT
+storage_main_007;storage;FÖRRÅD;main;4900.95;-30832.86;A120-300;500.03;MTEXT;FÖRRÅD
+restroom_men_main_001;restroom_men;HERRTOALETT;main;-8842.95;-33379.89;A120-300;500.03;MTEXT;HERRTOALETT
+elevator_main_001;elevator;HISS 5;main;40415.89;38394.2;A120-300;500.03;MTEXT;HISS 5
+elevator_main_002;elevator;HISS 6;main;-20345.83;-45048.94;A120-300;500.03;MTEXT;HISS 6
+stair_main_001;stair;TRAPPA;main;46859.69;45869.84;A120-300;500.03;MTEXT;TRAPPA
+stair_main_002;stair;TRAPPA E;main;-15641.73;48376.37;A120-300;500.03;MTEXT;TRAPPA E
+stair_main_003;stair;TRAPPA H;main;13038.41;48276.37;A120-300;500.03;MTEXT;TRAPPA H
+kiosk_main_001;kiosk;KIOSK 1:1;main;18148.0;-34496.85;A120-300;500.03;MTEXT;KIOSK 1:1
+stair_main_004;stair;TRAPPA P;main;12918.27;-48731.6;A120-300;500.03;MTEXT;TRAPPA P
+stair_main_005;stair;TRAPPA S;main;-15858.58;-48834.33;A120-300;500.03;MTEXT;TRAPPA S
+restroom_women_main_003;restroom_women;DAMTOALETT;main;5400.0;-34341.5;A120;175.0;MTEXT;DAMTOALETT
+storage_main_008;storage;FÖRRÅD;main;5400.0;-30741.5;A120;175.0;MTEXT;FÖRRÅD
+storage_main_009;storage;FÖRRÅD;main;16800.0;-28941.5;A120;175.0;MTEXT;FÖRRÅD
+storage_main_010;storage;FÖRRÅD;main;18419.46;-32280.28;A120;175.0;MTEXT;FÖRRÅD
+kiosk_main_002;kiosk;KIOSK 1:1;main;16800.0;-34640.4;A120;175.0;MTEXT;KIOSK 1:1
+restroom_women_main_004;restroom_women;DAMTOALETT;main;22800.0;-31341.5;A120;175.0;MTEXT;DAMTOALETT
+storage_main_011;storage;FÖRRÅD;main;34200.0;-24741.5;A120;175.0;MTEXT;FÖRRÅD
+restroom_accessible_main_002;restroom_accessible;HWC;main;39600.0;-21441.5;A120;175.0;MTEXT;HWC
+hall_main_005;hall;FOAJÉ;main;33000.0;-37641.5;A120;175.0;MTEXT;FOAJÉ
+hall_main_006;hall;FOAJÉ;main;-33600.0;-37641.5;A120;175.0;MTEXT;FOAJÉ
+storage_main_012;storage;FÖRRÅD;main;45900.0;6458.5;A120;175.0;MTEXT;FÖRRÅD
+storage_main_013;storage;FÖRRÅD;main;44400.0;11858.5;A120;175.0;MTEXT;FÖRRÅD
+hall_main_007;hall;FOAJÉ;main;33000.0;37358.5;A120;175.0;MTEXT;FOAJÉ
+entrance_stand_main_001;entrance_stand;LÄKTARENTRÉ;main;-5400.0;33158.5;A120;175.0;MTEXT;LÄKTARENTRÉ
+hall_main_008;hall;FOAJÉ;main;-33600.0;37358.5;A120;175.0;MTEXT;FOAJÉ
+stair_main_006;stair;TRAPPA P;main;13800.0;-48741.5;A120;175.0;MTEXT;TRAPPA P
+stair_main_007;stair;TRAPPA S;main;-14700.0;-48741.5;A120;175.0;MTEXT;TRAPPA S
+stair_main_008;stair;TRAPPA H;main;17670.2;48458.5;A120;175.0;MTEXT;TRAPPA H
+stair_main_009;stair;TRAPPA E;main;-14700.0;48458.5;A120;175.0;MTEXT;TRAPPA E
+restroom_generic_main_003;restroom_generic;WC;main;17566.46;-30279.19;A120;175.0;MTEXT;WC
+restroom_generic_main_004;restroom_generic;WC;main;16107.71;-30279.19;A120;175.0;MTEXT;WC
+elevator_main_003;elevator;HISS 5;main;41042.35;37784.16;A120;175.0;MTEXT;HISS 5
+elevator_main_004;elevator;HISS 6;main;-19794.37;-45658.98;A120;175.0;MTEXT;HISS 6
+stair_main_010;stair;TRAPPA;main;47186.15;45934.8;A120;175.0;MTEXT;TRAPPA
+hall_main_009;hall;FOAJÉ;main;33002.92;42356.71;A120;175.0;MTEXT;FOAJÉ
+restroom_wheelchair_main_001;restroom_wheelchair;RWC;main;-9054.09;36205.39;A-U-----T1-200;500.0;MTEXT;RWC
+restroom_generic_main_005;restroom_generic;TOALETT;main;-7156.76;36366.65;A-U-----T1-200;500.0;MTEXT;TOALETT
+restroom_generic_main_006;restroom_generic;TOALETT;main;-2430.79;33450.52;A-U-----T1-200;500.0;MTEXT;TOALETT
+kitchen_main_001;kitchen;KÖK;main;-56655.03;30781.21;A-U-----T1-200;500.0;MTEXT;KÖK
+office_main_001;office;KONTOR;main;-55202.42;17631.76;A-U-----T1-200;500.0;MTEXT;KONTOR
+elevator_main_005;elevator;HISS 4;main;-52278.72;22712.83;A-U-----T1-200;500.0;MTEXT;HISS 4
+elevator_main_006;elevator;HISS 7;main;-73660.25;12861.78;A-U-----T1-200;500.0;MTEXT;HISS 7
+elevator_main_007;elevator;HISS 2;main;-58493.41;6157.75;A-U-----T1-200;500.0;MTEXT;HISS 2
+kitchen_main_002;kitchen;PENTRY;main;-69618.1;15900.16;A-U-----T1-200;500.0;MTEXT;PENTRY
+storage_main_014;storage;FÖRRÅD;main;-50094.42;28193.77;A-U-----T1-200;500.0;MTEXT;FÖRRÅD
+restroom_generic_main_007;restroom_generic;WC;main;-61565.13;32351.39;A-U-----T1-200;500.0;MTEXT;WC
+technical_main_001;technical;ELC;main;-54895.54;5603.34;A-U-----T1-200;500.0;MTEXT;ELC
+hall_main_010;hall;FOAJÉ;main;-50873.21;-1504.73;A-U-----T1-200;500.0;MTEXT;FOAJÉ
+entrance_hall_main_001;entrance_hall;ENTRÉHALL;main;-65368.78;-5200.12;A-U-----T1-200;500.0;MTEXT;ENTRÉHALL
+entrance_main_main_001;entrance_main;GÄSTENTRÉ;main;-63270.98;-23748.27;A-U-----T1-200;500.0;MTEXT;GÄSTENTRÉ
+entrance_main_main_002;entrance_main;ENTRÉ;main;-51477.59;-27925.95;A-U-----T1-200;500.0;MTEXT;ENTRÉ
+entrance_stand_main_002;entrance_stand;LÄKTARENTRÉ B;main;-38518.09;12462.95;A-U-----T1-200;500.0;MTEXT;LÄKTARENTRÉ B
+entrance_stand_main_003;entrance_stand;LÄKTARENTRÉ C;main;-31181.21;25498.96;A-U-----T1-200;500.0;MTEXT;LÄKTARENTRÉ C
+entrance_stand_main_004;entrance_stand;LÄKTARENTRÉ D;main;-14759.58;31227.8;A-U-----T1-200;500.0;MTEXT;LÄKTARENTRÉ D
+entrance_main_main_003;entrance_main;ENTRÉ;main;-5428.01;31722.58;A-U-----T1-200;500.0;MTEXT;ENTRÉ
+entrance_stand_main_005;entrance_stand;LÄKTARENTRÉ G;main;9688.08;31227.8;A-U-----T1-200;500.0;MTEXT;LÄKTARENTRÉ G
+entrance_stand_main_006;entrance_stand;LÄKTARENTRÉ J;main;25018.26;24065.95;A-U-----T1-200;500.0;MTEXT;LÄKTARENTRÉ J
+entrance_stand_main_007;entrance_stand;LÄKTARENTRÉ K;main;36863.01;14863.91;A-U-----T1-200;500.0;MTEXT;LÄKTARENTRÉ K
+entrance_stand_main_008;entrance_stand;LÄKTARENTRÉ R;main;-14765.94;-30144.81;A-U-----T1-200;500.0;MTEXT;LÄKTARENTRÉ R
+entrance_stand_main_009;entrance_stand;LÄKTARENTRÉ T;main;-31053.15;-24217.2;A-U-----T1-200;500.0;MTEXT;LÄKTARENTRÉ T
+entrance_stand_main_010;entrance_stand;LÄKTARENTRÉ U;main;-47135.04;-17309.42;A-U-----T1-200;500.0;MTEXT;LÄKTARENTRÉ U
+entrance_stand_main_011;entrance_stand;LÄKTARENTRÉ A;main;-46474.46;-1081.88;A-U-----T1-200;500.0;MTEXT;LÄKTARENTRÉ A
+entrance_stand_main_012;entrance_stand;LÄKTARENTRÉ O;main;9543.5;-30434.62;A-U-----T1-200;500.0;MTEXT;LÄKTARENTRÉ O
+entrance_stand_main_013;entrance_stand;LÄKTARENTRÉ N;main;25591.71;-25180.4;A-U-----T1-200;500.0;MTEXT;LÄKTARENTRÉ N
+entrance_stand_main_014;entrance_stand;LÄKTARENTRÉ M;main;37741.65;-14395.6;A-U-----T1-200;500.0;MTEXT;LÄKTARENTRÉ M
+entrance_stand_main_015;entrance_stand;LÄKTARENTRÉ L;main;41886.05;-783.85;A-U-----T1-200;500.0;MTEXT;LÄKTARENTRÉ L
+kiosk_main_003;kiosk;KIOSK 3:1;main;-25670.87;33292.75;A-U-----T1-200;500.0;MTEXT;KIOSK 3:1
+restroom_women_main_005;restroom_women;DAMTOALETT;main;-26173.21;30741.7;A-U-----T1-200;500.0;MTEXT;DAMTOALETT
+storage_main_015;storage;FÖRRÅD;main;-19620.71;31479.52;A-U-----T1-200;500.0;MTEXT;FÖRRÅD
+kiosk_main_004;kiosk;KIOSK 2:1;main;17369.58;34329.15;A-U-----T1-200;500.0;MTEXT;KIOSK 2:1
+storage_main_016;storage;FÖRRÅD;main;16113.19;31496.0;A-U-----T1-200;500.0;MTEXT;FÖRRÅD
+storage_main_017;storage;FÖRRÅD;main;17064.04;28624.03;A-U-----T1-200;500.0;MTEXT;FÖRRÅD
+stair_main_011;stair;TRAPPHALL;main;23176.23;32988.81;A-U-----T1-200;500.0;MTEXT;TRAPPHALL
+elevator_main_008;elevator;HISS 1;main;22049.9;31088.49;A-U-----T1-200;500.0;MTEXT;HISS 1
+storage_main_018;storage;FÖRRÅD;main;21198.96;29382.48;A-U-----T1-200;500.0;MTEXT;FÖRRÅD
+restroom_women_main_006;restroom_women;DAMTOALETT;main;32908.27;25636.13;A-U-----T1-200;500.0;MTEXT;DAMTOALETT
+technical_main_002;technical;ELC;main;39888.22;20205.91;A-U-----T1-200;500.0;MTEXT;ELC
+storage_main_019;storage;FÖRRÅD;main;-18404.29;-31268.67;A-U-----T1-200;500.0;MTEXT;FÖRRÅD
+restroom_women_main_007;restroom_women;DAMTOALETT;main;-26604.18;-30342.07;A-U-----T1-200;500.0;MTEXT;DAMTOALETT
+kiosk_main_005;kiosk;KIOSK 4:1;main;-23544.77;-33672.87;A-U-----T1-200;500.0;MTEXT;KIOSK 4:1
+storage_main_020;storage;FÖRRÅD;main;-35058.94;-23420.69;A-U-----T1-200;500.0;MTEXT;FÖRRÅD
+technical_main_003;technical;ELC;main;-36679.54;-19966.7;A-U-----T1-200;500.0;MTEXT;ELC
+restroom_accessible_main_003;restroom_accessible;HWC;main;-38619.69;-18896.06;A-U-----T1-200;500.0;MTEXT;HWC
+storage_main_021;storage;FÖRRÅD;main;-34959.29;23675.03;A-U-----T1-200;500.0;MTEXT;FÖRRÅD
+stair_main_012;stair;TRAPPHALL PRESS;main;-10645.89;33049.7;A-U-----T1-200;500.0;MTEXT;TRAPPHALL PRESS
+storage_main_022;storage;FÖRRÅD;main;323.21;30152.4;A-U-----T1-200;500.0;MTEXT;FÖRRÅD
+technical_main_004;technical;ELC;main;-37106.33;20257.08;A-U-----T1-200;500.0;MTEXT;ELC
+restroom_accessible_main_004;restroom_accessible;HWC;main;-38958.57;18446.46;A-U-----T1-200;500.0;MTEXT;HWC
+kiosk_main_006;kiosk;KIOSK 3:2;main;-46235.78;5462.58;A-U-----T1-200;500.0;MTEXT;KIOSK 3:2
+kiosk_main_007;kiosk;KIOSK 4:2;main;-46474.46;-5246.41;A-U-----T1-200;500.0;MTEXT;KIOSK 4:2
+technical_main_005;technical;VVS;main;71684.81;-8387.31;A-------T--;175.0;MTEXT;VVS
+technical_main_006;technical;ELC.;main;74946.48;-22748.62;A-------T--;175.0;MTEXT;ELC.
+entrance_hall_main_002;entrance_hall;ENTRÈHALL;main;69102.02;-54183.04;A-------T--;175.0;MTEXT;ENTRÈHALL
+elevator_main_009;elevator;HISSM.;main;74085.46;26322.56;A-------T--;175.0;MTEXT;HISSM.
+stair_main_013;stair;TRAPPA;main;71539.16;27046.65;A-------T--;175.0;MTEXT;TRAPPA
+technical_main_007;technical;VVS;main;71684.81;-8387.31;A-------T--;175.0;MTEXT;VVS
+office_main_002;office;KONTOR;main;72676.39;23723.43;A-------T--;175.0;MTEXT;KONTOR
+hall_main_011;hall;HALL E;main;78503.57;-42434.15;A-------T--;175.0;MTEXT;HALL E
+hall_main_012;hall;HALL D;main;73726.71;-1720.8;A-------T--;175.0;MTEXT;HALL D
+technical_main_008;technical;VVS;main;71684.81;-8387.31;A-------T--;175.0;MTEXT;VVS
+technical_main_009;technical;ELC.;main;74946.48;-22748.62;A-------T--;175.0;MTEXT;ELC.
+entrance_hall_main_003;entrance_hall;ENTRÈHALL;main;69102.02;-54183.04;A-------T--;175.0;MTEXT;ENTRÈHALL
+technical_main_010;technical;MHD;main;73053.49;17689.47;A-------T--;175.0;MTEXT;MHD
+elevator_main_010;elevator;hiss 12;main;73047.19;17362.1;A-------T--;175.0;MTEXT;hiss 12
+elevator_main_011;elevator;HISSM.;main;74085.46;26322.56;A-------T--;175.0;MTEXT;HISSM.
+stair_main_014;stair;TRAPPA;main;71539.16;27046.65;A-------T--;175.0;MTEXT;TRAPPA
+technical_main_011;technical;VVS;main;71684.81;-8387.31;A-------T--;175.0;MTEXT;VVS
+office_main_003;office;KONTOR;main;72676.39;23723.43;A-------T--;175.0;MTEXT;KONTOR
+hall_main_013;hall;HALL E;main;78503.57;-42434.15;A-------T--;175.0;MTEXT;HALL E
+elevator_main_012;elevator;hiss 36;main;73027.52;-51618.94;A-------T--;175.0;MTEXT;hiss 36
+elevator_main_013;elevator;hiss 35;main;71594.75;-49834.69;A-------T--;175.0;MTEXT;hiss 35
+elevator_main_014;elevator;HISS;main;64495.96;-30051.66;A-------T--;125.0;MTEXT;HISS
+hall_main_014;hall;PASSAGE;main;70377.81;-18835.9;A-------T--;175.0;MTEXT;PASSAGE
+restroom_generic_main_008;restroom_generic;WC ENTRÈH.;main;52096.37;33802.05;A-A-NTA-T2N;175.0;MTEXT;WC ENTRÈH.
+restroom_anteroom_main_001;restroom_anteroom;FÖRRUM WC ENTRÈH.;main;51067.94;28332.4;A-A-NTA-T2N;175.0;MTEXT;FÖRRUM WC ENTRÈH.
+entrance_hall_main_004;entrance_hall;ENTRÉH. DEL ÖSTER;main;60778.6;16472.35;A-A-NTA-T2N;175.0;MTEXT;ENTRÉH. DEL ÖSTER
+entrance_hall_main_005;entrance_hall;ENTRÉH. DEL VÄSTER;main;59393.39;-20962.67;A-A-NTA-T2N;175.0;MTEXT;ENTRÉH. DEL VÄSTER
+restroom_anteroom_main_002;restroom_anteroom;FÖRRUM WC K.ENTRÉ;main;72497.18;-30725.33;A-A-NTA-T2N;175.0;MTEXT;FÖRRUM WC K.ENTRÉ
+entrance_main_main_004;entrance_main;KONGRESSENTRÉ;main;66271.86;-38192.23;A-A-NTA-T2N;175.0;MTEXT;KONGRESSENTRÉ
+restroom_wheelchair_main_002;restroom_wheelchair;RWC ENTRÉHALL;main;46526.38;29614.65;A-A-NTA-T2N;175.0;MTEXT;RWC ENTRÉHALL
+restroom_wheelchair_main_003;restroom_wheelchair;RWC K.ENTRÉ;main;74231.89;-24919.76;A-A-NTA-T2N;175.0;MTEXT;RWC K.ENTRÉ
+restroom_anteroom_main_003;restroom_anteroom;FÖRRUM WC K.ENTRÉ;main;71653.65;-23861.54;A-A-NTA-T2N;175.0;MTEXT;FÖRRUM WC K.ENTRÉ
+restroom_wheelchair_main_004;restroom_wheelchair;RWC;main;65861.85;-25223.67;A-A-NTA-T2N;175.0;MTEXT;RWC
+restroom_generic_main_009;restroom_generic;WC K.ENTRÉ;main;75088.34;-32316.24;A-A-NTA-T2N;175.0;MTEXT;WC K.ENTRÉ
+medical_main_001;medical;SJUKVÅRDSRUM;main;73493.45;13691.56;A-A-NTA-T2N;175.0;MTEXT;SJUKVÅRDSRUM
+restroom_wheelchair_main_005;restroom_wheelchair;RWC;main;73891.36;11492.71;A-A-NTA-T2N;175.0;MTEXT;RWC
+storage_main_023;storage;FÖRRÅD;main;73134.03;8809.31;A-A-NTA-T2N;175.0;MTEXT;FÖRRÅD
+hall_main_015;hall;FOAJÉ;main;-30092.46;29163.99;A120-300;500.03;MTEXT;FOAJÉ
+hall_duplicate_016;hall;FOAJÉ;duplicate;284103.74;20254.89;A120-300;500.03;MTEXT;FOAJÉ
+storage_duplicate_024;storage;FÖRRÅD;duplicate;309902.07;31431.29;A120-300;500.03;MTEXT;FÖRRÅD
+storage_duplicate_025;storage;FÖRRÅD;duplicate;315388.63;33072.02;A120-300;500.03;MTEXT;FÖRRÅD
+storage_duplicate_026;storage;FÖRRÅD;duplicate;332518.7;31362.33;A120-300;500.03;MTEXT;FÖRRÅD
+restroom_accessible_duplicate_005;restroom_accessible;HWC;duplicate;342722.44;27501.21;A120-300;500.03;MTEXT;HWC
+storage_duplicate_027;storage;FÖRRÅD;duplicate;346115.41;21332.15;A120-300;500.03;MTEXT;FÖRRÅD
+elevator_duplicate_015;elevator;HISS 5;duplicate;283003.08;27997.25;A120-300;500.03;MTEXT;HISS 5
+stair_duplicate_015;stair;TRAPPA;duplicate;275527.43;34441.05;A120-300;500.03;MTEXT;TRAPPA
+entrance_stand_duplicate_016;entrance_stand;LÄKTARENTRÉ K;duplicate;306533.36;24444.36;A-U-----T1-200;500.0;MTEXT;LÄKTARENTRÉ K
+entrance_stand_duplicate_017;entrance_stand;LÄKTARENTRÉ M;duplicate;335792.88;25323.0;A-U-----T1-200;500.0;MTEXT;LÄKTARENTRÉ M
+entrance_stand_duplicate_018;entrance_stand;LÄKTARENTRÉ L;duplicate;322181.13;29467.4;A-U-----T1-200;500.0;MTEXT;LÄKTARENTRÉ L
+restroom_women_duplicate_008;restroom_women;DAMTOALETT;duplicate;295761.14;20489.62;A-U-----T1-200;500.0;MTEXT;DAMTOALETT
+technical_duplicate_012;technical;ELC;duplicate;301191.36;27469.58;A-U-----T1-200;500.0;MTEXT;ELC
+restroom_accessible_duplicate_006;restroom_accessible;HWC;duplicate;146119.0;-21325.17;A120-300;500.03;MTEXT;HWC
+entrance_stand_duplicate_019;entrance_stand;LÄKTARENTRÉ M;duplicate;143940.79;-14395.6;A-U-----T1-200;500.0;MTEXT;LÄKTARENTRÉ M
+entrance_stand_duplicate_020;entrance_stand;LÄKTARENTRÉ M;duplicate;167627.37;-14395.6;A-U-----T1-200;500.0;MTEXT;LÄKTARENTRÉ M
+restroom_generic_main_010;restroom_generic;WC;main;45959.87;-9520.73;A120;175.0;MTEXT;WC
+kiosk_main_008;kiosk;KIOSK 2:1;main;27573.16;70659.7;A-U-----T1-200;500.0;MTEXT;KIOSK 2:1

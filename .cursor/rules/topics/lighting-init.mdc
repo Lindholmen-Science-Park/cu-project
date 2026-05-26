@@ -1,0 +1,99 @@
+---
+description: Lighting initialization — MDL race condition, session-layer visibility, MakeVisible pattern, DomeLight shadow suppression, DistantLight axis rotation, latitude. Read when working on lights, sky, DomeLight, shadows, sun direction, loading phases, or visibility toggling.
+---
+
+# Lighting initialization
+
+## Light architecture
+
+The CumulusLight dynamic sky defines two lights:
+
+| Light | Prim path | Role |
+|-------|-----------|------|
+| **DomeLight** | `/World/Environment/sky/DomeLight` | Ambient/fill IBL lighting from the MDL sky texture |
+| **DistantLight** | `/World/Environment/sky/AxisNorth/AxisLatitude/AxisSHA/AxisDeclination/DistantLight` | Sole directional shadow caster — positioned via axis rotation hierarchy |
+
+### DomeLight shadow suppression
+
+The DomeLight's procedural MDL texture contains a bright sun disc. In RTX, this creates a secondary directional shadow from the IBL, opposing the DistantLight shadow ("double shadow" artifact). To prevent this, **shadow casting is disabled** on the DomeLight via `ShadowAPI`:
+
+```usda
+over "DomeLight" (
+    prepend apiSchemas = ["ShadowAPI"]
+)
+{
+    float inputs:intensity = 1.5
+    bool inputs:shadow:enable = false
+}
+```
+
+**Never re-enable DomeLight shadows** — it will reintroduce the double-shadow problem. The DomeLight provides ambient fill only; all directional shadows come from the DistantLight.
+
+### DomeLight intensity
+
+Default intensity is `1.5` (set in both `dynamic_sky_layer.usda` and `dynamic_environment.usda`). This was increased from `0.9` to compensate for Gothenburg's latitude (57.7°N), where winter sun elevation is very low (~9° at noon on the solstice), making scenes dim without sufficient ambient fill.
+
+Weather presets in `sky_service.py` override the DomeLight intensity dynamically (e.g. `0.2` for darkStorm, `0.9` for clearSky). A minimum-intensity floor of `0.5` is enforced when no weather preset is active.
+
+## DistantLight sun positioning (axis hierarchy)
+
+The DistantLight sits at the bottom of a rotation hierarchy:
+
+```
+AxisNorth → AxisLatitude → AxisSHA → AxisDeclination → DistantLight
+                                  ↘ AxisAzimuth → AxisElevation
+```
+
+`sky_service.py` calculates solar angles from `timeOfDay`, `dayOfYear`, and `latitude` using spherical trigonometry, then writes `xformOp:rotateZYX` on each axis prim:
+
+| Axis prim | Component | Value |
+|-----------|-----------|-------|
+| `AxisSHA` | X (index 0) | `180.0 - sha_degrees` |
+| `AxisDeclination` | Z (index 2) | `declination_degrees` |
+| `AxisAzimuth` | Y (index 1) | `azimuth_degrees` |
+| `AxisElevation` | Z (index 2) | `elevation_degrees` |
+
+The `180.0 - sha` offset aligns the DistantLight direction with the CumulusLight shader convention. SHA formula: `sha_degrees = 15.0 * (time_of_day - 12.0)` (positive = afternoon/west, negative = morning/east).
+
+**Do not delegate axis rotations to `omni.kit.environment.core`** — it does not update the axes for streamed `timeOfDay` changes. Manual axis rotation in `sky_service.py` is required.
+
+### Latitude
+
+Default latitude: **57.7089** (Gothenburg, Sweden). Set in:
+- `dynamic_sky_layer.usda` → `AxisLatitude` `xformOp:rotateZYX` Z component and `SkyMaterial/Shader` `inputs:Latitude`
+- `dynamic_environment.usda` → same two locations
+- `sky_service.py` → `calculate_solar_angles` default parameter and `latitude` variable default
+
+All three must agree. Changing the city requires updating all three.
+
+## The MDL race condition
+
+The CumulusLight dynamic sky uses a procedural MDL shader for the DomeLight texture. This shader compiles asynchronously after stage open. If the RTX renderer evaluates the DomeLight before compilation finishes, it caches a **black environment texture permanently**. The only way to force a re-read is to cycle the light's visibility off → on, which is what `_finalize_scene_load` does behind the loading screen.
+
+## The visibility cycle (off → on)
+
+Lives in `younite.usd_viewer_stage_core_extension` → `extension.py` → `_finalize_scene_load`.
+
+1. Wait `MDL_COMPILE_WAIT` (3 s) for the shader to compile.
+2. **HIDE**: Set `visibility = invisible` on the session layer for every `UsdLux.LightAPI` prim (`Sdf.ChangeBlock` + `Usd.EditContext`).
+3. Let the renderer process the change (8 frames).
+4. **SHOW**: Call `UsdGeom.Imageable.MakeVisible()` on each light inside `Usd.EditContext(stage, session)`.
+5. Let the renderer settle (8 frames).
+6. Dispatch `scene.loaded` (loading screen drops).
+
+## Critical rule: always use `MakeVisible()`, never `RemoveProperty`
+
+| Approach | What it does | Problem |
+|----------|-------------|---------|
+| `prim_spec.RemoveProperty(prop_spec)` | Deletes the visibility attribute from the session layer spec | Can silently fail — leaves `invisible` stuck on the session layer. Scene looks OK while standing (accumulated indirect light), goes **dark during camera movement** (accumulation resets, no DomeLight contribution). |
+| `UsdGeom.Imageable(prim).MakeVisible()` | Writes `visibility = inherited` on the session layer | Explicit positive opinion on the strongest layer. Cannot silently fail. Survives Hydra invalidations (NavMesh bake, camera switches, sky parameter changes). |
+
+**Never use `RemoveProperty` to restore visibility on the session layer.** Always use `MakeVisible()` inside `Usd.EditContext(stage, session)`.
+
+## Session-layer interaction with sky_service
+
+`sky_service.py` also writes to the session layer (intensity, time-of-day, axis rotations) on the **same prim specs** as the light cycle. This is safe — `MakeVisible()` only touches the `visibility` attribute; other properties are unaffected.
+
+## When to re-trigger the cycle
+
+The cycle runs once during loading. It does **not** need repeating because `MakeVisible()` leaves a persistent `inherited` opinion. If you add a feature that creates new UsdLux light prims at runtime (not currently the case), those prims would need their own `MakeVisible()` call.

@@ -1,0 +1,617 @@
+/* 360° Video Player — fullscreen overlay with three.js video sphere.
+   Visual language mirrors `SpatialSoundOverlay.css` so users get a
+   consistent immersive-media UI across audio + video features.
+*/
+.v360-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 10051;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background: rgba(0, 0, 0, 0.6);
+    animation: v360-fade-in 0.22s ease;
+}
+
+.v360-overlay--player {
+    /* Player phase fills the screen with the video sphere — drop the dim
+       backdrop so the equirectangular projection isn't muddied. */
+    background: #000;
+}
+
+@keyframes v360-fade-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+/* Top bar — close + settings buttons. Matches the videobook player's auto-hide
+   behaviour: in onboarding phase always visible; in player phase fades in/out with
+   the rest of the chrome via the `--visible` modifier. */
+.v360-top-bar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 10052;
+    display: flex;
+    align-items: flex-start;
+    justify-content: flex-end;
+    padding: max(48px, env(safe-area-inset-top, 0px)) var(--page-edge-right, 16px) 0 var(--page-edge-left, 16px);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.v360-top-bar--visible {
+    opacity: 1;
+}
+
+.v360-top-bar-right {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    pointer-events: auto;
+}
+
+.v360-top-bar:not(.v360-top-bar--visible) .v360-top-bar-right {
+    pointer-events: none;
+}
+
+.v360-close-btn {
+    width: 48px;
+    height: 48px;
+}
+
+/* Settings button now provided by `MediaSettingsButton` (`.mpc-btn--settings`).
+   The shared base styles ship 48×48 white circle with a Dark-Purple sliders glyph
+   identical to the videobook player's settings chip. */
+
+/* Cinematic intro splash — paused background frame + dark scrim + bold title.
+   Mounted in `Video360Overlay` between onboarding and the live sphere; auto-
+   advances to the player phase after a short dwell. Mobile-first column layout
+   with the title block taking the remaining flex space. */
+.v360-intro-scrim {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    pointer-events: none;
+    z-index: 1;
+}
+
+.v360-intro-content {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 24px;
+    gap: 16px;
+    pointer-events: none;
+    animation: v360-intro-fade 0.4s ease;
+}
+
+@keyframes v360-intro-fade {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+.v360-intro-kicker {
+    margin: 0;
+    color: var(--Lemon, #DCFF7D);
+    text-align: center;
+    font-family: Lexend, sans-serif;
+    font-size: 26px;
+    font-style: normal;
+    font-weight: 500;
+    line-height: 110%;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+}
+
+.v360-intro-title {
+    margin: 0;
+    color: var(--Off-white, #F6F6F6);
+    text-align: center;
+    font-family: Lexend, sans-serif;
+    font-size: 42px;
+    font-style: normal;
+    font-weight: 600;
+    line-height: 120%;
+    max-width: 640px;
+}
+
+/* Bottom helper block — phone gesture + two-line swipe / gyro tip. */
+.v360-intro-helper {
+    position: absolute;
+    left: 50%;
+    bottom: max(96px, env(safe-area-inset-bottom, 0px) + 96px);
+    transform: translateX(-50%);
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    width: min(360px, calc(100% - 48px));
+    padding: 0 8px;
+    pointer-events: none;
+    animation: v360-intro-fade 0.4s ease;
+}
+
+.v360-intro-helper-icon--swipe {
+    width: 35.721px;
+    height: 64px;
+    flex-shrink: 0;
+    aspect-ratio: 24 / 43;
+    color: var(--Off-white, #F6F6F6);
+}
+
+.v360-intro-helper-text {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.v360-intro-helper-line {
+    margin: 0;
+    align-self: stretch;
+    color: var(--Off-white, #F6F6F6);
+    font-family: Lexend, sans-serif;
+    font-size: 16px;
+    font-style: normal;
+    font-weight: 400;
+    line-height: 130%;
+}
+
+.v360-intro-helper-line--gyro {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.v360-intro-helper-icon--gyro {
+    width: 24px;
+    height: 24px;
+    flex-shrink: 0;
+    aspect-ratio: 1 / 1;
+    color: var(--Lemon, #DCFF7D);
+}
+
+/* Transient intro title overlay — sits above the playing sphere, then
+   fades out via the `--hidden` modifier. Pointer-events disabled so the
+   drag-to-look gesture still hits the canvas behind it. */
+.v360-title-overlay {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    text-align: center;
+    padding: 0 24px;
+    pointer-events: none;
+    z-index: 2;
+    opacity: 1;
+    transition: opacity 0.6s ease;
+    text-shadow: 0 2px 12px rgba(0, 0, 0, 0.65);
+}
+
+.v360-title-overlay--hidden {
+    opacity: 0;
+}
+
+.v360-label {
+    font-family: Lexend, sans-serif;
+    font-weight: 500;
+    font-size: 18px;
+    line-height: 110%;
+    text-transform: uppercase;
+    color: #DCFF7D;
+}
+
+.v360-title {
+    font-family: Lexend, sans-serif;
+    font-weight: 600;
+    font-size: 36px;
+    line-height: 120%;
+    color: #fff;
+    margin: 0;
+    max-width: 720px;
+}
+
+/* Stage area: sphere host (player) or onboarding/splash card. */
+.v360-stage {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    width: 100%;
+    min-height: 0;
+    box-sizing: border-box;
+    padding-bottom: max(140px, env(safe-area-inset-bottom, 0px) + 140px);
+}
+
+.v360-overlay--player .v360-stage,
+.v360-overlay--intro .v360-stage {
+    /* Sphere/intro fill the viewport — no padding, controls overlay on top. */
+    padding-bottom: 0;
+}
+
+.v360-onboarding-bg-video {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    pointer-events: none;
+    z-index: 0;
+}
+
+.v360-onboarding-bg-scrim {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.38);
+    pointer-events: none;
+    z-index: 1;
+}
+
+/* Three.js canvas host — full bleed inside the stage. */
+.v360-sphere {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    cursor: grab;
+    touch-action: none;
+    background: #000;
+}
+
+.v360-sphere:active {
+    cursor: grabbing;
+}
+
+/* Brief loading state shown between phase=player and the first decoded
+   video frame. On warm reopen this is a single-frame flicker; on cold
+   start it covers the actual download. */
+.v360-loading {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #000;
+}
+
+.v360-loading-spinner {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    border: 3px solid rgba(255, 255, 255, 0.2);
+    border-top-color: rgba(255, 255, 255, 0.85);
+    animation: v360-spin 0.9s linear infinite;
+}
+
+@keyframes v360-spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Gyro toggle — lemon outline pill in the top-bar stack. Doubles as the
+   user-gesture target for iOS DeviceOrientationEvent permission. */
+.v360-gyro-btn {
+    display: flex;
+    width: 48px;
+    height: 48px;
+    padding: 6px 4px 4px;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 2px;
+    box-sizing: border-box;
+    border-radius: 12px;
+    border: 1.5px solid var(--Lemon, #DCFF7D);
+    background: transparent;
+    color: var(--Lemon, #DCFF7D);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: background 0.15s ease, color 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
+}
+
+.v360-gyro-btn:hover {
+    background: rgba(220, 255, 125, 0.12);
+}
+
+.v360-gyro-btn:active {
+    transform: scale(0.96);
+}
+
+.v360-gyro-btn:focus-visible {
+    outline: 2px solid var(--Lemon, #DCFF7D);
+    outline-offset: 2px;
+}
+
+.v360-gyro-btn--active {
+    background: var(--Lemon, #DCFF7D);
+    color: #1a0d33;
+    box-shadow: 0 1px 6px 0 rgba(0, 0, 0, 0.3);
+}
+
+.v360-gyro-btn .v360-intro-helper-icon--gyro {
+    width: 22px;
+    height: 22px;
+    color: currentColor;
+}
+
+.v360-gyro-btn-label {
+    display: block;
+    text-align: center;
+    font-family: Lexend, system-ui, sans-serif;
+    font-size: 9px;
+    font-weight: 600;
+    line-height: 110%;
+    letter-spacing: -0.45px;
+    color: currentColor;
+    white-space: nowrap;
+    pointer-events: none;
+}
+
+/* Captions — sits above the bottom controls, pointer-events disabled so
+   the drag-to-look gesture passes through to the sphere canvas. The
+   `--with-controls` modifier lifts the strip above the controls when the
+   user is interacting (matches the videobook caption behaviour). */
+.v360-captions {
+    position: absolute;
+    left: 50%;
+    bottom: 24px;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    width: 100%;
+    max-width: min(640px, calc(100% - 48px));
+    padding: 0 16px;
+    pointer-events: none;
+    z-index: 2;
+    transition: bottom 0.3s ease;
+}
+
+.v360-captions--with-controls {
+    bottom: 200px;
+}
+
+.v360-caption-line {
+    display: inline-block;
+    padding: 8px 12px;
+    background: rgba(0, 0, 0, 0.72);
+    color: #fff;
+    font-family: Lexend, sans-serif;
+    font-weight: 400;
+    font-size: 18px;
+    line-height: 130%;
+    letter-spacing: 0;
+    text-align: center;
+    border-radius: 6px;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+}
+
+/* Same caption tokens as videobook / spatial (see `videoBookSettings.ts`). */
+.v360-captions[data-caption-size="0"] .v360-caption-line {
+    font-size: 14px;
+}
+
+.v360-captions[data-caption-size="2"] .v360-caption-line {
+    font-size: 30px;
+    line-height: 120%;
+}
+
+/* Bottom controls — auto-hide chrome that fades in with `--visible`. */
+.v360-controls {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 10052;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 0 var(--page-edge-right, 16px) max(24px, env(safe-area-inset-bottom, 24px)) var(--page-edge-left, 16px);
+    background: linear-gradient(0deg, rgba(0, 0, 0, 0.7) 0%, transparent 100%);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+}
+
+.v360-controls--visible,
+.v360-controls:focus-within {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.v360-top-bar:focus-within {
+    opacity: 1;
+}
+
+.v360-top-bar:focus-within .v360-top-bar-right {
+    pointer-events: auto;
+}
+
+.v360-seek-row {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    max-width: min(420px, var(--page-max-width-gutter, 100%));
+    gap: 10px;
+    margin-bottom: 4px;
+}
+
+.v360-seek-dot-left {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #DCFF7D;
+    flex-shrink: 0;
+}
+
+.v360-seek-bar {
+    position: relative;
+    flex: 1;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    touch-action: none;
+}
+
+.v360-seek-track {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: rgba(255, 255, 255, 0.35);
+    border-radius: 2px;
+}
+
+.v360-seek-fill {
+    position: absolute;
+    left: 0;
+    height: 3px;
+    background: var(--Dark-Purple, #351a84);
+    border-radius: 2px;
+    pointer-events: none;
+}
+
+.v360-seek-thumb {
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #DCFF7D;
+    transform: translateX(-50%);
+    pointer-events: none;
+    box-shadow: 0 0 4px rgba(0, 0, 0, 0.3);
+    transition: transform 0.1s ease;
+}
+
+.v360-seek-bar:hover .v360-seek-thumb {
+    transform: translateX(-50%) scale(1.2);
+}
+
+.v360-time-row {
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+    max-width: min(420px, var(--page-max-width-gutter, 100%));
+    padding: 0 0 8px 22px;
+}
+
+.v360-time {
+    font-family: Lexend, sans-serif;
+    font-size: 12px;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.8);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.02em;
+}
+
+.v360-transport {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    max-width: min(420px, var(--page-max-width-gutter, 100%));
+}
+
+/* Mute on the left, CC on the right — bracketing the central play button. The
+   visual styling of every transport button itself comes from `MediaPlayerControls`
+   (`.mpc-btn--*`); we only pin them in absolute positions here so the play button
+   stays optically centred. */
+.v360-transport .mpc-btn--mute {
+    position: absolute;
+    left: 0;
+}
+
+.v360-transport .mpc-btn--cc {
+    position: absolute;
+    right: 0;
+}
+
+/* Responsive — landscape / short viewports. */
+@media (max-height: 500px) {
+    .v360-title {
+        font-size: 24px;
+    }
+
+    .v360-controls {
+        padding-bottom: 12px;
+    }
+
+    .v360-onboarding-card {
+        padding: 24px 18px;
+        gap: 16px;
+    }
+
+    .v360-onboarding-title {
+        font-size: 18px;
+    }
+
+    .v360-onboarding-phone-icon {
+        width: 80px;
+        height: auto;
+    }
+
+    .v360-onboarding-desc {
+        font-size: 14px;
+    }
+
+    .v360-title-overlay .v360-title {
+        font-size: 24px;
+    }
+
+    .v360-intro-content {
+        padding: 16px;
+        gap: 8px;
+    }
+
+    .v360-intro-helper {
+        bottom: max(40px, env(safe-area-inset-bottom, 0px) + 40px);
+        gap: 16px;
+    }
+
+    .v360-intro-helper-icon--swipe {
+        width: 24px;
+        height: 43px;
+    }
+
+    .v360-intro-helper-line {
+        font-size: 14px;
+    }
+
+    .v360-intro-kicker {
+        font-size: 18px;
+    }
+
+    .v360-intro-title {
+        font-size: 28px;
+    }
+
+    .v360-caption-line {
+        padding: 4px 10px;
+    }
+
+    .v360-captions {
+        bottom: 12px;
+        gap: 2px;
+    }
+
+    .v360-captions--with-controls {
+        bottom: 140px;
+    }
+}

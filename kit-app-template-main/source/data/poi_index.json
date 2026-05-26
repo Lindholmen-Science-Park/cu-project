@@ -1,0 +1,114 @@
+[
+	{
+		"id": "poi_gothia_towers",
+		"names": { "en": "Gothia Towers", "sv": "Gothia Towers" },
+		"descriptions": {
+			"en": "A landmark hotel complex next to Liseberg in central Gothenburg. Modern architecture with distinctive twin towers.",
+			"sv": "Ett landmärkeshotell intill Liseberg i centrala Göteborg. Modern arkitektur med karakteristiska tvillingtorn."
+		},
+		"aliases": ["gothia", "gothia tower", "gothia towers hotel"],
+		"tags": ["hotel", "towers", "modern", "landmark", "conference"],
+		"position": { "x": -3390.2416642762723, "y": 287.15912288131153, "z": -14438.86500958867 }
+	},
+	{
+		"id": "poi_skandinavium",
+		"names": { "en": "Skandinavium", "sv": "Skandinavium" },
+		"descriptions": {
+			"en": "Indoor arena in Gothenburg, opened in 1971. Hosts concerts, sports events, and entertainment.",
+			"sv": "Inomhusarena i Göteborg, invigd 1971. Här arrangeras konserter, idrottsevenemang och underhållning."
+		},
+		"aliases": ["scandinavium", "arena", "stadion"],
+		"tags": ["arena", "stadium", "events", "sports", "concerts", "entertainment"],
+		"position": { "x": -3625.095663323501, "y": -1123.6745876652326, "z": -5542.937011876325 }
+	},
+	{
+		"id": "poi_liseberg",
+		"names": { "en": "Liseberg", "sv": "Liseberg" },
+		"descriptions": {
+			"en": "One of Scandinavia's largest amusement parks, located in central Gothenburg. Features roller coasters, rides, and entertainment.",
+			"sv": "En av Skandinaviens största nöjesparker, belägen i centrala Göteborg. Har berg-och dalbanor, karuseller och underhållning."
+		},
+		"aliases": ["liseberg", "amusement park", "nöjespark"],
+		"tags": ["amusement park", "entertainment", "rides", "family", "attraction"],
+		"position": { "x": -3500.0, "y": 200.0, "z": -14500.0 }
+	},
+	{
+		"id": "poi_universeum",
+		"names": { "en": "Universeum", "sv": "Universeum" },
+		"descriptions": {
+			"en": "Science center with rainforest, aquarium, and interactive exhibits. Educational and family-friendly attraction.",
+			"sv": "Vetenskapscenter med regnskog, akvarium och interaktiva utställningar. Utbildande och familjevänlig sevärdhet."
+		},
+		"aliases": ["universeum", "science center", "vetenskapscenter", "aquarium"],
+		"tags": ["science", "museum", "aquarium", "rainforest", "education", "family"],
+		"position": { "x": -3400.0, "y": 250.0, "z": -14300.0 }
+	},
+	{
+		"id": "poi_garden_society",
+		"names": { "en": "Garden Society of Gothenburg", "sv": "Trädgårdsföreningen" },
+		"descriptions": {
+			"en": "Historic 19th-century park with rose garden and Palm House greenhouse. Peaceful green space in the city center.",
+			"sv": "Historisk 1800-talspark med rosenträdgård och Palmhuset. Fridfullt grönområde i stadens centrum."
+		},
+		"aliases": ["garden society", "trädgårdsföreningen", "palm house", "palmhuset"],
+		"tags": ["park", "garden", "historic", "nature", "green space", "peaceful"],
+		"position": { "x": -3200.0, "y": 150.0, "z": -14200.0 }
+	},
+	{
+		"id": "poi_gotaplatsen",
+		"names": { "en": "Götaplatsen", "sv": "Götaplatsen" },
+		"descriptions": {
+			"en": "Public square at the southern end of Avenyn. Features the Poseidon statue and cultural institutions.",
+			"sv": "Offentligt torg vid södra änden av Avenyn. Har Poseidonstatyn och kulturinstitutioner."
+		},
+		"aliases": ["gotaplatsen", "götaplatsen", "poseidon", "square"],
+		"tags": ["square", "plaza", "statue", "culture", "art", "landmark"],
+		"position": { "x": -3000.0, "y": 100.0, "z": -14100.0 }
+	},
+	{
+		"id": "poi_art_museum",
+		"names": { "en": "Gothenburg Museum of Art", "sv": "Göteborgs Konstmuseum" },
+		"descriptions": {
+			"en": "Art museum with collections from the 15th century to contemporary works. Located at Götaplatsen.",
+			"sv": "Konstmuseum med samlingar från 1400-talet till nutida verk. Beläget vid Götaplatsen."
+		},
+		"aliases": ["art museum", "konstmuseum", "museum", "art gallery"],
+		"tags": ["museum", "art", "culture", "exhibitions", "historic"],
+		"position": { "x": -2950.0, "y": 120.0, "z": -14050.0 }
+	},
+	{
+		"id": "poi_haga",
+		"names": { "en": "Haga District", "sv": "Haga" },
+		"descriptions": {
+			"en": "Historic neighborhood with cobblestone streets and well-preserved wooden houses. Known for cozy cafés and shops.",
+			"sv": "Historisk stadsdel med kullersten och välbevarade trähus. Känd för mysiga kaféer och butiker."
+		},
+		"aliases": ["haga", "haga district", "old town", "gamla stan"],
+		"tags": ["historic", "neighborhood", "cafes", "shopping", "cobblestone", "old"],
+		"position": { "x": -3800.0, "y": 180.0, "z": -14700.0 }
+	},
+	{
+		"id": "poi_feskekorka",
+		"names": { "en": "Feskekôrka", "sv": "Feskekôrka" },
+		"descriptions": {
+			"en": "Historic seafood market in a neo-Gothic building. Known as the Fish Church, offering fresh fish and seafood.",
+			"sv": "Historisk fiskmarknad i nygotisk byggnad. Känd som Fiskkyrkan, erbjuder färsk fisk och skaldjur."
+		},
+		"aliases": ["feskekorka", "fish church", "fiskkyrkan", "seafood market"],
+		"tags": ["market", "seafood", "fish", "historic", "food", "shopping"],
+		"position": { "x": -3700.0, "y": 160.0, "z": -14600.0 }
+	},
+	{
+		"id": "poi_avenyn",
+		"names": { "en": "Avenyn", "sv": "Avenyn" },
+		"descriptions": {
+			"en": "Gothenburg's main shopping and entertainment street. Lined with shops, restaurants, and cafés.",
+			"sv": "Göteborgs huvudgata för shopping och underhållning. Klasad med butiker, restauranger och kaféer."
+		},
+		"aliases": ["avenyn", "main street", "shopping street", "huvudgatan"],
+		"tags": ["shopping", "street", "restaurants", "entertainment", "main"],
+		"position": { "x": -3100.0, "y": 110.0, "z": -14250.0 }
+	}
+]
+
+

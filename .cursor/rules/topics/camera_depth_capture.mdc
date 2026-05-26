@@ -1,0 +1,98 @@
+---
+description: Camera depth capture — point cloud from virtual camera, ghost point detection via overlap, convex-hull NavMesh obstacle areas, bake orchestrator integration
+---
+
+# Camera Depth Capture (Dynamic Obstacle Detection)
+
+Captures a depth point cloud from a virtual camera, compares it against the model's collision geometry to find "ghost" points (objects present in point cloud but absent from the virtual model), and creates NavMesh obstacle areas from those ghosts. Designed so the detection step works identically with real-world sensor data.
+
+**Extension**: `younite.camera_depth_extension`
+**Depends on**: `omni.physx`, `younite.messaging_core_extension`, `younite.navmesh_route_extension` (bake orchestrator)
+**Frontend**: "Camera Depth Capture" section in hamburger menu (`UIControls.tsx`)
+
+## Architecture
+
+### Step 1 — Capture (simulates real sensor data)
+
+`depth_capture.py`: Shoots one PhysX ray per pixel of a virtual pinhole camera through `sensor_camera_01` (`/World/sensor_camera_01`, defined in `sensor_layer.usda`). Hit positions are stored as a `UsdGeom.Points` prim at `/World/SensorPointCloud` with an emissive orange material.
+
+- **Resolution**: 640×480 (configurable via `RESOLUTION`)
+- **Max distance**: 1500 cm (15 m, matches camera coverage `MAX_RAY_DISTANCE`)
+- **Point size**: 0.25 cm
+- No renderer/viewport involvement — purely `omni.physx.get_physx_scene_query_interface().raycast_closest()`
+
+### Step 2 — Detect Obstacles (camera-independent, works with any point cloud)
+
+`obstacle_detection.py`: For each point in the cloud, a PhysX `overlap_sphere` query (radius 10 cm) checks whether collision geometry exists at that position.
+
+- **Overlap found** → point matches model surface → skip
+- **No overlap** → "ghost point" — object exists in point cloud but not in model
+
+This step does NOT re-cast from the camera. It operates purely on point positions vs. model collision shapes, making it compatible with future real-world sensor data.
+
+### Step 3 — Cluster & Create NavMesh Areas
+
+1. Ghost points are projected onto the XZ plane, assigned to a 25 cm grid, and flood-filled (BFS) into connected clusters.
+2. Per cluster, a 2D **convex hull** (Andrew's monotone chain) of the actual ghost point XZ positions is computed.
+3. The hull is expanded outward by `AREA_MARGIN` (5 cm) from the centroid for NavMesh coverage.
+4. A downward raycast from near the lowest ghost point finds the floor Y (median of 5 sample positions, max 200 cm range).
+5. A flat fan-triangulated convex-hull polygon mesh is created under `/World/CameraDepthObstacles/Obstacle_XX/Area` with `NavMeshAreaAPI`.
+
+### Step 4 — Bake & Hide
+
+`CameraDepthObstacleProvider` (in `navmesh_bake_orchestrator.py`) follows the same lifecycle as `CameraAreaProvider`:
+- `prepare_for_bake()` → make obstacle areas visible
+- NavMesh rebake runs (areas are now excluded from walkable mesh)
+- `after_bake()` → hide areas again (unless user toggled "Show Areas" on)
+
+## Events
+
+| Event | Direction | Payload |
+|-------|-----------|---------|
+| `cameraDepthRequest` | Web → Kit | `{ action: "capture" \| "detect_obstacles" \| "clear" \| "toggle_points", visible?: bool }` |
+| `cameraDepthStatus` | Kit → Web | `{ status, pointCount, obstacleCount, pointsVisible, error }` |
+| `showCameraDepthAreasRequest` | Web → Kit | `{ visible: bool }` — handled by `navmesh_route_extension` |
+| `navmeshRebakeRequest` | Kit → Kit | Dispatched after obstacle creation or clear |
+
+## Key constants
+
+### `depth_capture.py`
+- `RESOLUTION = (640, 480)` — camera pixel grid
+- `MAX_DISTANCE = 1500.0` — ray range in cm (15 m)
+- `POINT_SIZE = 0.25` — visual point radius in cm
+
+### `obstacle_detection.py`
+- `CONTACT_RADIUS = 10.0` — overlap sphere radius for ghost detection (cm)
+- `GRID_CELL_SIZE = 25.0` — XZ clustering grid (cm)
+- `AREA_MARGIN = 5.0` — convex hull expansion (cm)
+- `MAX_OBSTACLE_SLOTS = 10`
+- `POINTS_PER_YIELD = 5000` — async yield interval
+
+## NavMesh area slots
+
+Pre-registered in `main_scene.usda` under `customLayerData.navmeshSettings.areas`: `camera_depth_obstacle_01` through `camera_depth_obstacle_10`, each with `defaultCost = -1` (not walkable).
+
+## Frontend UI
+
+- **Capture Depth**: triggers point cloud capture from camera
+- **Detect Obstacles**: runs overlap-based ghost detection → creates NavMesh areas → rebakes
+- **Clear**: removes point cloud and obstacle areas → rebakes
+- **Toggle Point Cloud**: show/hide the orange point cloud visualization
+- **Toggle Obstacle Areas**: show/hide the NavMesh exclusion area polygons
+
+## Test workflow
+
+1. Enable incidents, place an obstacle (cube/cone/torus) on the scene
+2. Click "Capture Depth" — point cloud appears including the obstacle surface
+3. Remove the obstacle manually (disable incidents) — "ghost" dots remain
+4. Click "Detect Obstacles" — ghost points are found (no model geometry at those positions), convex hull area is created, NavMesh rebakes to exclude the area
+5. Routes now avoid the ghost obstacle
+
+## Related
+
+- Camera frustum areas (same NavMesh pattern): `.cursor/rules/topics/camera_navmesh_areas.mdc`
+- Incidents (obstacle shapes for testing): `.cursor/rules/topics/incidents.mdc`
+- NavMesh area mechanics: `.cursor/rules/topics/navmesh-areas.mdc`
+- Bake orchestrator + provider protocol: `.cursor/rules/topics/bake-orchestrator.mdc`
+- Camera data visualization (heatmap / sphere tracker): `.cursor/rules/topics/camera_data_visualization.mdc`
+- Sensor camera definition: `kit-app-template-main/source/data/scenes/sublayers/sensor_layer.usda`

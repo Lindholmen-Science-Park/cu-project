@@ -1,0 +1,33 @@
+[
+    {
+        "_comment": "POI rows for coin_kiosk_* — coin_type comes from prim suffix (kiosk).",
+        "xform_id": "kiosk_01",
+        "in_use": true,
+        "display_name": "Kiosk"
+    },
+    {
+        "xform_id": "kiosk_02",
+        "in_use": true,
+        "display_name": "Kiosk"
+    },
+    {
+        "xform_id": "kiosk_03",
+        "in_use": true,
+        "display_name": "Kiosk"
+    },
+    {
+        "xform_id": "kiosk_04",
+        "in_use": true,
+        "display_name": "Kiosk"
+    },
+    {
+        "xform_id": "kiosk_05",
+        "in_use": true,
+        "display_name": "Kiosk"
+    },
+    {
+        "xform_id": "kiosk_06",
+        "in_use": true,
+        "display_name": "Kiosk"
+    }
+]

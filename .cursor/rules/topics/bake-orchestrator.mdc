@@ -1,0 +1,97 @@
+---
+description: NavMesh Bake Orchestrator — centralised rebake lifecycle, provider protocol, registered providers
+---
+
+# NavMesh Bake Orchestrator
+
+Centralises the rebake lifecycle so every bake automatically includes all currently-active area providers. Callers only need to call `orchestrator.request_rebake()`.
+
+**File**: `younite.navmesh_route_extension/.../services/kit_services/navmesh_bake_orchestrator.py`
+**Registration**: `younite.navmesh_route_extension/extension.py` — creates providers and registers them on startup.
+
+## Provider protocol
+
+Any object implementing `NavMeshAreaProvider` can be registered:
+
+| Method | Purpose |
+|--------|---------|
+| `name` (property) | Unique string identifier |
+| `is_active()` | True when this provider's areas should be included in the bake |
+| `set_active(bool)` | Toggle active state |
+| `show_areas` (property) | Whether debug visuals are currently shown |
+| `set_show_areas(bool)` | Toggle visibility of debug area visuals |
+| `get_area_definitions()` | Return list of `{areaName, color, defaultCost}` dicts for dynamic area registration (optional) |
+| `prepare_for_bake()` | Ensure area prims exist on nav layer (synchronous) |
+| `after_bake()` | Post-bake cleanup (e.g. hide debug visuals if user hasn't toggled them on) |
+| `remove_areas()` | Delete area prims from the nav layer |
+
+## Area registration
+
+**Hard constraint**: `omni.anim.navigation.core` reads `customLayerData.navmeshSettings.areas` **once at stage load**. Runtime modifications are ignored by the baker. All area names must be pre-registered in `main_scene.usda` before the session starts.
+
+1. **All 12 current areas** (4 base + 4 camera + 4 sound) are listed in `main_scene.usda` → `customLayerData.navmeshSettings.areas`. This is the **single source of truth**.
+2. The orchestrator's `ensure_areas_registered()` runs before each bake — it checks provider `get_area_definitions()` against existing entries and warns if any are missing. It writes them to `customLayerData` so a save captures them, but they only take effect after **saving and reloading**.
+
+When adding new cameras or sound locations, add their area entries to `main_scene.usda` → `customLayerData.navmeshSettings.areas`.
+
+## Agent settings management
+
+The orchestrator manages NavMesh agent parameters for different navigation modes. `main_scene.usda` → `customLayerData.navmeshSettings` is the **single source of truth** for walking mode defaults.
+
+**Walking mode**: `read_scene_agent_defaults()` reads 7 agent keys from the USD scene on first bake: `agentMaxFloorSlope`, `agentMaxRadius`, `agentMaxStepHeight`, `agentMinHeight`, `agentMinIslandRadius`, `agentMinRadius`, `agentSamplingDistance`. These are cached in `_scene_agent_defaults`.
+
+**Wheelchair mode**: `_WHEELCHAIR_SETTINGS` is a module-level constant with all 7 agent parameters explicitly defined. It **never inherits** from the scene defaults — the two modes evolve independently. To change wheelchair NavMesh parameters, edit `_WHEELCHAIR_SETTINGS` in `navmesh_bake_orchestrator.py`.
+
+**`get_agent_settings_for_mode(mode)`**: Returns the full settings dict — `_scene_agent_defaults` for `"walking"`, `_WHEELCHAIR_SETTINGS` for `"wheelchair"`, `None` for unknown modes.
+
+**Mode switching**: A `navmeshModeSet` event is **not a rebake** — it's an instant swap of the cached `INavMesh` handle in `NavMeshModeCache`. Both walking and wheelchair meshes are pre-baked at startup and live in memory side-by-side. See `navmesh-dual-mode.mdc`.
+
+**Orchestrator rebakes fan out to both modes**: `NavMeshRouteExtension` wraps the orchestrator's `do_rebake` / `do_settings_rebake` callbacks with `_orchestrator_dual_bake`, which invokes `NavMeshModeCache.bake_both_modes()` (wheelchair first, walking last). Every incident / area-provider rebake therefore refreshes both cached handles — the user's selected mode is still active afterwards because the cache retains the mode string separately from the handle slots.
+
+## Rebake lifecycle
+
+All handled by the orchestrator, serialised with `asyncio.Lock`:
+
+1. `ensure_areas_registered()` — merge base config + provider area definitions into `customLayerData`; on first call, also reads scene agent defaults
+2. For each active provider → `prepare_for_bake()` (ensure area prims visible on nav layer)
+3. Trigger the actual bake via the injected callback. In Goteverse this is `_orchestrator_dual_bake`, which bakes wheelchair then walking and updates `NavMeshModeCache`.
+4. For each active provider → `after_bake()` (e.g. hide debug visuals)
+5. Recalculate all active routes
+
+## Registered providers
+
+| Provider | Name | Wraps | Active when |
+|----------|------|-------|-------------|
+| `CameraAreaProvider` | `camera_areas` | `camera_navmesh_areas.py` | "Camera Data → Pathfinding" toggled on |
+| `SoundAreaProvider` | `sound_areas` | `sound_navmesh_areas.py` | "Sound → Pathfinding" toggled on |
+| `IncidentAreaProvider` | `incidents` | `incident_placement_service.py` | Always (at least one incident exists) |
+| `CameraDepthObstacleProvider` | `camera_depth_obstacles` | `obstacle_detection.py` | Always (at least one obstacle exists) |
+
+## Shared vs per-instance area names
+
+- **Incidents** and **camera depth obstacles** use a single shared area name (`incident_blocked`, `camera_depth_obstacle`). All instances are non-walkable (cost = -1). No slot limit.
+- **Camera** and **sound** areas use per-instance names (`{cam_name}_area`, `{loc_name}_area`) so each can have individually adjustable cost sliders.
+
+## Adding a new area feature
+
+1. Implement `NavMeshAreaProvider` (or add a concrete class in `navmesh_bake_orchestrator.py`).
+2. Add area entries to `main_scene.usda` → `customLayerData.navmeshSettings.areas`.
+3. If instances need individual cost control → implement `get_area_definitions()` to return per-instance defs (also serves as runtime validation).
+4. Register with `orchestrator.register_provider(provider)` in `navmesh_route_extension/extension.py`.
+5. Every rebake will automatically include/exclude it based on `is_active()` and register its areas.
+
+## Frontend pattern (show areas + affect pathfinding)
+
+Each area provider typically has two web UI toggles:
+- **Show areas** (visibility only): sends e.g. `showSoundAreasRequest { visible }` → provider's `set_show_areas()`.
+- **Affect pathfinding** (active state + rebake): sends e.g. `soundDataCalcToggle { active }` → provider's `set_active()` + `orchestrator.request_rebake()`.
+
+Status event dispatched back to web: e.g. `soundDataCalcStatus { active, status: "baking"|"ready"|"error", areaNames }`.
+
+## Related
+
+- Dual-mode NavMesh cache (walking + wheelchair, instant switch): `.cursor/rules/topics/navmesh-dual-mode.mdc`
+- NavMesh area mechanics: `.cursor/rules/topics/navmesh-areas.mdc`
+- Camera areas: `.cursor/rules/topics/camera_navmesh_areas.mdc`
+- Sound areas: `.cursor/rules/topics/sound-areas.mdc`
+- Incidents: `.cursor/rules/topics/incidents.mdc`

@@ -1,0 +1,18 @@
+#usda 1.0
+(
+    defaultPrim = "bird_eye_camera"
+    metersPerUnit = 0.01
+    upAxis = "Y"
+)
+
+def Camera "bird_eye_camera"
+{
+    float2 clippingRange = (1, 10000000)
+    float focalLength = 50.0
+    float focusDistance = 1000
+    custom uniform vector3d omni:kit:centerOfInterest = (0, 0, -1000)
+    double3 xformOp:rotateYXZ = (-90, 0, 0)  # Looking down from above
+    double3 xformOp:scale = (1, 1, 1)
+    double3 xformOp:translate = (0, 50000, 0)  # High above the stadium
+    uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateYXZ", "xformOp:scale"]
+}

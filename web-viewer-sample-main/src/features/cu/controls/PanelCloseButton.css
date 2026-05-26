@@ -1,0 +1,43 @@
+.cu-panel-close-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 44px;
+    height: 44px;
+    margin: 0;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: rgba(246, 246, 246, 0.92);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.25);
+    cursor: pointer;
+    transition: background 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.cu-panel-close-btn:hover {
+    background: rgba(246, 246, 246, 1);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+    transform: scale(1.05);
+}
+
+.cu-panel-close-btn:active {
+    transform: scale(0.93);
+}
+
+.cu-panel-close-btn:focus {
+    outline: none;
+}
+
+.cu-panel-close-btn:focus-visible {
+    outline: 2px solid var(--Dark-Purple, #351a84);
+    outline-offset: 2px;
+}
+
+.cu-panel-close-btn__icon {
+    width: 23px;
+    height: 23px;
+    display: block;
+    flex-shrink: 0;
+}

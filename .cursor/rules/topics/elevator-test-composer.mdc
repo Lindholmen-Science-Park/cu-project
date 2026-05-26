@@ -1,0 +1,443 @@
+---
+description: Composer-only elevator cab/door test rig — experimental local scene under Assets/Elevator, opt-in extension via startcomposer_elevator_test.bat, trip orchestration, door kinematics. Read when working on the elevator test extension or integrating elevator assets into the stadium.
+---
+
+# Elevator test (Composer only)
+
+Experimental **authoring** tool to prototype elevator cab travel and synchronized landing + car doors on a standalone USD payload. **Not** wired to streaming, web messaging, world-state sync, or production **navigation shortcuts** (`shortcuts.mdc`).
+
+**Extension**: `younite.elevator_test_extension`  
+**Kit profile**: Composer only — **not** listed in `younite.usd_composer.kit` `[dependencies]` and **not** in any streaming `.kit` file.
+
+---
+
+## Local-only assets (do not commit)
+
+Scene and payload live together under:
+
+```
+kit-app-template-main/source/data/Assets/Elevator/
+├── elevator_test_scene.usda   # minimal stage (payload + environment)
+├── elevator_edit.usdc         # elevator rig (doors, car, shaft)
+└── textures/                  # e.g. color_0C0C0C.exr
+```
+
+- Entire folder is **gitignored** (`.gitignore`: `kit-app-template-main/source/data/Assets/Elevator/`).
+- Move or copy this folder outside the repo for backup; the extension code stays in the repo.
+- Scene payload reference: `@./elevator_edit.usdc@` (same directory as the scene).
+
+---
+
+## Launch
+
+| Script | Extension | Scene |
+|--------|-----------|--------|
+| `startcomposer.bat` | **Off** | `main_scene` (default) or argument under `source/data/scenes/` |
+| `startcomposer_elevator_test.bat` | **On** (`--enable younite.elevator_test_extension`) | `elevator_test_scene` |
+
+Flow for elevator test:
+
+1. `startcomposer_elevator_test.bat` sets `YOUNITE_KIT_EXTRA_ARGS=--enable younite.elevator_test_extension` and calls `startcomposer.bat elevator_test_scene`.
+2. `start_composer.bat` forwards `YOUNITE_KIT_EXTRA_ARGS` into `repo.bat launch`.
+3. `auto_load_mastah.py` resolves the scene from `source/data/scenes/` **or** `source/data/Assets/Elevator/`.
+
+`startcomposer.bat` clears any stray `YOUNITE_KIT_EXTRA_ARGS` unless the scene argument is exactly `elevator_test_scene` (so normal Composer never inherits `--enable` from a previous shell).
+
+**UI**: Tools → **Elevator Test** (panel does **not** auto-open on startup; open from the menu).
+
+**Panel layout** (`elevator_panel.py`):
+
+- **Operating mode**: **Normal (1.0 m/s)** / **Inspection (0.3 m/s)** — sets `ElevatorService.mode`; only when cab and trip are idle. Status line shows active mode and `travelSpeedCap`.
+- **Car calls** — **Floor 0** / **Floor 1**: register destination (button **stays lit** until cab opens at that floor). Press while busy → **FIFO queue**; next trip starts when idle. **Queue:** label shows pending floors.
+- **Landing calls** — **Call floor 0** / **Call floor 1** (summon cab to that landing); lit until cab **opens** there. Same FIFO queue as in-car buttons.
+- **Refresh**; trip phase label (e.g. `leveling`, `dwelling`, `closing_dest`).
+- Manual overrides: **3 toggle buttons** (not separate open/close pairs) — floor 0 outer, floor 1 outer, inner. Label reflects state (`Open …` / `Close …` / `opening…`); click toggles based on tracked open/closed state.
+
+**Manual enable**: Extension Manager or `repo.bat launch younite.usd_composer.kit -- --enable younite.elevator_test_extension`.
+
+If the panel still appears on normal Composer after an earlier session, disable **Younite Elevator Test** once in Extension Manager (Kit may persist user-enabled state).
+
+---
+
+## USD hierarchy (in scene)
+
+Payload root is scaled **100×** and rotated **-90° X** in `elevator_test_scene.usda`. Extension paths are **stage paths** after composition:
+
+```
+/World/elevator_edit/                    # payload instance
+├── floor_0_landing_door_1, _2
+├── floor_1_landing_door_1, _2
+├── elevator_shaft
+├── elevator_car/                      # cab — moves on local Z
+│   ├── elevator_car_door_1
+│   └── elevator_car_door_2
+└── Floor
+```
+
+**Configured prim paths** (`extension.toml` / carb settings under `/exts/younite.elevator_test_extension/`):
+
+| Setting | Default |
+|---------|---------|
+| `elevator_prim_path` | `/World/elevator_edit/elevator_car` |
+| `payload_root` | `/World/elevator_edit` |
+| `travel_axis` | `z` |
+| `floor_low` | `-1.26736` (floor 0) |
+| `floor_high` | `1.74` (floor 1) |
+| `rated_speed` | `1.0` (stage Z units/s ≈ m/s on Aalto rig) |
+| `inspection_speed` | `0.3` (KDL16 inspection / rescue cap) |
+| `accel` / `decel` | `0.5` |
+| `jerk_max` | `1.0` |
+| `reduced_speed` | `0.8` (within `approach_distance` 0.4 m of target) |
+| `start_delay_sec` / `stop_delay_sec` | `0.4` |
+| `leveling_speed` / `leveling_distance` | `0.2` m/s / `0.05` m (~**0.25 s** crawl — subtle; raise distance/slow speed in toml for Composer demos) |
+| `door_open_duration_sec` / `door_close_duration_sec` | `1.8` / `2.2` |
+| `door_dwell_sec` | `3.0` (open hold at destination, then auto-close; `0` skips dwell only) |
+| `use_reduced_speed_near_target` | `true` |
+
+---
+
+## Code layout
+
+```
+source/extensions/younite.elevator_test_extension/
+├── config/extension.toml
+├── premake5.lua
+└── younite/elevator_test_extension/
+    ├── extension.py              # lifecycle, menu, GLOBAL_EVENT_UPDATE, stage observer
+    ├── elevator_panel.py         # omni.ui Composer panel
+    ├── motion_profile.py         # jerk-limited integrator (KDL16-style; planning only)
+    ├── elevator_mode.py          # NORMAL / INSPECTION (KDL16)
+    ├── elevator_call_queue.py    # FIFO queue + lit car/hall call state
+    ├── trip_plan.py              # precomputed move from exact start/end stops
+    ├── elevator_service.py       # cab Z travel (samples plan + start/stop delays)
+    ├── landing_door_service.py   # per-floor outer doors (persistent controllers)
+    ├── elevator_car_door_service.py  # inner car doors
+    ├── door_pair_controller.py   # door kinematics (2 legs) + progress speed (last 5% decel)
+    └── elevator_door_coordinator.py    # sync + automated floor trips
+```
+
+**Events**: `omni.kit.app.GLOBAL_EVENT_UPDATE` for animation ticks; `"omni.usd@stage_event"` on `StageEventType.OPENED` to reset/sync door state (Events 2.0 via `carb.eventdispatcher`).
+
+**No** `younite.messaging_core_extension` events — Composer-only, no web bridge.
+
+---
+
+## Cab movement (`ElevatorService` + `trip_plan` + `motion_profile`)
+
+- Reads/writes `xformOp:translate` on `elevator_prim_path`; travel on **Z** only.
+- Two stops: `floor_low` / `floor_high` (exact configured Z). Span ≈ **3.01 m** world travel (Aalto NOSTOKORKEUS 3010 mm).
+- `get_current_floor()` → `0` or `1` (nearest stop).
+- On each trip, **`build_trip_plan(start, approach_end)`** runs once (fine dt) using the same jerk-limited rules as the KONE reference: **v=1.0**, **a/decel=0.5**, **j=1.0**, **reduced 0.8** within **0.4** of target. The plan stops **`leveling_distance`** (default **5 cm**) before the nominal floor Z; deceleration uses **v²/(2a)** on that segment.
+- Runtime **`sample_trip_plan(plan, elapsed)`** plays the fast profile to the approach point.
+- **`leveling` phase**: constant **`leveling_speed`** crawl from approach point to exact `floor_low` / `floor_high` until within **`stop_eps`** (5 mm) — forward-only, no overshoot. Default **0.2 m/s** over **5 cm** ≈ **0.25 s** (physically realistic, subtle visually).
+- Then **stop delay** (0.4 s) before cab motion clears.
+- Panel state exposes `decelStartPos`, `peakSpeed`, `moveDuration` for debugging.
+- **Start delay** / **stop delay** (default 0.4 s each) bracket the planned move.
+- **Inspection mode** (Composer panel): caps cab profile at **`inspection_speed`** (0.3 m/s); doors/trip phases unchanged. Switch only when cab/trip idle.
+- **Call queue** (`ElevatorCallQueue`): car + hall registrations, lit until `mark_served` on **opening** at destination; FIFO dispatch after each trip completes (`closing_dest` done).
+- Not a full KONE state machine (no DOP_261/263, collective direction logic beyond 2-floor FIFO, light-curtain reopen) — kinematic animation only.
+- **Reference**: Aalto HISSI 44733071 / KONE MonoSpace 500 parameters (manufacturer email + `Assets/Elevator/` PDF); aligned with reference Python integrator, not a separate 7-segment analytic S-curve formula.
+
+---
+
+## Doors (`DoorPairController`)
+
+Shared motion for each door pair (landing outer + car inner) on **local X** via `EditContext` session writes. Animation is **two separate layers** — not one eased curve from closed to open.
+
+### Layer 1 — Kinematics (shape): piecewise linear, two legs
+
+Progress `p` runs **0 → 1** per open/close. Positions come from `sample_open` / `sample_close` — linear lerp within each leg. `lead_fraction` (~0.49 for current stops) is derived from door1 travel distances (closed→middle vs middle→open).
+
+**Opening**
+
+| Leg | Progress | Door 1 | Door 2 |
+|-----|----------|--------|--------|
+| 1 — lead | `0 … lead_fraction` | closed → middle | held at closed |
+| 2 — together | `lead_fraction … 1` | middle → open | closed → open |
+
+**Closing** (reverse order)
+
+| Leg | Progress | Door 1 | Door 2 |
+|-----|----------|--------|--------|
+| 1 — together | `0 … (1 − lead_fraction)` | open → middle | open → closed |
+| 2 — lead | `(1 − lead_fraction) … 1` | middle → closed | held at closed |
+
+No easing is applied in this layer — only straight interpolation between configured X stops.
+
+### Layer 2 — Timing (speed): one rule for the full move
+
+Progress is **not** `elapsed / duration`. Each frame in `DoorPairController.update()`:
+
+```text
+progress += (dt / duration) × speed_multiplier
+```
+
+Open uses `door_open_duration_sec` (default **1.8 s**); close uses `door_close_duration_sec` (default **2.2 s**).
+
+| Progress range | `speed_multiplier` |
+|----------------|-------------------|
+| **0% → 95%** | **1.0** (constant — linear wall-clock motion) |
+| **95% → 100%** | **`max(0.06, (1 − rem)⁴)`** where `rem` is 0→1 through that last 5% slice |
+
+Tuning constants in `door_pair_controller.py`: `_DECEL_FINAL_FRACTION = 0.05`, `_DECEL_MIN_SPEED = 0.06`.
+
+Because progress slows only in the last 5%, total open/close may run **slightly longer** than the configured duration — intentional crawl into the stop, similar to real elevator doors.
+
+**Cab vs doors:** cab follows a **precomputed** jerk-limited plan (`trip_plan` + `motion_profile` at plan time); doors use the piecewise-linear + last-5% decel model above.
+
+### Stop values
+
+- **Landing** (`LANDING_DOOR_STOPS`): door1 closed `19.18064`, middle `19.6866`, open `20.21453`; door2 closed/open `19.6866` / `20.21453`.
+- **Car** (`CAR_DOOR_STOPS`): door1 closed `0.20815`, middle `-0.21415`, open `-0.7779`; door2 closed `-0.29805`, open `-0.82825`.
+
+### Service wiring
+
+`LandingDoorService` keeps **one persistent `DoorPairController` per floor** (do not recreate per request — breaks close-after-open state).
+
+`ElevatorCarDoorService` uses `car_root=elevator_prim_path` (the **car** prim, not its parent). Wrong root was a past bug that prevented inner doors from moving.
+
+---
+
+## Coordinator (`ElevatorDoorCoordinator`)
+
+**Manual**
+
+- `request_open_floor` / `request_close_floor`: outer doors on that floor; inner doors sync only when cab is on the same floor.
+- `request_open_car` / `request_close_car`: inner only.
+
+**Idempotent floor + car sync** (important for manual overrides and trip opening):
+
+- **Close floor**: close inner only if `car.is_open`; close outer only if `landing.is_floor_open`. Already-closed inner or outer is skipped — never aborts the other leaf.
+- **Open floor**: open outer only if not already open; when cab is on that floor, open inner if not already open (even when outer was left open manually before the cab arrived).
+
+**Automated trip** — `request_trip_to_floor(target)`:
+
+1. **closing** — close outer doors at current floor + inner car doors if open.
+2. **moving** — jerk-limited profile to **5 cm** before floor stop (~**5 s** for full span, plus delays).
+3. **leveling** — slow crawl at **0.2 m/s** into exact floor Z (panel shows `Trip: leveling…`).
+4. **opening** — `request_open_floor(target)` (outer if needed + inner when cab arrived).
+5. **dwelling** — hold `door_dwell_sec` (default **3 s**) with doors open (skipped when `door_dwell_sec = 0`). **Car call** during dwell (`request_car_call`) registers the floor (if new), cancels dwell, and starts **closing_dest**; queue continues after doors close.
+6. **closing_dest** — auto-close landing + car doors at destination; when idle, **`_try_dispatch()`** runs the next FIFO entry if any.
+
+`is_busy()` gates **manual door overrides** and **mode change** only. Car/hall call buttons stay enabled while busy (register + queue). Lit calls clear on **opening** at the served floor (`mark_served`). Serve-in-place: cab already at queued head → open → dwell → close without move.
+
+---
+
+## Extension checklist (repo)
+
+The extension is **built** with the repo (`premake5.lua` + `source/extensions/`) but **not** auto-loaded by Composer:
+
+1. Folder + `premake5.lua` + `__init__.py` + `extension.toml` — done.
+2. **Do not** add to `younite.usd_composer.kit` `[dependencies]` unless productizing.
+3. **Do not** add to streaming dev/prod kits.
+4. Enable only via `startcomposer_elevator_test.bat` or `--enable`.
+
+---
+
+## Relation to production elevators
+
+| | Elevator test (this) | Navigation shortcuts |
+|--|----------------------|----------------------|
+| Purpose | Authoring / kinematics prototype | Runtime multi-floor routing in main scene |
+| Scene | Local `Assets/Elevator/` | `nav_shortcuts_layer.usda` + `shortcuts.json` |
+| Kit | Composer, opt-in | Streaming dev (gated toggles) |
+| Web | None | Dev Tools + future CU policy |
+
+Integrating this rig into Goteverse would need new USD placement, shortcut config, messaging/world-state if exposed to web, and WCAG if CU-facing — out of scope for the test extension.
+
+---
+
+## Troubleshooting
+
+| Symptom | Likely cause |
+|---------|----------------|
+| Panel shows “no stage” / Z: — | Wrong scene (use elevator test scene) or missing `Assets/Elevator/` |
+| Inner doors never move | `car_root` not set to `elevator_car` prim |
+| Outer doors won’t close after open | New `DoorPairController` per request instead of persistent per-floor instance |
+| Outer won’t close after inner already closed | Fixed: coordinator must skip already-closed inner before landing close (don’t treat “already closed” as fatal) |
+| Inner won’t open after trip when outer already open at destination | Fixed: `request_open_floor` must still open inner when landing is already open |
+| Extension on normal Composer | Still enabled in Extension Manager; remove from kit `[dependencies]` if re-added |
+| Scene not found | Run `startcomposer_elevator_test.bat`; ensure `elevator_test_scene.usda` exists under `Assets/Elevator/` |
+
+---
+
+## Optional physics colliders (local experiment — not in repo)
+
+The **default** elevator test is **transform-only**: cab and doors move via the extension on `GLOBAL_EVENT_UPDATE`; **Play off** is the normal workflow. No `omni.physx` dependency, no rigid bodies.
+
+Use this section when you need **collision geometry** (raycasts, NavMesh blockers, future picking) on a **local copy** of the scene — **not** to simulate passengers or dynamic objects riding the cab.
+
+### Scope (collider-only)
+
+| Do | Don't |
+|----|-------|
+| Kinematic rigid bodies on **moving** roots (cab, each landing door) | Dynamic rigid bodies on the cab floor |
+| Static mesh colliders on shaft / fixed geometry | Motors, forces, or PhysX to drive cab travel |
+| Extension continues to write `xformOp:translate` | Visible proxy collision boxes (use existing mesh colliders) |
+| **Play off** for panel testing | Passenger glue, surface velocity, mass/damping hacks |
+
+**Inner car doors**: put mesh colliders on `elevator_car_door_1/2` **under** `elevator_car` — one kinematic RB on the car is enough (doors inherit cab Z + their own X from the extension).
+
+**Never edit** `elevator_edit.usdc` for physics; author colliders in a **scene `.usda` layer** (`over` blocks) so the payload stays clean.
+
+### Quick replicate (~15 min)
+
+1. **Copy the scene** in `Assets/Elevator/`:
+   - `elevator_test_scene.usda` → `elevator_test_scene_colliders.usda` (or a sublayer — same folder, same payload ref).
+
+2. **Add a physics scene** under `/World` (reference the shared template used elsewhere in the repo):
+   ```usda
+   def "physicsScene" (
+       prepend references = @../../physics/physics_scene.usda@
+   )
+   {
+   }
+   ```
+
+3. **Static colliders** (collision API only — no rigid body) on fixed meshes, e.g.:
+   - `elevator_edit/elevator_shaft/SOLID` — `PhysicsCollisionAPI`, `PhysxTriangleMeshCollisionAPI`, `physics:approximation = "none"`.
+
+4. **Kinematic rigid bodies** on prims the extension animates:
+   - `elevator_car` — `PhysicsRigidBodyAPI`, `physics:kinematicEnabled = 1`, `physics:rigidBodyEnabled = 1`.
+   - Each `floor_*_landing_door_*` — same kinematic RB on the door **root** Xform (they slide on X independently).
+   - Mesh colliders on the door/car-floor mesh prims (`_51004587V004`, `C51494265V003`, etc.) as **children** of those roots.
+
+5. **Optional launch script** (local only, do not commit unless productizing):
+   ```bat
+   set "YOUNITE_KIT_EXTRA_ARGS=--enable younite.elevator_test_extension"
+   set "YOUNITE_SCENE_NAME=elevator_test_scene_colliders"
+   cd kit-app-template-main && call start_composer.bat && cd ..
+   ```
+   `auto_load_mastah.py` already resolves scenes under `Assets/Elevator/`.
+
+6. **Verify**: open with the colliders scene, run floor trips with **Play off** — motion should match `elevator_test_scene`. Press **Play** only if you need live PhysX colliders during sim (see below).
+
+### Composer UI shortcut
+
+Instead of hand-editing USD, you can select mesh prims in Composer → **Add → Physics → Collider** (and **Rigid Body → Kinematic** on moving roots). Save the scene `.usda`; keep overrides on the scene layer, not inside `elevator_edit.usdc`.
+
+### Play on vs Play off
+
+| Mode | Use when |
+|------|----------|
+| **Play off** | Panel trips, door choreography, authoring — **recommended default** |
+| **Play on** | Something else in the stage needs PhysX colliders updated every sim step (character controller, overlap queries during sim) |
+
+With **collider-only** and **no dynamic passengers**, the extension does **not** need physics hooks in the repo. Kinematic colliders follow USD transforms when the sim runs; if Play-on sync ever drifts, the fix is a small **pre-step** hook (`omni.physx` subscribe, re-write current cab/door transforms) — that was prototyped and **reverted**; re-add only if Play-on testing shows misaligned colliders.
+
+### What we tried and dropped (don't repeat)
+
+- **Dynamic test cube** on the cab floor — moving kinematic platforms + dynamic stacks cause stop hops; irrelevant if there are no passengers.
+- **`convexHull` on the car floor mesh** — colliders failed silently; use `approximation = "none"` on authored meshes.
+- **Per-object passenger glue / overlap damp** — not needed for collider-only scope.
+
+### Landing door closed positions (colliders scene)
+
+If outer doors look misaligned in a physics copy, match closed X to `LANDING_DOOR_STOPS` in `landing_door_service.py` (`door1` closed `19.18064`, `door2` closed `19.6866`) via scene-layer `over` on each landing door root.
+
+---
+
+## Future: robot rider — friction vs coupling vs hybrid
+
+This rig is intended as a **separate** basis for robot teach-in / sim (lobby → cab → ride → exit). It is **not** tied to Goteverse NavMesh, auto-mover, or production navigation shortcuts.
+
+**Cab motion stays the same in all modes:** kinematic + Python script (`ElevatorService` + door controllers). Never drive the cab with motors, forces, or dynamic rigid-body simulation.
+
+### Three ride phases
+
+| Phase | Who moves the robot | Elevator |
+|-------|---------------------|----------|
+| **Approach** (lobby → cab) | Robot controller / physics (dynamic) | Idle, doors open |
+| **Ride** (floor trip) | Coupling, friction, or hybrid (see below) | Script moves cab Z |
+| **Exit** (cab → lobby) | Robot controller / physics again | Stopped, doors open |
+
+During **approach** and **exit**, the robot is a normal dynamic agent. During **ride**, something must make the robot follow the cab — that is a deliberate design choice, not an accident of PhysX.
+
+### Cab occupancy (who rides?)
+
+Use an invisible **trigger volume** on the car floor (overlap box, slightly above the floor mesh) or an explicit teach UI **Start ride** flag:
+
+- Object enters volume → `on_cab = true`
+- Object leaves → `on_cab = false`
+- Trip starts with `on_cab` → that object is the **rider** for this trip (dynamic detection — not hard-coded to one prim)
+
+While **riding**, pause the robot’s own locomotion (wheels/joints); only the cab + coupler move the base. Re-enable locomotion after doors open at destination.
+
+### Option A — Coupling (reliable ride; games/sim default)
+
+**Not a hack** — this is how most games handle moving platforms (Unreal “moving base”, Unity platform velocity, Source `MOVETYPE_PUSH`, parent-for-cutscene).
+
+While `on_cab` and trip is **moving**:
+
+- **Delta**: each frame add `(cab_pos_now − cab_pos_last)` to rider world transform, or
+- **Parent**: attach rider under `elevator_car` for the trip; unparent at stop (preserve world pose)
+
+Implement in **one module** (e.g. `ride_coupler.py`) — not scattered across `extension.py` / `elevator_service.py`:
+
+```text
+ride_coupler.on_frame(cab_prim, rider_prim, on_cab, trip_moving)
+  → if on_cab and trip_moving: apply delta OR manage parent/unparent
+```
+
+**Best for:** deterministic teach/replay, no hop at stop, stakeholder demos that must “just work”.
+
+### Option B — Friction / contact-only (physical fidelity)
+
+Stakeholders may ask for **real contact** (wheels on floor, slip, push forces). Valid goal — different acceptance criteria than Option A.
+
+**Scene (local colliders copy — see section above):**
+
+- Cab: **kinematic** RB + floor mesh collider (`approximation = "none"` — not `convexHull` on floor mesh)
+- Rider: **dynamic** RB or articulation; wheel/foot colliders; sane mass; low restitution material on floor + feet
+- Physics scene: stabilization, bounded `maxDepenetrationVelocity` if needed
+
+**Extension (required for friction experiments):**
+
+- `omni.physx` **pre-step** hook: advance cab pose, write kinematic transform **before** PhysX integrates (prototyped then reverted — re-add when testing friction)
+- **Play on** during robot sim
+
+**What friction is good for:** drive-on, stand/walk on floor, horizontal slip, loading forces.
+
+**Known pain points (even in commercial engines):** vertical stop → penetration correction → **hop/jitter** (~15 cm observed on a test cube); non-deterministic run-to-run; wheeled robots need heavy tuning.
+
+### Option C — Hybrid (often satisfies both camps)
+
+Common when the requirement is “physical” but stops must be clean:
+
+1. **Approach / exit:** full friction + robot controller on cab floor
+2. **Ride:** friction for horizontal contact **or** “on cab” detection; **add cab delta / platform velocity to rider** during vertical move (Unreal-style moving base)
+3. **Stop:** brief linear/angular damp on rider only, or gentler cab ease — optional mitigation if hop remains
+
+Document the requirement explicitly:
+
+> Rider follows cab via contact/friction where possible; **platform motion inheritance** allowed for vertical trip/stops if friction alone fails acceptance.
+
+### Choosing a mode
+
+| Requirement | Prefer |
+|-------------|--------|
+| Teach replay bit-identical | Coupling (A); record pose in cab frame for playback |
+| Wheel–floor contact, slip, forces | Friction (B) or hybrid (C) |
+| No hop at floor landing | Coupling (A) or hybrid (C) |
+| Pure friction, no coupling | Budget tuning time; slower cab ease; accept stop mitigation |
+
+### Code layout when robot work starts
+
+Keep the current extension as **ElevatorDriver** only. Add alongside (not inside) door services:
+
+```text
+ride_coupler.py       # delta or parent; single entry point
+cab_occupancy.py      # trigger overlap or teach UI → on_cab
+# optional later:
+physics_pre_step.py   # cab/door sync before PhysX (friction/hybrid only)
+```
+
+**Do not** rely on passive friction to carry the rider unless that path is explicitly chosen and tested; do not mix coupling hacks into `ElevatorService` transform writes.
+
+---
+
+## Related
+
+- **Navigation shortcuts** (production elevator hops): `shortcuts.mdc`
+- **Composer launch / scene auto-load**: `auto_load_mastah.py`, `startcomposer.bat`, `start_composer.bat`
+- **Events API** (update + stage observer patterns): `events-api.mdc`

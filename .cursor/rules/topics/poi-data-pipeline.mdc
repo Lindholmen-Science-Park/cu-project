@@ -1,0 +1,194 @@
+---
+description: Data-driven POI pipeline — JSON data files, Kit discovery/enrichment, web metadata filtering, i18n for structured values, adding new POI types. Read when working on restrooms, quiet zones, exits, or adding a new POI type.
+globs:
+  - "**/restroom_data.json"
+  - "**/quiet_zone_data.json"
+  - "**/exit_data.json"
+  - "**/RestroomWidget*"
+  - "**/QuietZoneWidget*"
+  - "**/ExitsWidget*"
+  - "**/navmesh_route_extension/events/poi_state.py"
+  - "**/navmesh_route_extension/events/poi_routes.py"
+alwaysApply: false
+---
+
+# Data-Driven POI Pipeline
+
+All point-of-interest types (restrooms, quiet zones, exits) follow a single data-driven pattern: USD xForms define **positions**, external JSON files define **properties**, and the Kit backend merges them at request time. The web frontend receives enriched results and filters/formats entirely client-side.
+
+## Design principles
+
+1. **Data is the source of truth** — only xForms with a matching JSON entry are discoverable. A scene can contain 100 xForms but if only 10 have data, only those 10 appear in the UI.
+2. **`in_use` flag** — each entry has `in_use: true/false`. Set to `false` for temporarily unavailable POIs (out-of-order toilet, closed restaurant) without deleting the data.
+3. **Orphan logging** — Kit logs `WARNING: orphan xForm '/World/<name>' has no data entry` for xForms that match a POI prefix but lack a data entry, prompting cleanup.
+4. **Client-side filtering** — all filter logic runs in the web widget using metadata. No Kit re-request needed when toggling filters.
+5. **Structured values for i18n** — data stores numbers/codes (not display strings) so the frontend can localise them.
+
+## File locations
+
+| File | Purpose |
+|---|---|
+| `source/data/restroom_data.json` | Restroom properties (7 entries) |
+| `source/data/quiet_zone_data.json` | Quiet zone properties (3 entries) |
+| `source/data/exit_data.json` | Exit properties (10 entries) |
+| `source/data/scenes/sublayers/restroom_layer.usda` | Restroom xForm positions (`restroom_01`…`restroom_07`) |
+| `source/data/scenes/sublayers/quiet_zone_layer.usda` | Quiet zone xForm positions (`quiet_zone_01`…`quiet_zone_03`) |
+| `source/data/scenes/sublayers/exit_points_layer.usda` | Exit xForm positions (`exit_point_01`…`exit_point_10`) |
+
+## JSON data schemas
+
+### Restroom (`restroom_data.json`)
+
+```json
+{
+  "xform_id": "restroom_01",
+  "in_use": true,
+  "display_name": "Accessible toilets Section N",
+  "section": "N",
+  "for_men": true,
+  "for_women": true,
+  "is_unisex": true,
+  "is_accessible": true,
+  "has_changing_table": false,
+  "fee": 0,
+  "toilet_seats": 2,
+  "cleaning_schedule": "once_daily"
+}
+```
+
+### Quiet zone (`quiet_zone_data.json`)
+
+```json
+{
+  "xform_id": "quiet_zone_01",
+  "in_use": true,
+  "display_name": "Restaurant Slottet",
+  "is_accessible": true,
+  "fee": 0,
+  "cleaning_schedule": "once_daily"
+}
+```
+
+### Exit (`exit_data.json`)
+
+```json
+{
+  "xform_id": "exit_point_01",
+  "in_use": true,
+  "display_name": "Main entrance"
+}
+```
+
+### Structured value conventions
+
+| Field | Type | Convention |
+|---|---|---|
+| `fee` | `number` | `0` = free; positive = amount in SEK |
+| `cleaning_schedule` | `string` | Code: `"once_daily"`, `"twice_daily"` — mapped to i18n keys |
+| `is_accessible` | `boolean` | Mapped to `toiletInfoAccessibleYes` / `toiletInfoAccessibleNo` |
+
+## Kit backend (`events/` package)
+
+POI data loading and USD discovery helpers live in **`younite/navmesh_route_extension/events/poi_state.py`**. Carb event handlers for bulk routes, route-measure toggle, and **`poiTeleport`** live in **`events/poi_routes.py`**. Both are wired from **`events/__init__.py`** (`register_navmesh_route_events`): **`load_poi_state()`** runs **before** route-calculation subscriptions so `waypoint_route_ids` and POI lookups are always initialized (same startup order as the rest of the extension event wiring).
+
+### POI_CONFIGS registry
+
+The registry dict is defined inside **`load_poi_state()`** in `poi_state.py` (then attached to the wire context as `ctx.poi_configs`):
+
+```python
+poi_configs = {
+    "exit":       { "prefix": "exit_point_",  "route_id": "exit_nav",       "max_results": 10, "data_file": "exit_data.json" },
+    "restroom":   { "prefix": "restroom_",    "route_id": "poi_nav",        "max_results": null, "use_waypoints": True, "data_file": "restroom_data.json" },
+    "quiet_zone": { "prefix": "quiet_zone_",  "route_id": "quiet_zone_nav", "max_results": 10, "use_waypoints": True, "data_file": "quiet_zone_data.json" },
+}
+```
+
+### Data loading (`_load_poi_data_file` / `load_poi_state`)
+
+For each config, `data_file` is read via **`_load_poi_data_file(data_dir, filename)`** into `cfg["_data_lookup"]` — a `{xform_id: entry_dict}` map. The data directory comes from **`find_data_dir()`**, which walks up from the **`navmesh_route_extension`** package root (the parent of the `events/` folder), using the same anchors as before (`source`, `kit-app-template-main`), with a CWD fallback.
+
+### Discovery (`discover_pois`)
+
+**`discover_pois(prefix, data_lookup=...)`** in `poi_state.py` iterates direct children of `/World`, matches by `prefix`, then gates on `data_lookup`:
+- Entry exists and `in_use: true` → included
+- Entry exists and `in_use: false` → skipped silently
+- No entry → logged as orphan warning, skipped
+
+### Enrichment (`enrich_results`)
+
+**`enrich_results(results, data_lookup)`** in `poi_state.py` attaches the full JSON entry as a `metadata` dict to each result after route computation. The web receives `metadata` on both `PoiResult` and `ExitResult` types.
+
+### Events
+
+| Event | Direction | Payload |
+|---|---|---|
+| `navmeshRoutesToPoisRequest` | Web → Kit | `{ poiType: "restroom" \| "quiet_zone" }` |
+| `navmeshRoutesToPoisResult` | Kit → Web | `{ poiType, results: [{ exitRef, success, metadata, ... }] }` |
+| `navmeshRoutesToExitsRequest` | Web → Kit | `{}` (auto-discover) or `{ exitRefs: [...] }` |
+| `navmeshRoutesToExitsResult` | Kit → Web | `{ results: [{ exitRef, success, metadata, ... }] }` |
+
+## Web frontend
+
+### TypeScript types
+
+`PoiResult` and `ExitResult` (in `types.ts`) both have `metadata?: Record<string, any>`.
+
+### RestroomWidget
+
+- **List cap vs filters**: Kit returns **all** in-use restrooms with route measures (`max_results: null`). The default list shows only the **10 nearest** by walk distance/time. **Filters** run on the **full** result set so a type that ranks 11th+ is still discoverable (e.g. accessible toilets beyond the default top 10).
+- **Filters**: exclusive client-side logic using `metadata` booleans (`for_men`, `for_women`, `is_unisex`, `is_accessible`, `has_changing_table`). Selecting "Women" shows only restrooms where `for_women && !for_men && !is_unisex`.
+- **Detail sheet (FP)**: fee, accessibility, cleaning schedule, toilet seats — all from `metadata`. Action buttons are FP "Take Me There" / "Move to" via `PoiRoutesWidget`.
+- **Route-ready + tracking screen (FP):** the sheet **“Get directions”** enters **restroom tracking** (hides the widget) while the stream overlay waits on **`navmeshRouteReady`**. The **Get directions** control is **`disabled`** until **`nav.routeReadyByRouteId['poi_nav'] === true`**, with **`title`** from **`t('search.poiWaitForRoute')`**, so the user cannot open tracking with no FAB. See **`bird-eye-route.mdc` § "FP search widgets"** and **`waypoint-routing.mdc`** (`_WALL_CHECK_RATIO`) for Kit-side degenerate-via failure modes.
+- **Display name**: `metadata.display_name` with fallback to `t('search.toiletSection', { n })`.
+- **Bird-eye click branch**: when `currentCamera === 'bird_eye'`, clicking a list item closes the widget and opens `MapMarkerPoiSheet` with `useNavmeshPoiTeleport: true` instead of running the FP "Take Me There" / "Move to" pair. The sheet's two actions ("Teleport me there" / "Get directions") then route through the unified bird-eye → FP flow described in `poi-teleport.mdc` and `bird-eye-route.mdc`. A flag pin is also shown at the POI's prim location via `birdEyePinShowAtPrim`.
+- **Distance/time prelist in bird-eye**: the per-item time / distance uses **`_resolve_player_ref_for_poi_lists()`** in **`events/poi_routes.py`**, which falls back to `lastFpPos*` when the active view is bird-eye. See `route-measurement.mdc` → "Bird-eye player ref".
+
+### QuietZoneWidget
+
+- No filters. Detail sheet shows fee, accessibility, cleaning schedule from `metadata`.
+- Display name: `metadata.display_name` with fallback.
+- **Route-ready + tracking screen (FP):** same pattern as **`RestroomWidget`**, but the route id is **`quiet_zone_nav`** — disable **Get directions** until **`nav.routeReadyByRouteId['quiet_zone_nav'] === true`**, **`title` → `search.poiWaitForRoute`**. Tracking reset on error / selection change is described in **`bird-eye-route.mdc` § "FP search widgets"**.
+- Bird-eye click branch and prelist: identical to `RestroomWidget` (same `useNavmeshPoiTeleport` flag, same `lastFpPos*` distance computation).
+
+### ExitsWidget
+
+- Forwards `metadata` from `ExitResult` to `PoiResult` via `exitToPoiResult()`.
+- Display name: `metadata.display_name`.
+
+### i18n value formatting
+
+Both restroom and quiet zone widgets use shared helper functions:
+
+- **`formatFee(fee, t)`** — `fee === 0` → `t('search.poiFeeFree')`, else `t('search.poiFeeAmount', { amount })`.
+- **`formatCleaning(code, t)`** — maps code to i18n key via `CLEANING_SCHEDULE_I18N` lookup (`once_daily` → `search.poiCleaningOnceDaily`, etc.). Falls back to raw code string for unknown codes.
+
+i18n keys (in all 4 locales — EN/SV/FR/ES):
+
+| Key | EN |
+|---|---|
+| `search.poiFeeFree` | Free |
+| `search.poiFeeAmount` | {{amount}} SEK |
+| `search.poiWaitForRoute` | Calculating walking route… (disabled **Get directions** `title` until **`navmeshRouteReady`**) |
+| `search.poiCleaningOnceDaily` | Once daily |
+| `search.poiCleaningTwiceDaily` | Twice daily |
+
+## Adding a new POI type
+
+1. **USD sublayer** — create `source/data/scenes/sublayers/<type>_layer.usda` with xForms named `<prefix>_01`, `<prefix>_02`, etc. Reference it from `main_scene.usda`.
+2. **JSON data file** — create `source/data/<type>_data.json` with entries matching the xForm IDs. Include at minimum `xform_id`, `in_use`, `display_name`.
+3. **Register in `poi_configs` inside `load_poi_state()`** (`events/poi_state.py`) — add an entry with `prefix`, `route_id`, `max_results`, `data_file`, and optionally `use_waypoints: True`.
+4. **Web widget** — create the React component using `metadata` for display/filtering. Use `formatFee` / `formatCleaning` helpers if applicable.
+5. **Navigation hook** — add state + open/close handlers following the `usePoiNavigation.ts` or `useQuietZoneNavigation.ts` pattern.
+6. **Bird-eye flow (free)** — if the widget appears in the search overlay in bird-eye, mirror `RestroomWidget` / `QuietZoneWidget`: on click in `currentCamera === 'bird_eye'` close the list and call `nav.openMapMarkerSheet({ useNavmeshPoiTeleport: true, primPath, … })` plus `sendMessage('birdEyePinShowAtPrim', { primPath })`. Both teleport ("Teleport me there" → `poiTeleport`) and directions ("Get directions" → `mapMarkerDirectionsStart` with `endpointPath` + optional `startEndpointPath` on swap) work without any Kit-side change — the unified `start_pose` path in `_async_first_person_enter` handles the body-yaw alignment.
+
+No Kit-side code changes are needed beyond that registry entry — discovery, enrichment, routing, **bird-eye sheet, navmesh-POI teleport and directions** are all generic across POI types.
+
+## Related
+
+- **POI coins** (3D round-sign markers placed near POIs via `coin_<xform_id>_<coin_type>` xForms, dynamic `coins_registry.json` for assets, info-only click card): `poi-coins.mdc`
+- **Route measurement** (distance/time, exit routing, bird-eye `lastFpPos*` fallback for POI lists): `route-measurement.mdc`
+- **POI teleportation** (instant jump to any POI; the three teleport APIs and which one each flow uses): `poi-teleport.mdc`
+- **Bird-eye route overlay** (`MapMarkerDirectionsPanel`, `useNavmeshPoiTeleport`, `startEndpointPath`, `birdEyePinShowAtPrim`): `bird-eye-route.mdc`
+- **USD sublayers** (scene composition, adding sublayers): `sublayers.mdc`
+- **Localization** (i18n, adding languages): `localization.mdc`
+- **Waypoint routing** (corridor waypoints for indoor POIs): `waypoint-routing.mdc`

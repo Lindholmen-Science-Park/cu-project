@@ -1,0 +1,160 @@
+---
+description: Kit Events 2.0 standard — subscribing, cleanup, observer naming, stage-event bridge, custom events. Read when adding event subscriptions, per-frame updates, or stage event listeners.
+globs:
+  - kit-app-template-main/source/extensions/**/*.py
+---
+
+# Kit Events 2.0 — Standard for All Extensions
+
+All Younite extensions **must** use the Events 2.0 API (`carb.eventdispatcher`).
+Events 1.0 (`get_update_event_stream()`, `get_stage_event_stream()`, `create_subscription_to_pop()`) is deprecated and must not appear in new code.
+
+---
+
+## Quick Reference
+
+```python
+import carb.eventdispatcher
+import omni.kit.app
+
+ed = carb.eventdispatcher.get_eventdispatcher()
+```
+
+| Purpose | `event_name` |
+|---|---|
+| Per-frame update | `omni.kit.app.GLOBAL_EVENT_UPDATE` (constant) |
+| USD stage event | `"omni.usd@stage_event"` (string) |
+| Custom (outbound to web) | any string, e.g. `"videoListSync"` |
+| Custom (inbound from web) | any string, e.g. `"videoListRequest"` |
+
+---
+
+## Subscribing
+
+### Per-frame update
+
+```python
+self._update_sub = ed.observe_event(
+    observer_name="younite.<extension_name>/update",
+    event_name=omni.kit.app.GLOBAL_EVENT_UPDATE,
+    on_event=self._on_update,
+    order=0,
+)
+```
+
+### Delta time on `GLOBAL_EVENT_UPDATE`
+
+Kit puts elapsed seconds in **`event.payload["dt"]`**, not on `event.dt`. Reading the wrong field and falling back to a fixed `1/60` per callback makes movement **scale with FPS** (more frames × fixed step = faster).
+
+**Correct pattern** (used in rain/snow, NPC mover, maintenance bots, `player_core` `PlayerUpdateLoop`, face-turn, etc.):
+
+```python
+def _on_update(self, event) -> None:
+    dt = 0.0
+    try:
+        payload = getattr(event, "payload", None) or {}
+        if isinstance(payload, dict):
+            dt = float(payload.get("dt", 0.0))
+    except Exception:
+        dt = 0.0
+    if dt <= 0.0:
+        dt = 1.0 / 60.0
+    # ... speed * dt, time_budget = dt, rate * dt, etc.
+```
+
+**Never** use `getattr(event, "dt", …)` on Events 2.0 update events — that attribute is not populated.
+
+**Player core** (`runtime/update_loop.py`) passes this `dt` into `PointClickAutoMover`, `PlayerInputController` (bird-eye pan), and `BirdEyeFramer`. `navigation_orchestrator_service._on_face_turn_update` uses the same read: **`profile="route"`** → `FACE_ROUTE_TURN_RATE * dt * ease_scale`; **`profile="stadium"`** → advances smootherstep progress by `elapsed += dt`. See `cct-movement.mdc` § Click-to-navigate face-turn.
+
+### Stage events
+
+```python
+self._stage_sub = ed.observe_event(
+    observer_name="younite.<extension_name>/stage",
+    event_name="omni.usd@stage_event",
+    on_event=self._on_stage_event,
+    order=0,
+)
+
+def _on_stage_event(self, e):
+    import omni.usd
+    event_type = e.payload.get("StageEventType")
+    if event_type == int(omni.usd.StageEventType.OPENED):
+        ...
+```
+
+### Custom messaging events (Kit ↔ Web)
+
+```python
+# Outbound: dispatch to frontend
+from younite.messaging_core_extension.outbound_events import register_outbound_events
+register_outbound_events(["myEventName"])
+ed.dispatch_event("myEventName", payload_dict)
+
+# Inbound: listen for frontend messages
+self._subs.append(
+    ed.observe_event(
+        observer_name="younite.<extension_name>/myInbound",
+        event_name="myInboundEvent",
+        on_event=self._on_inbound,
+        order=0,
+    )
+)
+```
+
+---
+
+## Cleanup (Critical)
+
+Set subscription references to `None` (single) or call `.clear()` (list). This triggers the destructor which removes the observer. **Never call `.unsubscribe()`** — that is an Events 1.0 method.
+
+### Single subscription
+
+```python
+def on_shutdown(self):
+    self._update_sub = None
+```
+
+### List of subscriptions
+
+```python
+def on_shutdown(self):
+    self._subs.clear()
+```
+
+Setting `None` to `None` is harmless, so guards like `if self._sub is not None:` are optional. `getattr` guards are fine to keep for robustness if `on_startup` might not have run.
+
+---
+
+## Observer Naming Convention
+
+Use `"younite.<extension_name>/<purpose>"`:
+
+- `"younite.interactions_extension/update"`
+- `"younite.video_extension/stage"`
+- `"younite.rain_service/update"`
+
+Unique observer names make debugging straightforward.
+
+---
+
+## The Lazy Stage-Event Bridge
+
+Kit 110 has an internal bridge that translates Events 1.0 stage events (`OPENED`, `ASSETS_LOADED`, `CLOSED`, etc.) into the Events 2.0 namespace (`omni.usd@stage_event`). The bridge is **lazy**: it only activates when at least one subscriber calls `usd_context.get_stage_event_stream()`.
+
+### stage_watcher.py — The Required Anchor
+
+`younite.usd_viewer_stage_core_extension/.../stage_watcher.py` intentionally uses the deprecated `get_stage_event_stream()` call. It is the **single bridge activator** for the entire project. Its docstring explains the rationale.
+
+**Rules:**
+1. **Never migrate `stage_watcher.py`** away from `get_stage_event_stream()` — it keeps the bridge alive for all Events 2.0 stage-event observers.
+2. All other extensions must use Events 2.0 for stage events.
+3. When NVIDIA's SDK natively dispatches `omni.usd@stage_event` without the bridge (expected in a future Kit release), `stage_watcher.py` can be migrated and this rule removed.
+
+---
+
+## NVST_R_BUSY / "Failed to send custom app message" Warnings
+
+These WebRTC warnings appear when Kit dispatches outbound events faster than the NVST data channel can deliver. Common triggers: high-frequency dispatches during WebRTC setup/teardown, client disconnect/reconnect, data channel saturation.
+
+These are **cosmetic noise**, not errors. Messages are dropped on that frame and re-sent on the next successful tick. No action required unless warnings persist continuously (indicating the stream never connected).

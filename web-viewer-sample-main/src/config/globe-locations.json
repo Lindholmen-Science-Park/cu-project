@@ -1,0 +1,30 @@
+{
+  "globe": {
+    "initialView": {
+      "lat": 55.0,
+      "lon": 14.0,
+      "alt": 4500000,
+      "heading": 0,
+      "pitch": -90
+    }
+  },
+  "locations": [
+    {
+      "id": "gothenburg",
+      "labelKey": "globe.gothenburg",
+      "fallbackLabel": "Gothenburg",
+      "lat": 57.69924,
+      "lon": 11.98767,
+      "targetView": "bird_eye",
+      "scene": "main_scene",
+      "transitionMessageKey": "streaming.enteringGothenburg",
+      "cameraFlight": {
+        "waypoints": [
+          { "lat": 57.75, "lon": 12.0, "alt": 15000,  "duration": 5, "heading": 0, "pitch": -85, "maxHeight": 4500000 },
+          { "lat": 57.732, "lon": 11.930, "alt": 3500,  "duration": 3, "heading": 137, "pitch": -35, "maxHeight": 15000 },
+          { "lat": 57.7012, "lon": 11.9842, "alt": 212, "duration": 2.5, "heading": 137, "pitch": -35, "maxHeight": 3500 }
+        ]
+      }
+    }
+  ]
+}

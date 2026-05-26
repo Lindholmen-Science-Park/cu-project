@@ -1,0 +1,976 @@
+/*
+ * CU mode — Find my seat panel
+ * Design ref: Figma 2026 APRIL DEMO — node 5706-9094
+ */
+
+/* Fixed to bottom edge, full width */
+/* Above cu-controls-menu-frost (10051) so “Find my seat” sheet stacks on top while search stays open behind */
+.cu-seat-panel__dock {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 10060;
+    display: flex;
+    justify-content: flex-start;
+    align-items: flex-end;
+    box-sizing: border-box;
+    padding: 0 env(safe-area-inset-left, 0) 0 env(safe-area-inset-right, 0);
+    pointer-events: none;
+    overflow: visible;
+}
+
+/* Animation on shell (not card) to avoid overflow:hidden / border-radius clipping */
+.cu-seat-panel__sheet-shell {
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    align-self: stretch;
+    pointer-events: auto;
+    transform-origin: bottom center;
+    will-change: transform;
+    animation: cu-seat-sheet-in 0.48s cubic-bezier(0.32, 0.72, 0, 1) forwards;
+    overflow: visible;
+}
+
+.cu-seat-panel__dock .cu-seat-panel__card {
+    pointer-events: auto;
+    width: 100%;
+}
+
+/* Handlebar — 363px strip; pill centered horizontally */
+.cu-seat-panel__handlebar-hit {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 23px;
+    justify-content: flex-start;
+    box-sizing: border-box;
+    width: 363px;
+    max-width: 100%;
+    align-self: center;
+    margin: 0;
+    padding: 0;
+    touch-action: none;
+    cursor: grab;
+    flex-shrink: 0;
+    border: none;
+    background: transparent;
+    font: inherit;
+    color: inherit;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.cu-seat-panel__handlebar-hit:active {
+    cursor: grabbing;
+}
+
+.cu-seat-panel__handlebar-hit--inactive {
+    pointer-events: none;
+    cursor: default;
+}
+
+.cu-seat-panel__handlebar-pill {
+    display: block;
+    width: 80px;
+    height: 4px;
+    border-radius: 8px;
+    background: var(--Dark-Purple, #351a84);
+}
+
+@keyframes cu-seat-sheet-in {
+    from {
+        transform: translate3d(0, calc(100% + 28px), 0);
+        opacity: 0;
+    }
+    to {
+        transform: translate3d(0, 0, 0);
+        opacity: 1;
+    }
+}
+
+/* Exit: slide down out of view */
+.cu-seat-panel__sheet-shell.cu-seat-panel__sheet-shell--exiting {
+    animation: cu-seat-sheet-out 0.38s cubic-bezier(0.4, 0, 1, 1) forwards;
+    pointer-events: none;
+}
+
+@keyframes cu-seat-sheet-out {
+    from {
+        transform: translate3d(0, 0, 0);
+        opacity: 1;
+    }
+    to {
+        transform: translate3d(0, calc(100% + 32px), 0);
+        opacity: 0;
+    }
+}
+
+.cu-seat-panel__dock--exiting {
+    pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .cu-seat-panel__sheet-shell {
+        animation: none;
+        transform: none;
+        opacity: 1;
+    }
+
+    .cu-seat-panel__sheet-shell.cu-seat-panel__sheet-shell--exiting {
+        animation: none;
+        transform: translate3d(0, calc(100% + 32px), 0);
+        opacity: 0;
+    }
+
+    .cu-seat-panel__section-lang-dropdown .cu-lang-dropdown-trigger,
+    .cu-seat-panel__section-lang-dropdown .cu-lang-dropdown-anchor--open {
+        transition: none;
+    }
+}
+
+.cu-seat-panel__dock .cu-seat-panel__header {
+    cursor: default;
+    padding-top: 10px;
+}
+
+.cu-seat-panel__card--sheet .cu-seat-panel__header {
+    padding: 0 0 12px;
+}
+
+.cu-seat-panel__card--sheet .cu-seat-panel__mode-tabs {
+    margin-left: 0;
+    margin-right: 0;
+}
+
+/* Header + mode tabs: 16px between title and tabs */
+.cu-seat-panel__header-tabs {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+    align-self: stretch;
+    width: 100%;
+    box-sizing: border-box;
+    margin-bottom: 0;
+}
+
+.cu-seat-panel__header-tabs .cu-seat-panel__mode-tabs {
+    align-self: stretch;
+}
+
+/* Title + text tabs (single underline, no double border) */
+.cu-seat-panel__card--with-navmesh-tabs .cu-seat-panel__header-tabs .cu-seat-panel__header {
+    border-bottom: none;
+    padding-bottom: 4px;
+}
+
+.cu-seat-panel__mode-tabs {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-end;
+    justify-content: flex-start;
+    width: 100%;
+    box-sizing: border-box;
+    margin: 0 16px 0;
+    padding: 0;
+    gap: 14px;
+    border-bottom: none;
+}
+
+/* Medium-Default / Text CTA small — 15; inactive = muted purple, no bar (Figma) */
+.cu-seat-panel__mode-tab {
+    flex: 0 0 auto;
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    padding: 6px 2px 10px;
+    box-sizing: border-box;
+    border: none;
+    background: transparent;
+    color: rgba(53, 26, 132, 0.55);
+    font-family: Lexend, system-ui, sans-serif;
+    font-size: 15px;
+    font-style: normal;
+    font-weight: 500;
+    line-height: 110%;
+    letter-spacing: 0;
+    text-align: right;
+    cursor: pointer;
+    touch-action: manipulation;
+    transition:
+        color 0.18s ease,
+        opacity 0.18s ease;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.cu-seat-panel__mode-tab:not(.cu-seat-panel__mode-tab--active) .cu-seat-panel__mode-tab-icon {
+    opacity: 0.55;
+}
+
+.cu-seat-panel__mode-tab::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 2px;
+    border-radius: 40px;
+    background: transparent;
+    transition: background 0.18s ease;
+}
+
+.cu-seat-panel__mode-tab-icon {
+    display: inline-block;
+    flex-shrink: 0;
+    width: 20px;
+    height: 20px;
+    object-fit: contain;
+    transition: opacity 0.18s ease;
+}
+
+.cu-seat-panel__mode-tab:disabled {
+    opacity: 1;
+    color: #b0a8cc;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.cu-seat-panel__mode-tab:disabled .cu-seat-panel__mode-tab-icon {
+    opacity: 0.5;
+}
+
+/* Body wrapper (not fieldset — avoids WebKit layout issues) */
+.cu-seat-panel__body-wrap {
+    display: block;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    min-width: 0;
+    border: none;
+}
+
+.cu-seat-panel__body-wrap--locked {
+    pointer-events: none;
+}
+
+.cu-seat-panel__mode-tab:hover:not(:disabled):not(.cu-seat-panel__mode-tab--active) {
+    color: rgba(53, 26, 132, 0.72);
+}
+
+.cu-seat-panel__mode-tab:hover:not(:disabled):not(.cu-seat-panel__mode-tab--active) .cu-seat-panel__mode-tab-icon {
+    opacity: 0.72;
+}
+
+.cu-seat-panel__mode-tab:focus {
+    outline: none;
+}
+
+.cu-seat-panel__mode-tab:focus-visible {
+    border-radius: 4px 4px 0 0;
+    box-shadow: inset 0 0 0 2px rgba(53, 26, 132, 0.22);
+}
+
+.cu-seat-panel__mode-tab--active {
+    color: var(--Dark-Purple, #351a84);
+    font-weight: 500;
+}
+
+.cu-seat-panel__mode-tab--active .cu-seat-panel__mode-tab-icon {
+    opacity: 1;
+}
+
+.cu-seat-panel__mode-tab--active::after {
+    background: var(--Medium-Purple, #5421cc);
+}
+
+.cu-seat-panel__mode-tab--active:hover:not(:disabled) {
+    color: #2e1868;
+}
+
+.cu-seat-panel__mode-tab--active:hover:not(:disabled) .cu-seat-panel__mode-tab-icon {
+    opacity: 1;
+}
+
+.cu-seat-panel__dock .cu-seat-panel__header:active {
+    cursor: default;
+}
+
+.cu-seat-panel__card {
+    box-sizing: border-box;
+    overflow: hidden;
+    border-radius: 24px;
+    border: 1px solid rgba(33, 23, 64, 0.3);
+    background: var(--Off-white, #f6f6f6);
+    box-shadow:
+        0 2px 4px 0 rgba(0, 0, 0, 0.2),
+        0 12px 32px rgba(33, 23, 64, 0.08);
+    color: var(--Dark-Purple, #351a84);
+    font-size: 14px;
+    font-family: Lexend, system-ui, sans-serif;
+}
+
+/* Bottom sheet: full-bleed width; inner padding keeps Figma rhythm */
+.cu-seat-panel__card.cu-seat-panel__card--sheet {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    margin: 0;
+    padding: 12px 16px 32px 16px;
+    border: none;
+    border-radius: 32px 32px 0 0;
+    background: rgba(234, 231, 229, 0.9);
+    box-shadow: 0 -3px 15px 0 rgba(0, 0, 0, 0.15);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    /* Base .cu-seat-panel__card is overflow:hidden — allow section drop-up to extend above the card */
+    overflow: visible;
+}
+
+.cu-seat-panel__card--sheet > .cu-seat-panel__header-tabs,
+.cu-seat-panel__card--sheet > .cu-seat-panel__body-wrap {
+    align-self: stretch;
+    width: 100%;
+    min-width: 0;
+}
+
+.cu-seat-panel__header {
+    display: flex;
+    align-items: center;
+    align-self: stretch;
+    justify-content: space-between;
+    gap: 24px;
+    padding: 14px 16px 12px;
+    border-bottom: 1px solid rgba(33, 23, 64, 0.1);
+    cursor: grab;
+    user-select: none;
+    box-sizing: border-box;
+}
+
+.cu-seat-panel__header:active {
+    cursor: grabbing;
+}
+
+.cu-seat-panel__title {
+    margin: 0;
+    flex: 1;
+    min-width: 0;
+    font-family: Lexend, system-ui, sans-serif;
+    font-size: 20px;
+    font-weight: 500;
+    line-height: 1.15;
+    letter-spacing: 0;
+    color: var(--Dark-Purple, #351a84);
+}
+
+/* cu-seat-panel__close — base styles from shared PanelCloseButton */
+
+.cu-seat-panel__body {
+    padding: 0;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    box-sizing: border-box;
+    text-transform: none;
+}
+
+/* Section / Row / Seat: label left, control right (Figma 444) */
+.cu-seat-panel__fields {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    margin-bottom: 24px;
+    width: 100%;
+    min-width: 0;
+}
+
+.cu-seat-panel__field-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    column-gap: 8px;
+    align-self: stretch;
+    width: 100%;
+    min-width: 0;
+}
+
+.cu-seat-panel__status-suggestion {
+    display: block;
+    margin-top: 4px;
+    font-weight: 400;
+    opacity: 0.92;
+}
+
+.seat-panel-default__status-suggestion {
+    display: block;
+    margin-top: 4px;
+}
+
+/* Medium-Default / H4 — 17; fixed label column (Figma) */
+.cu-seat-panel__field-row .cu-seat-panel__field-label {
+    flex: 0 0 72px;
+    width: 72px;
+    min-width: 72px;
+    max-width: 72px;
+    margin: 0;
+    box-sizing: border-box;
+    text-align: left;
+    color: var(--Dark-Purple, #351a84);
+    font-family: Lexend, system-ui, sans-serif;
+    font-size: 17px;
+    font-style: normal;
+    font-weight: 500;
+    line-height: 20px;
+}
+
+.cu-seat-panel__field-control {
+    flex: 1 1 0;
+    min-width: 0;
+    width: auto;
+    margin: 0;
+    padding: 0;
+}
+
+.cu-seat-panel__field-row--error .cu-seat-panel__field-label {
+    color: #b42318;
+}
+
+@media (max-width: 360px) {
+    .cu-seat-panel__field-row {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 6px;
+    }
+
+    .cu-seat-panel__field-row .cu-seat-panel__field-label {
+        flex: 0 0 auto;
+        width: auto;
+        min-width: 0;
+        max-width: none;
+        margin-bottom: 2px;
+        text-align: left;
+    }
+
+    .cu-seat-panel__field-row .cu-seat-panel__field-control {
+        flex: 1 1 auto;
+        width: 100%;
+    }
+}
+
+.cu-seat-panel__field {
+    flex: 1;
+    min-width: 0;
+    text-transform: none;
+}
+
+.cu-seat-panel__field-label {
+    display: block;
+    font-family: Lexend, system-ui, sans-serif;
+    font-size: 17px;
+    font-style: normal;
+    font-weight: 500;
+    letter-spacing: 0;
+    line-height: 20px;
+    text-transform: none;
+    color: var(--Dark-Purple, #351a84);
+    margin-bottom: 6px;
+}
+
+.cu-seat-panel__field-error-mark {
+    display: inline-flex;
+    width: 16px;
+    height: 16px;
+    margin-left: 6px;
+    border-radius: 999px;
+    align-items: center;
+    justify-content: center;
+    background: rgba(180, 35, 24, 0.12);
+    color: #b42318;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1;
+    vertical-align: middle;
+}
+
+.cu-seat-panel__input {
+    box-sizing: border-box;
+    width: 100%;
+    padding: 16px;
+    border-radius: 8px;
+    border: 1px solid rgba(33, 23, 64, 0.22);
+    background: #ffffff;
+    box-shadow: inset 0 4px 2px rgba(0, 0, 0, 0.12);
+    color: var(--Dark-Purple, #351a84);
+    font-family: Lexend, system-ui, sans-serif;
+    font-size: 17px;
+    font-weight: 500;
+    line-height: 20px;
+    font-variant: normal;
+    font-feature-settings: normal;
+    text-transform: none !important;
+    transition:
+        border-color 0.18s ease,
+        box-shadow 0.18s ease;
+}
+
+.cu-seat-panel__input::placeholder {
+    color: rgba(53, 26, 132, 0.60);
+    font-weight: 500;
+}
+
+.cu-seat-panel__input:focus {
+    outline: none;
+    border-color: rgba(53, 26, 132, 0.45);
+    box-shadow: inset 0 4px 2px rgba(0, 0, 0, 0.20), 0 0 0 3px rgba(53, 26, 132, 0.12);
+}
+
+.cu-seat-panel__input:disabled {
+    opacity: 1;
+    cursor: not-allowed;
+    background: #f0eef5;
+    color: #9078b8;
+}
+
+.cu-seat-panel__input--error {
+    border-color: rgba(180, 35, 24, 0.65);
+    box-shadow: inset 0 4px 2px rgba(0, 0, 0, 0.20), 0 0 0 2px rgba(180, 35, 24, 0.12);
+}
+
+.cu-seat-panel__input--error:focus {
+    border-color: rgba(180, 35, 24, 0.8);
+    box-shadow: inset 0 4px 2px rgba(0, 0, 0, 0.20), 0 0 0 3px rgba(180, 35, 24, 0.18);
+}
+
+/* Section dropdown — same list/trigger system as settings language (LanguageDropdown.css); Figma trigger chrome */
+.cu-seat-panel__section-lang-dropdown {
+    align-self: stretch;
+    width: 100%;
+    position: relative;
+    z-index: 1;
+}
+
+.cu-seat-panel__section-lang-dropdown .cu-lang-dropdown-anchor {
+    position: relative;
+    align-self: stretch;
+}
+
+.cu-seat-panel__section-lang-dropdown .cu-lang-dropdown-trigger {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    flex: 1 0 0;
+    align-self: stretch;
+    width: 100%;
+    min-height: 0;
+    margin: 0;
+    padding: 16px 12px;
+    box-sizing: border-box;
+    border-radius: 8px;
+    border: 1px solid rgba(33, 23, 64, 0.3);
+    background: #d8cfff;
+    box-shadow: none;
+}
+
+.cu-seat-panel__section-lang-dropdown .cu-lang-dropdown-trigger:hover {
+    border-color: rgba(33, 23, 64, 0.42);
+    background: color-mix(in srgb, var(--Lighter-Purple, #d8cfff) 88%, var(--Dark-Purple, #351a84));
+}
+
+/* Open: list is a drop-up, flush with trigger — one card (list + trigger), no layout push */
+.cu-seat-panel__section-lang-dropdown .cu-lang-dropdown-anchor--open {
+    z-index: 10060;
+    display: block;
+    overflow: visible;
+    border: none;
+    background: transparent;
+    box-shadow: none;
+    /* No filter: drop-shadow — it tints the whole control darker than closed */
+    filter: none;
+}
+
+/* Figma: full width matches trigger, 16/12 padding, gap 24, #D8CFFF; top half of unified shell */
+.cu-seat-panel__section-lang-dropdown .cu-lang-dropdown-anchor--open .cu-lang-dropdown-list {
+    position: absolute;
+    z-index: 10061;
+    left: 0;
+    right: 0;
+    bottom: 100%;
+    top: auto;
+    display: flex;
+    width: 100%;
+    max-width: none;
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: flex-start;
+    gap: 24px;
+    padding: 16px 12px;
+    box-sizing: border-box;
+    border-radius: 8px 8px 0 0;
+    border: 1px solid rgba(33, 23, 64, 0.3);
+    border-bottom: none;
+    background: #d8cfff;
+    /* Light outer shadow only on the panel — avoids darkening the trigger fill */
+    box-shadow: 0 4px 16px rgba(33, 23, 64, 0.08);
+    max-height: min(300px, 45vh);
+    overflow-x: hidden;
+    overflow-y: auto;
+    flex: none;
+    min-height: 0;
+    margin: 0;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* Section letters: row layout, label left; border Dark Purple (Figma) */
+.cu-seat-panel__section-lang-dropdown .cu-lang-dropdown-list .cu-lang-dropdown-option {
+    display: flex;
+    align-self: stretch;
+    width: 100%;
+    margin: 0;
+    padding: 10px;
+    box-sizing: border-box;
+    border-radius: 6px;
+    border: 1px solid var(--Dark-Purple, #351a84);
+    background: #d8cfff;
+    color: #351a84;
+    font-weight: 600;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.cu-seat-panel__section-lang-dropdown .cu-lang-dropdown-list .cu-lang-dropdown-option-name {
+    text-align: left;
+    flex: 0 1 auto;
+    min-width: 0;
+    width: auto;
+}
+
+.cu-seat-panel__section-lang-dropdown .cu-lang-dropdown-list .cu-lang-dropdown-option:hover:not(.cu-lang-dropdown-option--selected) {
+    background: color-mix(in srgb, #d8cfff 82%, #351a84);
+    color: #351a84;
+}
+
+.cu-seat-panel__section-lang-dropdown .cu-lang-dropdown-list .cu-lang-dropdown-option:focus-visible:not(.cu-lang-dropdown-option--selected) {
+    background: color-mix(in srgb, #d8cfff 78%, #351a84);
+    box-shadow: inset 0 0 0 2px #351a84;
+}
+
+.cu-seat-panel__section-lang-dropdown .cu-lang-dropdown-list .cu-lang-dropdown-option--selected {
+    border: 1px solid var(--Dark-Purple, #351a84);
+    border-radius: 6px;
+    background: var(--Dark-Purple, #351a84);
+    color: #f6f6f6;
+    box-shadow: 0 1px 4px rgba(33, 23, 64, 0.2);
+}
+
+.cu-seat-panel__section-lang-dropdown .cu-lang-dropdown-list .cu-lang-dropdown-option--selected:hover {
+    background: color-mix(in srgb, #351a84 92%, #f6f6f6);
+    color: #f6f6f6;
+}
+
+.cu-seat-panel__section-lang-dropdown .cu-lang-dropdown-list .cu-lang-dropdown-option--selected:focus-visible {
+    box-shadow:
+        0 1px 4px rgba(33, 23, 64, 0.2),
+        inset 0 0 0 2px rgba(246, 246, 246, 0.65);
+}
+
+/* Bottom half of unified shell — seams to list (no top border / no inner gap) */
+.cu-seat-panel__section-lang-dropdown .cu-lang-dropdown-anchor--open .cu-lang-dropdown-trigger {
+    position: relative;
+    z-index: 10062;
+    border: 1px solid rgba(33, 23, 64, 0.3);
+    border-top: none;
+    border-radius: 0 0 8px 8px;
+    background: #d8cfff;
+    box-shadow: none;
+    padding: 16px 12px;
+}
+
+/* Same Lighter Purple as closed — no color-mix darkening while open */
+.cu-seat-panel__section-lang-dropdown .cu-lang-dropdown-anchor--open .cu-lang-dropdown-trigger:hover {
+    border-color: rgba(33, 23, 64, 0.3);
+    background: #d8cfff;
+}
+
+.cu-seat-panel__section-lang-dropdown .cu-lang-dropdown-caret {
+    width: 24px;
+    height: auto;
+    flex-shrink: 0;
+}
+
+.cu-seat-panel__section-lang-trigger-main {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+/* Match list rows: label left, full row width */
+.cu-seat-panel__section-lang-dropdown .cu-lang-dropdown-value-row {
+    justify-content: flex-start;
+    align-items: center;
+    width: 100%;
+    min-width: 0;
+}
+
+.cu-seat-panel__section-lang-dropdown .cu-lang-dropdown-value:not(.cu-seat-panel__section-lang-placeholder) {
+    text-align: left;
+    color: var(--Dark-Purple, #351a84);
+    font-weight: 600;
+}
+
+/* Text CTA small — 15 (placeholder) */
+.cu-seat-panel__section-lang-dropdown .cu-lang-dropdown-value.cu-seat-panel__section-lang-placeholder {
+    color: var(--Dark-Purple, #351a84);
+    font-family: Lexend, system-ui, sans-serif;
+    font-size: 15px;
+    font-style: normal;
+    font-weight: 600;
+    line-height: 110%;
+    opacity: 0.6;
+}
+
+.cu-seat-panel__section-lang-dropdown--error .cu-lang-dropdown-trigger:not(:disabled) {
+    border-color: rgba(180, 35, 24, 0.55);
+    box-shadow: 0 0 0 2px rgba(180, 35, 24, 0.12);
+}
+
+.cu-seat-panel__section-lang-dropdown--error .cu-lang-dropdown-anchor--open {
+    filter: none;
+}
+
+.cu-seat-panel__section-lang-dropdown--error .cu-lang-dropdown-anchor--open .cu-lang-dropdown-list {
+    border-color: rgba(180, 35, 24, 0.55);
+}
+
+.cu-seat-panel__section-lang-dropdown--error .cu-lang-dropdown-trigger:focus-visible:not(:disabled) {
+    outline-color: rgba(180, 35, 24, 0.85);
+}
+
+.cu-seat-panel__section-lang-dropdown--disabled .cu-lang-dropdown-trigger:disabled {
+    opacity: 0.72;
+    cursor: not-allowed;
+}
+
+.cu-seat-panel__btn-row {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 0;
+}
+
+.cu-seat-panel__btn {
+    flex: 1;
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 48px;
+    min-width: 0;
+    padding: 12px 16px;
+    border-radius: 999px;
+    font-family: Lexend, system-ui, sans-serif;
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 1.15;
+    white-space: nowrap;
+    cursor: pointer;
+    border: 1px solid rgba(33, 23, 64, 0.3);
+    transition:
+        background 0.18s ease,
+        border-color 0.18s ease,
+        transform 0.12s ease,
+        color 0.18s ease,
+        box-shadow 0.18s ease,
+        opacity 0.18s ease;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.cu-seat-panel__btn-label {
+    text-align: center;
+    white-space: nowrap;
+}
+
+.cu-seat-panel__signpost-icon {
+    flex-shrink: 0;
+    display: block;
+    width: 20px;
+    height: 20px;
+    color: currentColor;
+}
+
+.cu-seat-panel__btn:focus {
+    outline: none;
+}
+
+.cu-seat-panel__btn:focus-visible {
+    outline: 2px solid var(--Dark-Purple, #351a84);
+    outline-offset: 2px;
+}
+
+.cu-seat-panel__btn--teleport:focus-visible {
+    outline-color: var(--Medium-Purple, #5421cc);
+}
+
+/* Figma: solid medium purple + lemon/lime label & icon */
+.cu-seat-panel__btn--primary {
+    background: var(--Medium-Purple, #5421cc);
+    color: var(--Lemon, #dcff7d);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    box-shadow: 0 2px 8px rgba(84, 33, 204, 0.35);
+}
+
+.cu-seat-panel__btn--primary:not(:disabled):hover {
+    background: #4b1eb8;
+    border-color: rgba(255, 255, 255, 0.2);
+    box-shadow: 0 4px 12px rgba(84, 33, 204, 0.42);
+}
+
+.cu-seat-panel__btn--primary:not(:disabled):active {
+    transform: scale(0.98);
+}
+
+.cu-seat-panel__btn--primary:disabled {
+    opacity: 1;
+    cursor: not-allowed;
+    background: rgba(84, 33, 204, 0.28);
+    color: rgba(220, 255, 125, 0.55);
+    border-color: rgba(84, 33, 204, 0.35);
+    box-shadow: none;
+}
+
+.cu-seat-panel__btn--stop {
+    background: rgba(244, 67, 54, 0.18);
+    color: #c62828;
+    border-color: rgba(198, 40, 40, 0.35);
+}
+
+.cu-seat-panel__btn--stop:not(:disabled):hover {
+    background: rgba(244, 67, 54, 0.28);
+}
+
+.cu-seat-panel__btn--stop:disabled {
+    opacity: 1;
+    color: #9e9e9e;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+/* Secondary: white fill, medium purple outline (Figma 444) */
+.cu-seat-panel__btn--teleport {
+    background: #ffffff;
+    color: var(--Medium-Purple, #5421cc);
+    border: 1px solid var(--Medium-Purple, #5421cc);
+    box-shadow: none;
+}
+
+.cu-seat-panel__btn--teleport:not(:disabled):hover {
+    background: rgba(84, 33, 204, 0.08);
+    border-color: var(--Medium-Purple, #5421cc);
+    color: var(--Medium-Purple, #5421cc);
+}
+
+.cu-seat-panel__btn--teleport:not(:disabled):active {
+    transform: scale(0.98);
+    background: rgba(84, 33, 204, 0.12);
+}
+
+.cu-seat-panel__btn--teleport:disabled {
+    opacity: 1;
+    cursor: not-allowed;
+    background: #ffffff;
+    color: rgba(84, 33, 204, 0.42);
+    border-color: rgba(84, 33, 204, 0.35);
+    box-shadow: none;
+}
+
+.cu-seat-panel__status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    line-height: 1.4;
+    margin-bottom: 8px;
+    color: #4f3d8a;
+}
+
+.cu-seat-panel__status-flag {
+    width: 24px;
+    height: 24px;
+    aspect-ratio: 1 / 1;
+    flex-shrink: 0;
+    box-sizing: border-box;
+    display: block;
+}
+
+.cu-seat-panel__status-text {
+    min-width: 0;
+}
+
+.cu-seat-panel__status-text--stacked {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    line-height: 1.35;
+}
+
+.cu-seat-panel__status-line {
+    display: block;
+}
+
+.cu-seat-panel__status--error {
+    color: #c62828;
+}
+
+.cu-seat-panel__status--inline {
+    margin-top: -8px;
+    margin-bottom: 12px;
+    min-height: 24px;
+}
+
+.cu-seat-panel__measure {
+    font-size: 12px;
+    color: #6c5a9e;
+    margin-bottom: 8px;
+    line-height: 1.45;
+}
+
+.cu-seat-panel__measure-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.cu-seat-panel__measure-delta {
+    font-size: 12px;
+    color: #7a6aac;
+    margin-top: 4px;
+}
+
+.cu-seat-panel__icon-btn {
+    border: none;
+    background: rgba(53, 26, 132, 0.08);
+    color: var(--Dark-Purple, #351a84);
+    border-radius: 8px;
+    width: 32px;
+    height: 32px;
+    cursor: pointer;
+    font-size: 16px;
+    line-height: 1;
+    transition: background 0.15s ease;
+}
+
+.cu-seat-panel__icon-btn:hover {
+    background: rgba(53, 26, 132, 0.14);
+}
+
+.cu-seat-panel__icon-btn:disabled {
+    opacity: 1;
+    color: #a89fc4;
+    cursor: not-allowed;
+    pointer-events: none;
+}

@@ -1,0 +1,23 @@
+[package]
+title = "Younite Tile Management Extension"
+description = "Distance-based city tile loading with three-zone warmup preloading"
+version = "2.0.0"
+authors = ["Younite"]
+keywords = ["tile", "culling", "performance", "distance", "payload"]
+category = "Performance"
+
+[dependencies]
+"omni.usd" = {}
+"younite.payload_orchestrator_core_extension" = {}
+"younite.messaging_core_extension" = {}
+"younite.usd_viewer_stage_core_extension" = {}
+"younite.usd_viewer_player_core_extension" = {}
+
+[[python.module]]
+name = "younite.distance_culling_extension"
+
+[build]
+include = [
+    "younite/**/*.py",
+    "config/*.toml",
+]

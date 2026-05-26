@@ -1,0 +1,240 @@
+---
+description: OSM route overlay (dev) — translucent glass-tinted walk-graph mesh with click-to-walk + Play-to-junction auto-advance, direct-dispatch to PointClickAutoMover bypassing the route composer
+globs:
+  - "**/osm_route_overlay/**/*.py"
+  - "**/dev/osmRouteOverlay/**"
+alwaysApply: false
+---
+
+# OSM route overlay (dev) — direct route traversal
+
+A dev-only visual + interaction layer that draws the walkable subset of the OSM graph as a flat, translucent **glass-tinted route mesh** floating just above the world, then lets the user **point-and-click along the routes** to walk the player on them — bypassing the NavMesh / `RouteComposer` entirely. Adds a **Play/Pause floating button** that auto-advances the player along the route they're on until the next junction or dead-end.
+
+This is **not** the City Navigate widget (`osm-navigation.mdc`). That widget renders a single calculated route for a chosen POI in bird's-eye view. The overlay here renders the **whole walkable graph** in third/first-person and treats every visible segment as a directly-walkable surface — *"the route IS the path"*.
+
+> **Naming**: The feature was originally prototyped as "ribbon overlay" (after the visual style — wide flat translucent strip). The user asked to rename it to something more descriptive; we standardised on **OSM route overlay**. The token `OsmRoute*` (with the disambiguating `Overlay` suffix on events/components) is consistent with the `osm-navigation` widget's `osmRoute*` events and clear about what the surface represents — the walkable OSM route network.
+
+**Service**: `younite.navmesh_route_extension/services/kit_services/osm_route_overlay/` — `OsmRouteOverlayService` in `service.py` (import from `osm_route_overlay` package root re-exports the class)
+**Wired in**: `younite.navmesh_route_extension/extension.py` (constructed with the shared `NavMeshModeCache` + `NavMeshRouteService`, started/stopped with the extension)
+**Depends on**: `younite.osm_navigation_extension` (graph data), `younite.messaging_core_extension` (event bridge), `younite.usd_viewer_player_core_extension` (auto-mover)
+
+---
+
+## Visual model — translucent glass
+
+A single `UsdGeom.Mesh` of horizontal quads (one quad per visible OSM edge) authored on the **session layer** under `/World/OsmRouteDevOverlay/Walking`, with `UsdPhysics.CollisionAPI` + `MeshCollisionAPI` so PhysX raycasts hit the route surface directly.
+
+**Material** (`UsdPreviewSurface` at `OVERLAY_MATERIAL_PATH = .../Looks/RouteMaterial`):
+
+| Input | Value | Notes |
+|---|---|---|
+| `inputs:diffuseColor` | `OVERLAY_COLOR = (0.32, 0.62, 0.95)` | Cool tinted blue, slightly desaturated so it reads as tinted glass not paint stripe |
+| `inputs:opacity` | `OVERLAY_OPACITY = 0.22` | True see-through. Stays visible over bright pavement; below 0.18 it disappears, above 0.30 it starts reading opaque again |
+| `inputs:opacityThreshold` | **`0.0` (explicit)** | **Required** — RTX defaults to alpha-cutout (binary masking) and renders fully opaque matte unless this is explicitly authored to 0. Same recipe `rain_service` uses |
+| `inputs:emissiveColor` | `OVERLAY_COLOR × OVERLAY_EMISSIVE_GAIN = 0.06` | Tiny boost so glass reads in deep shadow. Emissive in `UsdPreviewSurface` is **not modulated by opacity** — high values dominate the pixel and read as matte regardless of alpha (this was the original "smoky-grey matte" bug) |
+| `inputs:roughness` | `OVERLAY_ROUGHNESS = 0.18` | Sharp specular for glass-like sheen. >0.5 reads as chalk/matte |
+| `inputs:metallic` | `0.0` | Dielectric reflection, not chrome stripe |
+| Mesh `subdivisionScheme` | `"none"` | Flat quads, no Catmull-Clark — subdiv routes through a different RTX shader path that drops translucency |
+| Mesh `displayColor` | **not authored** | RTX's gprim sync uses `displayColor` as surface albedo and **bypasses** the bound translucent material when authored. The original "Hydra Storm fallback" was actually fighting the real material — never re-add it |
+
+**Geometry constants** (in service file, all in cm):
+
+- `OVERLAY_HOVER_CM = 35.0` — above the player's CCT capsule top (~22 cm) but below CCT `stepOffset` (40 cm), so any rare contact resolves via the auto-step rather than getting stuck.
+- `OVERLAY_WIDTH_CM = 110.0` — comfortable mobile touch target without flooding narrow alleys.
+
+**Visible classes** — `VISUAL_EDGE_CLASSES = {pedestrian, steps, residential, arterial, service}`. Showing only `pedestrian` + `steps` hid sidewalks down residential streets that the router happily uses, leaving "phantom" gaps the user couldn't tap. `_parse_osm_edge` still rejects mode-impassable edges via `OsmGraphService._edge_cost(...)`, so `wheelchair` mode hides `steps` automatically — the on-screen routes match exactly what Dijkstra would consider.
+
+---
+
+## Click → route walk pipeline
+
+The user's mental model splits clicks and walking cleanly:
+
+- **Click is for state** — attach to a route, detach from a route, or change lanes between routes. *Not* for progressing along a route.
+- **Play is for motion** — the auto-advance FAB is the only way to walk *along* a route (to the next junction or dead-end).
+- **NavMesh always wins** when terrain has NavMesh underneath. The route is "the only walkable surface" only where NavMesh is absent (bridges, elevated walkways, plazas outside the bake, areas where PhysX doesn't resolve to a real prim — i.e. "world" hits).
+
+When `osmRouteOverlayVisible === true`, the web sets `intent: "osmRouteOverlayMarker"` on every pick request (`AppStream.tsx`), and `younite.interactions_extension/services/kit_services/click_router.py` routes **every** hit (including ones with empty `pickPrimPath` — "world" background hits) through `younite.osm_route_overlay.click`. The orchestrator's normal `younite.navigation.requestPoint` is **not** fired at the click router; the OSM overlay service is the sole decision point and re-emits the nav request itself for the NavMesh fall-through case.
+
+`_on_osm_route_overlay_click` resolution (full decision table in the handler docstring):
+
+| PhysX result | NavMesh proximity | Player attached? | Action |
+|---|---|---|---|
+| Hit route mesh | (any) | No, OR yes but click is on a *different* chain | Snap to projected route point, plan + dispatch direct polyline |
+| Hit route mesh | (any) | Yes, click is on the *same* degree-2 chain | **No-op** — quiet hint to use Play |
+| Hit terrain | On / near NavMesh (≤ `NAVMESH_TOLERANCE_CM = 50` cm) | (any) | Re-emit `navigation.requestPoint`, NavMesh handles it. Player auto-detaches via `_on_nav_request → _set_attached(False)` |
+| Hit terrain, OR "world" hit (no resolved prim) | Off NavMesh (> `NAVMESH_TOLERANCE_CM`, or NavMesh unqueryable) | (any) | Snap to nearest visible route within `SNAP_PROXIMITY_CM = 90` cm; else broader `_snap_off_navmesh` (any walkable OSM edge); else fall through to NavMesh request (will likely fail-quiet) |
+
+After resolving, the walk path runs:
+
+1. **Plan polyline** — `_plan_visible_polyline(player_xyz, target_xyz)` runs **Dijkstra over the cached visible-edge subgraph** (`_visible_adj` / `_visible_node_pos`, built once when the overlay turns on). It picks the entry/exit edge endpoints minimising **total walking distance** (player → entry + Dijkstra → exit + exit → target), not just the cheapest A↔C edge cost — pure Dijkstra would make the player backtrack to a closer node before turning. `_projection_is_forward` drops the entry/exit projection points if inserting them would force a backtrack.
+2. **Stop the route engine** — `_stop_player_route_engine()` cancels any in-flight `NavMeshRouteService` calculation for the `player` route so it doesn't recalculate and overwrite our waypoints.
+3. **Prime auto-mover state** — dispatch `navigationStateSet { movementMode: "pointClick", autoMove: true, routeId: "player" }` so `PointClickAutoMover._auto_move` is `true` (the auto-mover ignores waypoints when `_auto_move == false`, the default after a previous route arrived).
+4. **Direct dispatch** — emit `navmeshRouteWaypoints { routeId: "player", waypoints, segmentSpeeds: [OSM_ROUTE_WALK_SPEED]*n, faceDirection: <only on first leg> }`.
+
+`_direct_walk_active` flag — set to `true` on the first dispatch and cleared on `arrived` / `interrupted`. Subsequent route clicks during an active walk **omit** `faceDirection: true` so the camera doesn't snap on every "tap further along". Without this the camera "blinks" when changing lanes.
+
+### Same-chain detection (`_player_chain_edges` / `_is_same_chain_as_player`)
+
+The chain walker grabs the player's nearest visible edge, then walks both directions through degree-2 nodes (capped by `MAX_AUTO_ADVANCE_HOPS = 64` as a runaway guard) until it hits a junction (degree ≥ 3) or dead-end (degree == 1), collecting every edge along the way as `frozenset({node_a, node_b})`. The click target is then projected to its nearest visible edge; if that edge is in the collected set, the click is on the same continuous run as the player and the handler returns silently — no dispatch, no detach, no camera nudge.
+
+This is what makes "tap further along this route" feel right under the new model: instead of walking the player a few metres forward (and forcing them to use Play next), the click is a quiet acknowledgement and the user can press Play to advance to the next junction. Lane-change clicks (different chain) still walk normally because they project to an edge outside the player's chain set.
+
+**Speed**: `OSM_ROUTE_WALK_SPEED = 12.0` × auto-mover base 300 cm/s = `3600 cm/s` (~36 m/s). Matches the bird-eye / OSM bridge crossing pace so direct route traversal feels identical to clicking Play on a composer route. The user explicitly asked for this parity — do not lower it without their say-so.
+
+**Edge projection (not nearest-node) is critical**: OSM nodes are typically 10–50 m apart along a segment, so node-only proximity would miss every click landing in the middle of a long route. Projection lets the same-chain check work mid-edge instead of only at nodes.
+
+---
+
+## Auto-advance ("Play" button)
+
+A floating Play/Pause button (`OsmRouteOverlayAutoMoveFab.tsx`) lets the user walk the **straightest continuation** of the current route hands-free until the next junction (degree ≥ 3) or dead-end (degree == 1).
+
+### Backend — `_on_route_auto_move`
+
+Subscribes to `osmRouteOverlayAutoMove` (registered as a `customEvent` in `messaging_bridge_service` so it doesn't need an explicit `events_contracts.py` entry).
+
+`action: "play"`:
+1. Read `player_xyz` and `_get_player_forward_xz()` (live world transform of `/World/PlayerCharacter/first_person_camera`, USD camera convention `-Z` = forward — going through the prim, not carb settings, guarantees we get the *current* yaw even if the input loop hasn't ticked).
+2. `_plan_auto_advance_polyline` distinguishes two cases:
+   - **At a junction** (player within `AT_JUNCTION_RADIUS_CM = 200` cm of a visible degree-≥3 node): pick the **outgoing edge** whose unit direction has the largest dot-product with `forward_xz` ("straightest tie-breaker") and walk to its far end, then through the chain.
+   - **Mid-edge**: project to the nearest visible edge (within `NEAR_ROUTE_RADIUS_CM = 250` cm — refuse otherwise), pick the edge endpoint in the forward direction, then chain-walk from there.
+3. `_traverse_chain_to_junction(prev, cur)` iteratively walks degree-2 nodes until it hits a junction, dead-end, or `MAX_AUTO_ADVANCE_HOPS = 64` (runaway guard — degree-2 chains in the stadium stay well under 20).
+4. Returns the polyline, dispatched via the same `_dispatch_polyline_directly` as click-walks (single source of truth for direct dispatch).
+
+`action: "stop"` → `_stop_player_auto_move()` clears `_direct_walk_active`, dispatches `navigationStateSet { autoMove: false }`, and stops the player route engine. Mirrors what the seat/exit/POI flows do when the user taps Pause.
+
+### Frontend — `OsmRouteOverlayAutoMoveFab`
+
+**File**: `web-viewer-sample-main/src/features/dev/osmRouteOverlay/OsmRouteOverlayAutoMoveFab.tsx`
+**Mounted in**: `DevViewLayer.tsx`
+
+**Visibility gating**:
+```ts
+const visible =
+    !!nav.osmRouteOverlayVisible &&
+    !!nav.osmRouteOverlayAttached &&
+    ctrl.controlMode === 'pointClick' &&
+    env.currentCamera !== 'bird_eye' &&
+    env.currentCamera !== 'space';
+```
+
+The `osmRouteOverlayAttached` gate is critical — without it the FAB shows whenever the overlay is on, which (a) confuses the user when pressing Play does nothing because they're standing on plain NavMesh, and (b) hides the only visual feedback signal the user has for "did my last click land on a route or jump me off?". With the gate, every click either makes the FAB appear (route hit, you're now bound to the polyline) or disappear (NavMesh hit, you've jumped off) — diagnostic and functional in one move.
+
+**State binding** — `nav.playerAutoMoveActive` (in `useNavmeshCore`, set by `handleAutoMoveStatus` whenever Kit emits `autoMoveStatus { routeId: "player" }`). Toggling `Play → Pause` is **optimistic** (sets the flag locally before Kit confirms) so the icon flips instantly on tap; `autoMoveStatus` reconciles the truth.
+
+**Visual** — reuses the seat-nav play button styling (`stream-seat-nav-overlay__btn`) and Figma icons (`figma-5706-play.svg` / `figma-april-pause.svg`) so the gesture "press the round button bottom-centre to start moving" stays consistent across CU and dev modes. Dev-only, so the strings are plain English (no i18n).
+
+---
+
+## Events
+
+| Event | Direction | Payload | Purpose |
+|---|---|---|---|
+| `osmRouteOverlaySet` | Web → Kit | `{ visible: bool, roadSnap?: bool }` | Build / tear down the route mesh + visible subgraph |
+| `osmRouteOverlayStatus` | Kit → Web | `{ visible: bool }` | Confirms overlay state |
+| `osmRouteOverlayAttached` | Kit → Web | `{ attached: bool }` | Player↔route binding flips. Drives FAB visibility. Sticky: stays `true` between successful click-walks and after arrival, flips to `false` only on a NavMesh point-click (jump-off) or overlay teardown. **Idempotent on the Kit side** — it doesn't re-emit when the value didn't change, so the long stream of NavMesh-only clicks made before the overlay is ever used is silent |
+| `younite.osm_route_overlay.click` | Kit internal | `{ world: {x,y,z}, pickPrimPath }` | Click landed on or near the visible overlay |
+| `younite.navigation.requestPoint` | Kit internal | `{ world: {x,y,z}, pickPrimPath? }` | NavMesh point-click. The overlay service **subscribes** to this purely so it can detach when the user jumps off; the orchestrator owns the actual NavMesh routing |
+| `osmRouteOverlayAutoMove` | Web → Kit | `{ action: "play" \| "stop" }` | Toggle the auto-advance walk |
+| `osmRouteOverlayMarker` (intent) | Web → Kit | (sent via `younite.pick.request`) | Forces the click router to treat the pick as an OSM-overlay click even when the web's overlay-active flag is out of sync |
+| `navmeshRouteWaypoints` | Kit → auto-mover | `{ routeId: "player", waypoints, segmentSpeeds, faceDirection? }` | Direct polyline dispatch (bypasses orchestrator + composer) |
+| `navigationStateSet` | Kit → web/auto-mover | `{ movementMode: "pointClick", autoMove: true, routeId: "player", ... }` | Prime auto-mover before dispatching waypoints |
+| `autoMoveStatus` | Kit → Web | `{ routeId, active, reason }` | Drives the FAB Play/Pause icon when `routeId === "player"` |
+
+> **Disambiguation from City Navigate**: `osm-navigation` uses `osmRouteResult` / `osmRouteInfo` for the calculated single-POI route. The overlay events all carry the `Overlay` suffix (`osmRouteOverlay*`) to keep them distinct.
+
+---
+
+## Why direct dispatch (not the route composer)?
+
+The City Navigate path goes click → `younite.pick.result` → `NavigationOrchestratorService` → `RouteComposer` → `NavMeshRouteService` → `navmeshRouteWaypoints`. For overlay-walking that pipeline is wrong because:
+
+- The composer plans a NavMesh leg from player → first OSM node, then OSM Dijkstra, then NavMesh again — but the player is **already on the route overlay**, so the NavMesh leg detours to the nearest NavMesh polygon and back.
+- The composer's polyline doesn't correspond to the **visible** route vertices, so the player walks a slightly different route than the user can see.
+- The composer recalculates periodically; if we dispatch a polyline and then the orchestrator runs again, the polylines collide.
+
+Direct dispatch sidesteps all three by feeding the auto-mover the exact polyline the user can see, the same way a pre-baked composer route would. Click-router suppression (step 1) prevents the orchestrator from running in parallel.
+
+---
+
+## Critical dependencies
+
+- **Mode cache** (`NavMeshModeCache`) — `_active_osm_mode()` resolves `walking` / `wheelchair` so `wheelchair` mode hides `steps` segments automatically. Same instance the production CU accessibility toggle uses.
+- **`OsmGraphService`** — owned by `younite.osm_navigation_extension`. We never duplicate the graph; we cache a per-mode filtered subgraph (`_visible_adj`, `_visible_node_pos`) at overlay-on time and rebuild it on mode change.
+- **`NavMeshRouteService`** — only used to call `stop_route(player)` so its in-flight calculation doesn't overwrite our waypoints.
+- **`PointClickAutoMover`** (in `younite.usd_viewer_player_core_extension`) — consumes `navmeshRouteWaypoints` for `routeId === "player"`. Speed comes from `segmentSpeeds × base_speed`.
+
+---
+
+## Tuning knobs (all in `osm_route_overlay/constants.py`)
+
+| Constant | Default | Knob |
+|---|---|---|
+| `OVERLAY_COLOR` | `(0.32, 0.62, 0.95)` | Tinted-glass blue. Stay cool / desaturated; saturated cyans read as paint stripe |
+| `OVERLAY_OPACITY` | 0.22 | True translucency. Below 0.18 disappears over bright pavement; above 0.30 starts reading opaque |
+| `OVERLAY_EMISSIVE_GAIN` | 0.06 | Self-lit boost. Keep < 0.10 of diffuse — emissive is not modulated by opacity |
+| `OVERLAY_ROUGHNESS` | 0.18 | Specular sharpness. >0.50 reads as chalk/matte; <0.10 produces denoiser flicker on a 1.1 m wide surface |
+| `OVERLAY_WIDTH_CM` | 110.0 | Surface width — touch-target vs visual flooding |
+| `OVERLAY_HOVER_CM` | 35.0 | Hover above ground. Must stay below CCT `stepOffset` (40 cm) |
+| `SNAP_PROXIMITY_CM` | 90.0 | Off-route, off-NavMesh / "world" click → route snap radius (slightly > half-width). Used **only** when the NavMesh is too far to handle the click |
+| `NAVMESH_TOLERANCE_CM` (in `route_composer.types`) | 50.0 | Terrain-click NavMesh-priority threshold. Click within this XZ distance of the NavMesh → re-emit `navigation.requestPoint`. **Re-used** here, not duplicated |
+| `OSM_ROUTE_WALK_SPEED` | 12.0 | Auto-mover base-speed multiplier; matches bird-eye composer pace |
+| `AT_JUNCTION_RADIUS_CM` | 200.0 | Player-near-junction shortcut radius for auto-advance |
+| `NEAR_ROUTE_RADIUS_CM` | 250.0 | Max distance to attach auto-advance to a route |
+| `MAX_AUTO_ADVANCE_HOPS` | 64 | Chain-walker runaway guard. Re-used by `player_chain_edges` for same-chain detection |
+
+---
+
+## File map
+
+**Backend** (`services/kit_services/osm_route_overlay/`):
+- `service.py` — `OsmRouteOverlayService`: events, overlay lifecycle, click handler, direct dispatch, NavMesh distance
+- `constants.py` — paths + tuning constants
+- `mesh.py` — session-layer quad mesh + material + PhysX collider
+- `subgraph.py` — visible-edge cache for the mesh and planner
+- `spatial_queries.py` — edge projection / nearest visible edge
+- `path_planning.py` — Dijkstra, visible polyline, same-chain detection, auto-advance
+- `parse_edge.py`, `polyline_math.py`, `player_pose.py` — small helpers
+- `younite.navmesh_route_extension/extension.py` — constructs `OsmRouteOverlayService(mode_cache, navmesh_route_service)`, starts/stops with the extension
+- `younite.navmesh_route_extension/config/extension.toml` — adds `younite.osm_navigation_extension` dependency for `OsmGraphService`
+- `younite.interactions_extension/services/kit_services/click_router.py` — routes overlay-mesh hits to `younite.osm_route_overlay.click` and suppresses the orchestrator emit
+- `younite.messaging_core_extension/events_contracts.py` — `OSM_ROUTE_OVERLAY_SET` / `OSM_ROUTE_OVERLAY_STATUS` aliases (the `osmRouteOverlayAttached` Kit→web event goes via `register_outbound_events` at runtime — no contracts entry needed)
+
+**Frontend**:
+- `web-viewer-sample-main/src/features/dev/osmRouteOverlay/OsmRouteOverlayAutoMoveFab.tsx` — Play/Pause floating button
+- `web-viewer-sample-main/src/features/streaming/DevViewLayer.tsx` — mounts the FAB
+- `web-viewer-sample-main/src/features/streaming/hooks/navigationHandlers/useNavmeshCore.ts` — `osmRouteOverlayVisible` / `osmRouteOverlayRoadSnap` / `playerAutoMoveActive` / `osmRouteOverlayAttached` state + setters. Includes a defensive `useEffect` that resets `attached` to `false` whenever `visible` toggles off, so a stale "attached" flag from a previous session can't leak into the next visibility cycle
+- `web-viewer-sample-main/src/features/streaming/hooks/eventHandlers/types.ts` — `setPlayerAutoMoveActive` + `setOsmRouteOverlayAttached` on `EventStateSetters`
+- `web-viewer-sample-main/src/features/streaming/hooks/eventHandlers/navigationHandlers.ts` — `handleAutoMoveStatus` mirrors `routeId === "player"` `active` into `playerAutoMoveActive`; the `osmRouteOverlayAttached` branch mirrors Kit's flag into `osmRouteOverlayAttached`
+- `web-viewer-sample-main/src/features/streaming/StreamOnlyWindow.tsx` — wires `osmRouteOverlayActive` into `AppStream`
+- `web-viewer-sample-main/src/features/dev/controls/submenus/NavigationSubmenu.tsx` — toggle for `osmRouteOverlayVisible`
+- `web-viewer-sample-main/src/features/streaming/AppStream.tsx` — sends pick requests with `intent: "osmRouteOverlayMarker"` when overlay is active
+
+---
+
+## Common pitfalls
+
+- **Don't author `displayColor` on the overlay mesh** — RTX's gprim sync uses it as the surface albedo and bypasses the bound translucent material entirely. The overlay reads as opaque matte the moment `displayColor` is present, regardless of how low you set `opacity`. The original "Hydra Storm fallback" was actually fighting the real material.
+- **Don't crank `emissiveColor`** — it's not modulated by `opacity`. Anything > 0.10 of diffuse dominates the pixel and reads as a self-lit matte stripe regardless of how transparent the rest is.
+- **Don't call `prim.MakeVisible()`/`MakeInvisible()` on the overlay** — visibility is implicit (mesh removed in `_teardown_overlay`). Adding the overlay to the Payload Orchestrator would break the click-suppression contract because the orchestrator runs async.
+- **Don't add `tram` / `light_rail` / `rail_heavy` to `VISUAL_EDGE_CLASSES`** — those are for transit overlays, not walkable routes.
+- **Don't bypass `_dispatch_polyline_directly`** — every direct dispatch must (a) stop the player route engine, (b) prime `navigationStateSet { autoMove: true }`, (c) dispatch `navmeshRouteWaypoints`. Skipping any step leaves the auto-mover idle or makes it fight with the orchestrator.
+- **Don't always send `faceDirection: true`** — only on the first leg of a continuous walk (`_direct_walk_active` flag), or the camera snaps every time the user taps further along.
+- **Don't lower `OSM_ROUTE_WALK_SPEED`** without user approval — they explicitly asked for parity with the bird-eye composer pace.
+- **`opacityThreshold` must be authored explicitly to 0.0** on the route material — RTX defaults to alpha-cutout otherwise and renders the mesh fully opaque matte.
+- **Don't conflate "attached" with "auto-move active"** — `_player_attached` is sticky between walks (player parked on a route → still attached → FAB still shown), `_direct_walk_active` is per-walk (set on dispatch, cleared on `autoMoveStatus { active: false }`). The FAB needs both signals: visibility from `attached`, Play/Pause icon from `playerAutoMoveActive`. Wiring the FAB to `_direct_walk_active` would hide it the moment the player arrives at the next junction — exactly when they want to press Play again.
+- **Don't unsubscribe `_on_nav_request` "for performance"** — it fires on every NavMesh point-click and looks expensive, but `_set_attached` early-returns on no-op flips so the actual cost is one `bool == bool` compare per click. Removing it would leave the FAB stuck visible after every jump-off.
+- **Don't add a NavMesh-priority gate to route-mesh hits** — an earlier iteration tried to make the route "fall through to NavMesh when NavMesh was nearby" using a 60 cm threshold. It backfired: the route hovers ~35 cm above ground, so NavMesh's "closest point" to the elevated click landed on the wrong side of the route and the player teleported across. The user explicitly described this as "clicked on ground and it just jumped on other side of that osmroute". The current model — *PhysX hit on route mesh = OSM action, period* — is the correct one. NavMesh-priority belongs on **terrain hits**, where the click XZ is actually on or near the navmesh polygon the user pointed at.
+- **Don't walk the player on every route-mesh click** — when the player is already attached and the click projects to an edge on their current degree-2 chain, return silently. The user's explicit preference: "I dont really need to walk by osmroutes when clicking along it. Play button already handles this really well. Clicking is used to attach/detach from osm paths." Walking on same-chain clicks is the bug, not the feature.
+- **Don't ignore "world" hits** — a PhysX hit with no resolved `pickPrimPath` is **not** a no-op; it means the ray landed on something that doesn't sit on the bake (background terrain, plaza, bridge surface). Treat it as off-NavMesh and snap to the nearest visible OSM route via `_snap_off_navmesh`. Earlier iterations dropped these clicks on the floor — the result was "clicked off the route, nothing happens" UX dead zones in exactly the areas where the route is the only walkable surface.
+
+---
+
+## Related
+
+- Player auto-mover (consumes `navmeshRouteWaypoints`): `cct-movement.mdc` (CCT pipeline) + `auto_mover.py` source
+- City Navigate widget (separate dev tool, single-route POI navigation): `osm-navigation.mdc`
+- Bird-eye pin-anywhere (uses `OsmGraphService` + `RouteComposer` for cross-graph routing): `bird-eye-pin-anywhere.mdc`
+- Click router (decides route-overlay vs NavMesh vs interaction): `interactions.mdc`
+- Mode cache (walking / wheelchair): `navmesh-dual-mode.mdc`

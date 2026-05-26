@@ -1,0 +1,595 @@
+#usda 1.0
+(
+    customLayerData = {
+        dictionary cameraSettings = {
+            dictionary Front = {
+                double3 position = (0, 0, 50000)
+                double radius = 500
+            }
+            dictionary Perspective = {
+                double3 position = (-7005.428878552404, 6635.125378391665, -14839.106908525546)
+                double3 target = (-6920.7893957690585, 6577.7952271740005, -14663.429633525979)
+            }
+            dictionary Right = {
+                double3 position = (-50000, 0, 0)
+                double radius = 500
+            }
+            dictionary Top = {
+                double3 position = (0, 50000, 0)
+                double radius = 500
+            }
+            string boundCamera = "/OmniverseKit_Persp"
+        }
+        dictionary metricsAssembler = {
+            dictionary "/World/edited_tile_1" = {
+            }
+            dictionary "/World/edited_tile_2" = {
+            }
+            dictionary "/World/edited_tile_3" = {
+            }
+            dictionary "/World/edited_tile_4" = {
+            }
+            dictionary "/World/peoples_test_02" = {
+            }
+            int version = 1
+        }
+        dictionary navmeshSettings = {
+            double agentMaxFloorSlope = 45.000000670552254
+            double agentMaxRadius = 35
+            double agentMaxStepHeight = 55
+            double agentMinHeight = 150
+            double agentMinIslandRadius = 200
+            double agentMinRadius = 35
+            double agentSamplingDistance = 25.00000037252903
+            dictionary areas = {
+                dictionary "0" = {
+                    string areaName = "Walkable"
+                    float3 color = (0.2, 0.8, 1)
+                    double defaultCost = 1
+                }
+                dictionary "1" = {
+                    string areaName = "NotWalkable"
+                    float3 color = (1, 0, 0)
+                    double defaultCost = -1
+                }
+                dictionary "10" = {
+                    string areaName = "arena_stairs"
+                    float3 color = (0.6039216, 0.14117648, 0.44313726)
+                    double defaultCost = 8
+                }
+                dictionary "11" = {
+                    string areaName = "arena_row_floor"
+                    float3 color = (0.8745098, 0.78039217, 0.23137255)
+                    double defaultCost = 10
+                }
+                dictionary "2" = {
+                    string areaName = "incident_blocked"
+                    float3 color = (0.898, 0.298, 0)
+                    double defaultCost = -1
+                }
+                dictionary "3" = {
+                    string areaName = "camera_depth_obstacle"
+                    float3 color = (1, 0.29411766, 0)
+                    double defaultCost = -1
+                }
+                dictionary "4" = {
+                    string areaName = "camera_vip_entrance_area"
+                    float3 color = (0.9, 0.15, 0.15)
+                    double defaultCost = 1
+                }
+                dictionary "5" = {
+                    string areaName = "camera_main_entrance_exit_area"
+                    float3 color = (0.15, 0.55, 0.9)
+                    double defaultCost = 1
+                }
+                dictionary "6" = {
+                    string areaName = "camera_main_entrance_entry_area"
+                    float3 color = (0.15, 0.85, 0.25)
+                    double defaultCost = 1
+                }
+                dictionary "7" = {
+                    string areaName = "sensor_camera_01_area"
+                    float3 color = (0.85, 0.65, 0.1)
+                    double defaultCost = 1
+                }
+                dictionary "8" = {
+                    string areaName = "sound_location_01_area"
+                    float3 color = (0.85, 0.55, 0.1)
+                    double defaultCost = 1
+                }
+                dictionary "9" = {
+                    string areaName = "stairs"
+                    float3 color = (0.7019608, 0.047058824, 0.4627451)
+                    double defaultCost = 5
+                }
+            }
+            bool excludeRigidBodies = 1
+        }
+        dictionary omni_layer = {
+            string authoring_layer = "./main_scene.usda"
+        }
+        dictionary renderSettings = {
+            double "rtx:directLighting:sampledLighting:maxRayUnexposedIntensity" = 6399.9990234375
+            double "rtx:indirectDiffuse:maxRayUnexposedIntensity" = 6399.9990234375
+            double "rtx:pathtracing:fireflyFilter:maxPerEmissiveUnexposedIntensity" = 3199.99951171875
+            double "rtx:pathtracing:fireflyFilter:maxUnexposedIntensityPerSample" = 3199.99951171875
+            double "rtx:pathtracing:fireflyFilter:maxUnexposedIntensityPerSampleDiffuse" = 3199.99951171875
+            double "rtx:raytracing:inscattering:maxRTSampleUnexposedIntensity" = 204799.96875
+            double "rtx:translucency:maxRayUnexposedIntensity" = 19199.998046875
+        }
+    }
+    defaultPrim = "World"
+    endTimeCode = 3600
+    metersPerUnit = 0.01
+    startTimeCode = 0
+    subLayers = [
+        @./sublayers/nav_waypoints_layer.usda@,
+        @./sublayers/video_stream_trigger_layer.usda@,
+        @./sublayers/restroom_layer.usda@,
+        @./sublayers/sensor_layer.usda@,
+        @./sublayers/material_edit_layer.usda@,
+        @./sublayers/heatmap_layer.usda@,
+        @./sublayers/camera_tracker_layer.usda@,
+        @./sublayers/avatars_layer.usda@,
+        @./sublayers/seated_people_layer.usda@,
+        @./sublayers/collider_layer.usda@,
+        @./sublayers/maintenance_bot_layer.usda@,
+        @./sublayers/navigation_layer.usda@,
+        @./sublayers/deactivation_layer.usda@,
+        @./sublayers/camera_layer.usda@,
+        @./sublayers/exit_points_layer.usda@,
+        @./sublayers/sound_location_layer.usda@,
+        @./sublayers/spatial_sound_locations_layer.usda@,
+        @./sublayers/video_360_locations_layer.usda@,
+        @./sublayers/quiet_zone_layer.usda@,
+        @./sublayers/dynamic_sky_layer.usda@,
+        @./sublayers/osm_layer.usda@,
+        @./sublayers/player_spawnpoints_layer.usda@,
+        @./sublayers/lighting_layer.usda@,
+        @./sublayers/symbolic_buildings_layer.usda@,
+        @./sublayers/interactions_layer.usda@,
+        @./sublayers/iot_air_quality_layer.usda@,
+        @./sublayers/iot_bike_share_layer.usda@,
+        @./sublayers/iot_osm_pois_layer.usda@,
+        @./sublayers/nav_shortcuts_layer.usda@,
+        @./sublayers/coins_layer.usda@
+    ]
+    timeCodesPerSecond = 60
+    upAxis = "Y"
+)
+
+def Xform "World"
+{
+    def "physicsScene" (
+        prepend references = @../physics/physics_scene.usda@
+    )
+    {
+        bool physics:enableCCD = 1
+        float physics:maxDepenetrationVelocity = 10
+        rel physics:rigidBodies = [
+            </World/PlayerCharacter>,
+            </World/City_tile_01/_0071_CU_DT_8km2_Terrain_Generation>,
+            </World/City_tile_02/_0071_CU_DT_8km2_Terrain_Generation>,
+            </World/City_tile_03/_0071_CU_DT_8km2_Terrain_Generation>,
+            </World/City_tile_04/_0071_CU_DT_8km2_Terrain_Generation>,
+        ]
+    }
+
+    def "Skandinavium" (
+        prepend payload = @../Assets/Skandinavium/scandinavium_asset.usda@
+    )
+    {
+        token visibility = "inherited"
+        float3 xformOp:rotateXYZ = (0, -82.43871, 0)
+        float3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (227.10403880764898, 711.8000106064842, 664.6782980643238)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+
+        over "seats_instanced" (
+            delete apiSchemas = ["NavMeshExcludeAPI"]
+            prepend apiSchemas = ["NavMeshExcludeAPI"]
+        )
+        {
+            token visibility = "inherited"
+        }
+    }
+
+    def "Skandinavium_lights" (
+        prepend payload = @../lighting/Skandinavium_lights.usda@
+    )
+    {
+        token visibility = "inherited"
+        float3 xformOp:rotateXYZ = (0, -81.3, 0)
+        float3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (264.9312627519994, 672.6020757043545, 683.6782983475914)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+
+        over "L_Glod_Around_Lights46"
+        {
+            float inputs:exposure = 0
+            float inputs:intensity = 1124.25
+        }
+
+        over "L_Glod_Around_Lights16"
+        {
+            float inputs:exposure = 0
+            float inputs:intensity = 933.8234
+        }
+    }
+
+    def Xform "spawnpoint_poi_gothia_towers"
+    {
+        token visibility = "inherited"
+        double3 xformOp:rotateXYZ = (0, -33.6, 0)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (5965.0103915454, 2260.6539901462183, 24804.076237901223)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "spawnpoint_poi_skandinavium"
+    {
+        token visibility = "inherited"
+        double3 xformOp:rotateXYZ = (0, -144.76279851329397, 0)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (-5451.883787747738, 2211.396599386658, -6677.011606818356)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def "CU_DT_8km2_Project_Scene" (
+        prepend payload = @../environment/city/CU-DT-8km2.Project.Scene.usda@
+    )
+    {
+        token visibility = "inherited"
+        double3 xformOp:rotateXYZ = (0, 0, 0)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:scale:unitsResolve = (100, 100, 100)
+        double3 xformOp:translate = (-426145.64630092634, 1699.8588867187814, -221340.6800121309)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale", "xformOp:scale:unitsResolve"]
+
+        over "Geometry"
+        {
+            over "_00053_CU_DT_8km2"
+            {
+                over "_00053_CU_DT_8km2_Buildings"
+                {
+                }
+            }
+
+            over "_00054_CU_DT_8km2"
+            {
+                over "_00054_CU_DT_8km2_Buildings"
+                {
+                }
+            }
+
+            over "_00086_CU_DT_8km2"
+            {
+                over "_00086_CU_DT_8km2_Buildings"
+                {
+                    over "A4378a2327"
+                    {
+                        token visibility = "inherited"
+                    }
+                }
+
+                over "_00086_CU_DT_8km2_Terrain"
+                {
+                    over "Misc"
+                    {
+                        token visibility = "inherited"
+                    }
+                }
+            }
+
+            over "_00070_CU_DT_8km2"
+            {
+                over "_00070_CU_DT_8km2_Buildings"
+                {
+                    token visibility = "inherited"
+
+                    over "A4245a2315"
+                    {
+                        token visibility = "invisible"
+                    }
+
+                    over "A4254a2373"
+                    {
+                        token visibility = "invisible"
+                    }
+
+                    over "A4378a2327"
+                    {
+                        token visibility = "invisible"
+                    }
+
+                    over "_178"
+                    {
+                        token visibility = "invisible"
+                    }
+                }
+            }
+        }
+    }
+
+    def "edited_tile_1" (
+        prepend payload = @../environment/edited_tile_1.usdc@
+    )
+    {
+        token visibility = "inherited"
+        double xformOp:rotateX:unitsResolve = -90
+        float3 xformOp:rotateXYZ = (0, 0, 0)
+        float3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:scale:unitsResolve = (100, 100, 100)
+        double3 xformOp:translate = (-426132.7719001367, 1688.4065647378443, -221322.24843368967)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale", "xformOp:rotateX:unitsResolve", "xformOp:scale:unitsResolve"]
+    }
+
+    def "edited_tile_3" (
+        prepend payload = @../environment/edited_tile_3.usdc@
+    )
+    {
+        token visibility = "inherited"
+        double xformOp:rotateX:unitsResolve = -90
+        float3 xformOp:rotateXYZ = (0, 0, 0)
+        float3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:scale:unitsResolve = (100, 100, 100)
+        double3 xformOp:translate = (-426136.2428207975, 1698.0769535821346, -221340.40014782813)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale", "xformOp:rotateX:unitsResolve", "xformOp:scale:unitsResolve"]
+    }
+
+    def "edited_tile_4" (
+        prepend payload = @../environment/edited_tile_4.usdc@
+    )
+    {
+        token visibility = "inherited"
+        double xformOp:rotateX:unitsResolve = -90
+        float3 xformOp:rotateXYZ = (0, 0, 0)
+        float3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:scale:unitsResolve = (100, 100, 100)
+        double3 xformOp:translate = (-17730.9690054041, 6038.900089986688, 16381.578532266352)
+        double3 xformOp:translate:pivot = (4124.9997541308385, -2374.9999986765024, 19.65192971832099)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:translate:pivot", "xformOp:rotateXYZ", "xformOp:scale", "xformOp:rotateX:unitsResolve", "xformOp:scale:unitsResolve", "!invert!xformOp:translate:pivot"]
+    }
+
+    def "edited_tile_2" (
+        prepend payload = @../environment/edited_tile_2.usdc@
+    )
+    {
+        token visibility = "inherited"
+        double xformOp:rotateX:unitsResolve = -90
+        float3 xformOp:rotateXYZ = (0, 0, 0)
+        float3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:scale:unitsResolve = (100, 100, 100)
+        double3 xformOp:translate = (6988.23136292552, 4261.900063507266, -8865.721843924046)
+        double3 xformOp:translate:pivot = (4375.009016572874, -2124.8250117221796, 4.420483760644032)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:translate:pivot", "xformOp:rotateXYZ", "xformOp:scale", "xformOp:rotateX:unitsResolve", "xformOp:scale:unitsResolve", "!invert!xformOp:translate:pivot"]
+    }
+}
+
+def "Render" (
+    hide_in_stage_window = true
+    no_delete = true
+)
+{
+    def "OmniverseKit"
+    {
+        def "HydraTextures" (
+            hide_in_stage_window = true
+            no_delete = true
+        )
+        {
+            def RenderProduct "omni_kit_widget_viewport_ViewportTexture_0" (
+                prepend apiSchemas = ["OmniRtxSettingsCommonAdvancedAPI_1", "OmniRtxSettingsRtAdvancedAPI_1", "OmniRtxSettingsPtAdvancedAPI_1", "OmniRtxPostColorGradingAPI_1", "OmniRtxPostChromaticAberrationAPI_1", "OmniRtxPostBloomPhysicalAPI_1", "OmniRtxPostMatteObjectAPI_1", "OmniRtxPostCompositingAPI_1", "OmniRtxPostDofAPI_1", "OmniRtxPostMotionBlurAPI_1", "OmniRtxPostTvNoiseAPI_1", "OmniRtxPostTonemapIrayReinhardAPI_1", "OmniRtxPostDebugSettingsAPI_1", "OmniRtxDebugSettingsAPI_1"]
+                hide_in_stage_window = true
+                no_delete = true
+            )
+            {
+                rel camera = </OmniverseKit_Persp>
+                token omni:rtx:ambientOcclusion:denoiserMode = "none"
+                token omni:rtx:background:source:texture:textureMode = "repeatMirrored"
+                token omni:rtx:background:source:type = "domeLight"
+                bool omni:rtx:debug:view:pixelDebug:enableFixedTextPos = 1
+                token omni:rtx:directLighting:sampledLighting:denoisingTechnique = "None"
+                bool omni:rtx:dlss:frameGeneration = 1
+                bool omni:rtx:indirectDiffuse:denoiser:enabled = 0
+                bool omni:rtx:post:registeredCompositing:invertColorCorrection = 1
+                bool omni:rtx:post:registeredCompositing:invertToneMap = 1
+                bool omni:rtx:pt:adaptiveSampling:filterError = 0
+                uint omni:rtx:pt:adaptiveSampling:fixedSppIterations = 2
+                float omni:rtx:pt:fireflyFilter:maxPerEmissiveUnexposedIntensity = 3199.9995
+                float omni:rtx:pt:fireflyFilter:maxUnexposedIntensityPerSample = 3199.9995
+                float omni:rtx:pt:fireflyFilter:maxUnexposedIntensityPerSampleDiffuse = 3199.9995
+                int omni:rtx:pt:maxSamplesPerLaunch = 2073600
+                int omni:rtx:pt:mgpu:maxPixelsPerRegionExponent = 12
+                bool omni:rtx:reflections:denoiser:enabled = 0
+                token omni:rtx:rendermode = "RealTimePathTracing"
+                color3f omni:rtx:rt:ambientLight:color = (0.1, 0.1, 0.1)
+                bool omni:rtx:rt:demoire = 0
+                float omni:rtx:rt:directLighting:maxRayUnexposedIntensity = 6399.999
+                float omni:rtx:rt:indirectdiffuse:maxRayUnexposedIntensity = 6399.999
+                float omni:rtx:rt:inscattering:maxRTSampleUnexposedIntensity = 204799.97
+                bool omni:rtx:rt:lightcache:spatialCache:dontResolveConflicts = 1
+                float omni:rtx:rt:refractions:maxRayUnexposedIntensity = 19199.998
+                int omni:rtx:rt:sss:samples = 1
+                int omni:rtx:rtpt:maxVolumeBounces = 15
+                float omni:rtx:rtpt:modulatingRoughnessThreshold = 0.08
+                uint omni:rtx:viewTile:limit = 4294967295
+                rel orderedVars = </Render/Vars/LdrColor>
+                custom bool overrideClipRange = 0
+                uniform int2 resolution = (1343, 623)
+            }
+        }
+    }
+
+    def RenderSettings "OmniverseGlobalRenderSettings" (
+        prepend apiSchemas = ["OmniRtxSettingsGlobalRtAdvancedAPI_1", "OmniRtxSettingsGlobalPtAdvancedAPI_1"]
+        no_delete = true
+    )
+    {
+        rel products = </Render/OmniverseKit/HydraTextures/omni_kit_widget_viewport_ViewportTexture_0>
+    }
+
+    def "Vars"
+    {
+        def RenderVar "LdrColor" (
+            hide_in_stage_window = true
+            no_delete = true
+        )
+        {
+            uniform string sourceName = "LdrColor"
+        }
+    }
+}
+
+over "OmniverseKit_Persp" (
+    prepend apiSchemas = ["OmniRtxCameraAutoExposureAPI_1", "OmniRtxCameraExposureAPI_1"]
+    customData = {
+        dictionary omni = {
+            dictionary kit = {
+                bool hide_in_stage_window = 1
+                bool no_delete = 1
+            }
+        }
+    }
+    hide_in_stage_window = true
+    kind = "component"
+    no_delete = true
+)
+{
+    float2 clippingRange = (1, 10000000)
+    float exposure:fStop = 5
+    float exposure:responsivity = 1.1026709
+    float exposure:time = 0.02
+    float focalLength = 18.147562
+    float focusDistance = 400
+    custom uniform vector3d omni:kit:centerOfInterest = (0, 0, -203.2562255768475)
+    float3 xformOp:rotateXYZ = (163.6169, -25.724283, 180)
+    float3 xformOp:scale = (1, 1, 1)
+    double3 xformOp:translate = (-7005.428878552404, 6635.125378391665, -14839.106908525546)
+    uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+}
+
+over "OmniverseKit_Front" (
+    customData = {
+        dictionary omni = {
+            dictionary kit = {
+                bool hide_in_stage_window = 1
+                bool no_delete = 1
+            }
+        }
+    }
+    hide_in_stage_window = true
+    kind = "component"
+    no_delete = true
+)
+{
+    float2 clippingRange = (1, 10000000)
+    float horizontalAperture = 5000
+    custom uniform vector3d omni:kit:centerOfInterest = (0, 0, -50000)
+    token projection = "orthographic"
+    float verticalAperture = 5000
+    float3 xformOp:rotateXYZ = (-0, 0, -0)
+    float3 xformOp:scale = (1, 1, 1)
+    double3 xformOp:translate = (0, 0, 50000)
+    uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+}
+
+over "OmniverseKit_Right" (
+    customData = {
+        dictionary omni = {
+            dictionary kit = {
+                bool hide_in_stage_window = 1
+                bool no_delete = 1
+            }
+        }
+    }
+    hide_in_stage_window = true
+    kind = "component"
+    no_delete = true
+)
+{
+    float2 clippingRange = (1, 10000000)
+    float horizontalAperture = 5000
+    custom uniform vector3d omni:kit:centerOfInterest = (0, 0, -50000)
+    token projection = "orthographic"
+    float verticalAperture = 5000
+    float3 xformOp:rotateXYZ = (0, -90, -0)
+    float3 xformOp:scale = (1, 1, 1)
+    double3 xformOp:translate = (-50000, 0, 0)
+    uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+}
+
+over "OmniverseKit_Top" (
+    customData = {
+        dictionary omni = {
+            dictionary kit = {
+                bool hide_in_stage_window = 1
+                bool no_delete = 1
+            }
+        }
+    }
+    hide_in_stage_window = true
+    kind = "component"
+    no_delete = true
+)
+{
+    float2 clippingRange = (1, 10000000)
+    float horizontalAperture = 5000
+    custom uniform vector3d omni:kit:centerOfInterest = (0, 0, -50000)
+    token projection = "orthographic"
+    float verticalAperture = 5000
+    float3 xformOp:rotateXYZ = (90, -4.961563e-15, 180)
+    float3 xformOp:scale = (1, 1, 1)
+    double3 xformOp:translate = (0, 50000, 0)
+    uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+}
+
+def CesiumDataPrim "Cesium"
+{
+    prepend rel cesium:selectedIonServer = </CesiumServers/IonOfficial>
+}
+
+def CesiumGeoreferencePrim "CesiumGeoreference"
+{
+    matrix4d cesium:ecefToUsdTransform = ( (-20.77011300153257, 52.27102638448759, 82.6821758701098, 0), (97.81923331279779, 11.09878996127705, 17.55603757947356, 0), (0, 84.52547936632867, -53.43634847079601, 0), (1.4901161193847656e-8, -636290092.1241556, -1933179.0507858992, 1) )
+    double cesium:georeferenceOrigin:height = 35
+    double cesium:georeferenceOrigin:latitude = 57.69924423840406
+    double cesium:georeferenceOrigin:longitude = 11.987666514336354
+}
+
+def "CesiumServers"
+{
+    def CesiumIonServerPrim "IonOfficial"
+    {
+        string cesium:displayName = "ion.cesium.com"
+        string cesium:ionServerApiUrl = "https://api.cesium.com/"
+        int64 cesium:ionServerApplicationId = 413
+        string cesium:ionServerUrl = "https://ion.cesium.com/"
+        string cesium:projectDefaultIonAccessToken = ""
+        string cesium:projectDefaultIonAccessTokenId = "cbadc583-e58a-41fe-85f0-142f261b1e25"
+    }
+}
+
+def CesiumTilesetPrim "Cesium_World_Terrain"
+{
+    bool cesium:enableFogCulling = 1
+    prepend rel cesium:georeferenceBinding = </CesiumGeoreference>
+    string cesium:ionAccessToken = ""
+    int64 cesium:ionAssetId = 1
+    prepend rel cesium:ionServerBinding = </CesiumServers/IonOfficial>
+    double cesium:mainThreadLoadingTimeLimit = 5
+    double cesium:maximumScreenSpaceError = 16
+    bool cesium:preloadAncestors = 0
+    bool cesium:preloadSiblings = 0
+    prepend rel cesium:rasterOverlayBinding = </Cesium_World_Terrain/Bing_Maps_Aerial_imagery>
+    uniform token cesium:sourceType = "ion"
+    float3[] extent = [(-757446400, -1579110000, -982330940), (757446400, 306529900, 978464600)]
+
+    def CesiumIonRasterOverlayPrim "Bing_Maps_Aerial_imagery"
+    {
+        string cesium:ionAccessToken = ""
+        int64 cesium:ionAssetId = 2
+        prepend rel cesium:ionServerBinding = </CesiumServers/IonOfficial>
+    }
+}
+

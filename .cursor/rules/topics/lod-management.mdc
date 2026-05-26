@@ -1,0 +1,109 @@
+---
+description: Stadium LOD management — variant-set switching between full/light, async Unload/frame-gap/Load cycle to clear Hydra cache, extension architecture, known PointInstancer ghost issue. Read when working on LOD, stadium detail levels, or variant switching.
+---
+
+# Stadium LOD Management
+
+The stadium (Skandinavium) has two LOD levels managed via a USD variant set. A lighter version with deactivated interiors is used for bird's-eye view; the full-detail version is used for first-person view.
+
+## USD file structure
+
+`scandinavium_asset.usda` is the entry point, composing the base model with project overrides and exposing a `"lod"` variant set:
+
+```
+scandinavium_asset.usda
+├── references:
+│   ├── scandinavium_project_overrides.usda  (transform overrides, seats_instanced def)
+│   └── Skandinavium.usda                    (base stadium model)
+├── variantSet "lod":
+│   ├── "full"  → (no additional references)
+│   └── "light" → prepend references = scandinavium_lod_light_overrides.usda
+```
+
+- **`Skandinavium.usda`** — the base stadium model (~85K lines). Contains no seats.
+- **`scandinavium_project_overrides.usda`** — project-specific transform overrides and the `seats_instanced` prim (PointInstancer payload from `../Seats/seats_instanced.usda`).
+- **`scandinavium_lod_light_overrides.usda`** — ~9800 lines of `over` blocks with `active = false` on interior prims, corridor geometry, arena bleachers, and `seats_instanced`.
+
+### Scene integration
+
+`main_scene.usda` loads `scandinavium_asset.usda` (which defaults to the `light` variant):
+```usda
+def "Skandinavium" (
+    prepend payload = @../Assets/Skandinavium/scandinavium_asset.usda@
+) { ... }
+```
+
+All sublayer overrides (colliders, navigation, deactivation, materials) use `over "Skandinavium"` and compose correctly because the prim path is unchanged regardless of which variant is active.
+
+## Extension: `younite.lod_management_extension`
+
+**Location**: `source/extensions/younite.lod_management_extension/`
+**Entry point**: `LodManagementExtension` in `extension.py`
+
+### How it works — variant switch + async Unload/Load with frame gaps
+
+1. `SetVariantSelection(target)` on the `"lod"` variant set
+2. `stage.Unload(path)` — tells Hydra to discard all geometry for the prim
+3. **Await 2 render frames** — gives Hydra time to process the unload and clear cached state
+4. `stage.Load(path)` — Hydra loads the new variant content from scratch
+5. **Await `_HYDRA_SETTLE_FRAMES_AFTER_LOAD` (4) render frames** — gives Hydra time to process the loaded geometry into visible draw calls
+6. Publish `currentLod` to carb setting + dispatch `stadiumLodResponse`
+
+Both frame gaps are critical:
+- **Pre-Load gap (2 frames):** Without it, Hydra's incremental renderer retains cached PointInstancer instances from the previous variant, causing "ghost" seats to remain visible. This is a known Hydra behaviour — standard `SetVariantSelection` alone does not clear them.
+- **Post-Load gap (4 frames):** Without it, `currentLod` is published before Hydra has rendered the new geometry. The view transition overlay (`view_transition_readiness.py`) polls `currentLod` and triggers fade-in when it matches — if published too early, the user sees the stadium "pop in" after the screen is already visible. This was most noticeable on the first-person → bird's-eye transition, where there is no extra buffer (unlike bird's-eye → first-person, which has NavMesh preparation time between LOD readiness and fade-in).
+
+The current LOD is published to carb setting `/younite/stadium/currentLod` so `view_transition_readiness.py` can poll it without depending on the LOD extension directly.
+
+### Hydra readiness — no SDK signal available
+
+Hydra does not expose a "geometry load complete" or scene convergence callback. The available APIs are:
+- **`GLOBAL_EVENT_DRAWABLE_CHANGED`** (`omni.kit.hydra_texture`) — fires every rendered frame, but does not indicate whether pending geometry changes from a `Load()` are reflected in that frame.
+- **`HdRenderPass::IsConverged()`** (OpenUSD core) — for progressive renderer sample accumulation (e.g. ray tracers), not geometry load readiness.
+
+The hard-coded frame waits (`_HYDRA_SETTLE_FRAMES_AFTER_LOAD`) are the best available approach. The constant is tunable if testing shows 4 frames is insufficient on specific hardware. Replace with an event-driven check if a future Kit SDK version exposes a geometry-level readiness signal.
+
+### PointInstancer ghosting — diagnosis and mitigation
+
+When switching from `full` to `light` LOD, PointInstancer geometry (e.g. instanced stadium seats) can remain visible as "ghost" draw calls even though the underlying prims are deactivated (`active = false`) in the light variant. This is a Hydra rendering cache issue, not a USD composition problem — the composed stage is correct, but Hydra's incremental renderer does not fully invalidate cached PointInstancer instances on recomposition.
+
+**What was tried (in order):**
+
+1. **Variant switch only** (`SetVariantSelection`) — ghosts persist. Hydra treats the recomposition as incremental and keeps old instance draw calls.
+2. **Session-layer `visibility = "invisible"`** on individual PointInstancer prims — works visually but the full geometry stays in GPU memory, defeating the purpose of a lighter LOD.
+3. **`active = false` via override layer** — USD prunes the prim from composition, but Hydra does not always remove the corresponding cached instances.
+4. **Synchronous `Unload()` + `Load()` after variant switch** — still too fast for Hydra to clear its cache between operations.
+5. **Payload swap** (replacing the payload reference to a different USD file instead of using variants) — same ghosting result; the issue is in Hydra's cache, not in how USD composes the data.
+6. **Async `Unload()` → 2-frame gap → `Load()` → 4-frame settle** (current approach) — gives Hydra render frames to process the unload and discard cached state before loading new content, then additional frames after Load to render the new geometry before signalling readiness. This mitigates the issue but may not eliminate it in all cases on all Kit versions.
+
+**Takeaway:** When Hydra retains stale geometry after USD composition changes, inserting render frames between `Unload` and `Load` is the most effective runtime workaround. Adding settle frames after `Load` before publishing readiness prevents visual pop-in during view transitions. A full stage reload is the only guaranteed fix but is too expensive for interactive use. If a similar caching issue appears with other instanced or batched geometry types, the async frame-gap pattern is a good first approach to try.
+
+### Event wiring
+
+| Event | Direction | Purpose |
+|-------|-----------|---------|
+| `stadiumLodToggle` | web → Kit | Manual toggle from UI button. Payload: `{ lod: "full" \| "light" }` (empty = toggle) |
+| `stadiumLodResponse` | Kit → web | Response with `{ result, lod }` |
+| `younite.camera.viewTypeChanged` | Kit internal | Automatic switching (enabled by `_AUTO_LOD_ENABLED = True`) |
+
+### Automatic camera-based switching
+
+The extension listens to `younite.camera.viewTypeChanged` and maps `birdEye` → light, `firstPerson` → full. On stage `OPENED` (and if a stage is already loaded), it polls until `/World/Skandinavium` exists then syncs from carb `/younite/camera/viewType`.
+
+The default startup view type is configured via `/younite/camera/defaultViewType` in the `.kit` app config. If starting in first-person, `scandinavium_asset.usda` should default to the `"full"` variant so no LOD switch is needed during the loading phase.
+
+## Editing the light LOD overrides
+
+To change what is hidden in the light variant, edit `scandinavium_lod_light_overrides.usda` directly — add `over "PrimName" (active = false) { }` blocks for prims that should be pruned in bird's-eye mode. Kit must be restarted for USD file changes to take effect (layer caching).
+
+## File reference
+
+| File | Role |
+|------|------|
+| `Assets/Skandinavium/scandinavium_asset.usda` | Variant-set entry point (`"lod"` → `"full"` / `"light"`) |
+| `Assets/Skandinavium/scandinavium_lod_light_overrides.usda` | Light LOD deactivations (`active = false`) |
+| `Assets/Skandinavium/scandinavium_project_overrides.usda` | Project overrides + seats_instanced definition |
+| `Assets/Skandinavium/Skandinavium.usda` | Base stadium model (no seats) |
+| `scenes/main_scene.usda` | Loads `scandinavium_asset.usda` via payload |
+| `extensions/younite.lod_management_extension/` | Runtime variant switching extension |
+| `view_transition_readiness.py` | Polls `/younite/stadium/currentLod` for transition orchestration |

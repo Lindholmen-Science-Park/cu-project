@@ -1,0 +1,19 @@
+[package]
+title = "Younite Payload Orchestrator"
+description = "Centralised queue for payload load/unload and visibility operations with frame-budgeted execution"
+version = "0.1.0"
+authors = ["Younite"]
+keywords = ["payload", "visibility", "orchestrator", "performance"]
+category = "Core"
+
+[dependencies]
+"omni.usd" = {}
+
+[[python.module]]
+name = "younite.payload_orchestrator_core_extension"
+
+[build]
+include = [
+    "younite/**/*.py",
+    "*.toml",
+]

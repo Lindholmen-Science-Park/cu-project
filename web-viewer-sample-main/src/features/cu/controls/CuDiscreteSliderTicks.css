@@ -1,0 +1,53 @@
+/* Labels align to native range thumb centers over the same width as the input. */
+.cu-discrete-slider-ticks {
+    --cu-thumb-half: 12px;
+    position: relative;
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 1.15em;
+    margin: 0;
+    padding: 0;
+    user-select: none;
+    pointer-events: none;
+    color: var(--Dark-Purple, #351a84);
+    font-family: Lexend, system-ui, sans-serif;
+    font-size: 13px;
+    font-style: normal;
+    font-weight: 600;
+    line-height: 110%;
+}
+
+.cu-discrete-slider-ticks__tick {
+    position: absolute;
+    top: 0;
+    left: calc(
+        var(--cu-thumb-half) + (100% - 2 * var(--cu-thumb-half)) * var(--cu-tick-index) /
+            max(1, calc(var(--cu-tick-count) - 1))
+    );
+    transform: translateX(-50%);
+    white-space: nowrap;
+}
+
+.cu-discrete-slider-ticks--single {
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+}
+
+.cu-discrete-slider-ticks--single .cu-discrete-slider-ticks__tick {
+    position: static;
+    transform: none;
+}
+
+/* Quick settings: width set in PeoplePanel.css (.cu-time-slider-stack); spacing via stack gap */
+.cu-discrete-slider-ticks--quick {
+    margin-top: 0;
+}
+
+.cu-discrete-slider-ticks--under-world3d-time-track {
+    margin-top: 10px;
+}
+
+.cu-discrete-slider-ticks--under-world3d-camera-track {
+    margin-top: 8px;
+}

@@ -1,0 +1,955 @@
+#usda 1.0
+
+over "World"
+{
+    def NavMeshVolume "NavMeshVolume" (
+        prepend apiSchemas = ["NavMeshAreaAPI"]
+    )
+    {
+        float3[] extent = [(-50, -50, -50), (50, 50, 50)]
+        string nav:area = "Walkable"
+        token nav:volume:type = "Include"
+        float3 xformOp:rotateXYZ = (0, -0, 0)
+        float3 xformOp:scale = (139.97966, 53.09845, 186.24164)
+        double3 xformOp:translate = (-443.8220200474243, 2140.737304687571, -1184.9918568832873)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    over "Skandinavium"
+    {
+        over "SC_Extension"
+        {
+            over "EXTENSION_NULL"
+            {
+                over "FLOOR1_NULL"
+                {
+                    over "SC_Black_Extension_Door_2" (
+                        prepend apiSchemas = ["NavMeshExcludeAPI"]
+                    )
+                    {
+                        token visibility = "inherited"
+                    }
+
+                    over "SC_Linoleum_Extension_Flooring005"
+                    {
+                        token visibility = "inherited"
+                    }
+                }
+
+                over "EXTFACADE_NULL"
+                {
+                    over "SC_Metal_Extension_Frames"
+                    {
+                        matrix4d xformOp:transform = ( (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (-6912.512207, 1694, 1579.159912, 1) )
+                    }
+                }
+            }
+        }
+
+        over "SM_MERGED_StaticMeshActor_64"
+        {
+            token visibility = "inherited"
+        }
+
+        over "SC_Foyer"
+        {
+            over "FOYER_NULL"
+            {
+                over "SC_Blue_Foyer_Doors" (
+                    prepend apiSchemas = ["NavMeshExcludeAPI"]
+                )
+                {
+                    token visibility = "inherited"
+                }
+
+                over "SC_Wood_Foyer_Thresholds" (
+                    prepend apiSchemas = ["NavMeshExcludeAPI"]
+                )
+                {
+                }
+
+                over "MEZZNORTH_NULL"
+                {
+                    over "SC_Concrete_Mezz_Ceiling000" (
+                        prepend apiSchemas = ["NavMeshExcludeAPI"]
+                    )
+                    {
+                    }
+                }
+
+                over "SC_Concrete_Arena_Flooring003" (
+                    prepend apiSchemas = ["NavMeshExcludeAPI"]
+                )
+                {
+                }
+
+                over "SC_Concrete_Arena_Flooring007" (
+                    prepend apiSchemas = ["NavMeshExcludeAPI"]
+                )
+                {
+                }
+
+                over "SC_Concrete_Arena_Flooring006" (
+                    prepend apiSchemas = ["NavMeshExcludeAPI"]
+                )
+                {
+                }
+
+                over "SC_Concrete_Arena_Flooring002" (
+                    prepend apiSchemas = ["NavMeshExcludeAPI"]
+                )
+                {
+                }
+
+                over "SC_Concrete_Arena_Flooring005" (
+                    prepend apiSchemas = ["NavMeshExcludeAPI"]
+                )
+                {
+                }
+
+                over "SC_Concrete_Arena_Flooring001" (
+                    prepend apiSchemas = ["NavMeshExcludeAPI"]
+                )
+                {
+                }
+
+                over "SC_Concrete_Arena_Flooring000" (
+                    prepend apiSchemas = ["NavMeshExcludeAPI"]
+                )
+                {
+                }
+
+                over "SC_Concrete_Arena_Flooring004" (
+                    prepend apiSchemas = ["NavMeshExcludeAPI"]
+                )
+                {
+                }
+            }
+        }
+
+        over "SC_Glass_Facade_2_67" (
+            delete apiSchemas = ["NavMeshExcludeAPI"]
+        )
+        {
+        }
+
+        over "The_roof" (
+            prepend apiSchemas = ["NavMeshExcludeAPI"]
+        )
+        {
+        }
+
+        over "SC_Roof"
+        {
+            over "ROOFEXTENSION_NULL"
+            {
+                over "SC_Metal_Roof_Extension" (
+                    prepend apiSchemas = ["NavMeshExcludeAPI"]
+                )
+                {
+                }
+
+                over "SC_Metal_Roof_Extension_2" (
+                    prepend apiSchemas = ["NavMeshExcludeAPI"]
+                )
+                {
+                }
+
+                over "SC_Metal_Grate_Extension" (
+                    prepend apiSchemas = ["NavMeshExcludeAPI"]
+                )
+                {
+                }
+            }
+        }
+
+        over "SC_Facade"
+        {
+            over "FACADE_NULL"
+            {
+                over "NORTHFACADE_NULL"
+                {
+                    over "GolvBitGeneric_Nya_delen104" (
+                        prepend apiSchemas = ["NavMeshExcludeAPI"]
+                    )
+                    {
+                    }
+                }
+            }
+        }
+
+        over "SC_Landscape"
+        {
+            over "LANDSCAPE_NULL"
+            {
+                over "L_Metal_Exterior_Stairs" (
+                    prepend apiSchemas = ["NavMeshExcludeAPI"]
+                )
+                {
+                }
+            }
+        }
+
+        over "SC_Basement"
+        {
+            over "BASEMENT_NULL"
+            {
+                over "SC_Concrete_Basement_Stair000" (
+                    prepend apiSchemas = ["NavMeshAreaAPI"]
+                )
+                {
+                    string nav:area = "stairs"
+                }
+            }
+        }
+
+        over "SC_Arena"
+        {
+            over "ARENA_NULL"
+            {
+                over "SC_Linoleum_Arena_Stairs013" (
+                    prepend apiSchemas = ["NavMeshAreaAPI"]
+                )
+                {
+                    string nav:area = "arena_stairs"
+                }
+
+                over "SC_Linoleum_Arena_Slabs007" (
+                    prepend apiSchemas = ["NavMeshAreaAPI"]
+                )
+                {
+                    string nav:area = "arena_row_floor"
+                }
+
+                over "SC_Linoleum_Arena_Slabs006" (
+                    prepend apiSchemas = ["NavMeshAreaAPI"]
+                )
+                {
+                    string nav:area = "arena_row_floor"
+                }
+
+                over "SC_Concrete_Structure_Beams000" (
+                    prepend apiSchemas = ["NavMeshExcludeAPI"]
+                )
+                {
+                }
+
+                over "SC_Concrete_Structure_Beams001" (
+                    prepend apiSchemas = ["NavMeshExcludeAPI"]
+                )
+                {
+                }
+
+                over "SC_Concrete_Structure_Beams002" (
+                    prepend apiSchemas = ["NavMeshExcludeAPI"]
+                )
+                {
+                }
+
+                over "SC_Concrete_Structure_Beams003" (
+                    prepend apiSchemas = ["NavMeshExcludeAPI"]
+                )
+                {
+                }
+
+                over "SC_Concrete_Structure_Beams004" (
+                    prepend apiSchemas = ["NavMeshExcludeAPI"]
+                )
+                {
+                }
+
+                over "SC_Concrete_Structure_Beams005" (
+                    prepend apiSchemas = ["NavMeshExcludeAPI"]
+                )
+                {
+                }
+
+                over "SC_Concrete_Structure_Beams006" (
+                    prepend apiSchemas = ["NavMeshExcludeAPI"]
+                )
+                {
+                }
+
+                over "SC_Concrete_Structure_Beams007" (
+                    prepend apiSchemas = ["NavMeshExcludeAPI"]
+                )
+                {
+                }
+
+                over "SC_Concrete_Structure_Beams008" (
+                    prepend apiSchemas = ["NavMeshExcludeAPI"]
+                )
+                {
+                }
+
+                over "SC_Concrete_Structure_Beams009" (
+                    prepend apiSchemas = ["NavMeshExcludeAPI"]
+                )
+                {
+                }
+
+                over "SC_Concrete_Structure_Beams010" (
+                    prepend apiSchemas = ["NavMeshExcludeAPI"]
+                )
+                {
+                }
+
+                over "SC_Concrete_Structure_Beams011" (
+                    prepend apiSchemas = ["NavMeshExcludeAPI"]
+                )
+                {
+                }
+
+                over "SC_Concrete_Structure_Beams012" (
+                    prepend apiSchemas = ["NavMeshExcludeAPI"]
+                )
+                {
+                }
+
+                over "SC_Concrete_Structure_Beams013" (
+                    prepend apiSchemas = ["NavMeshExcludeAPI"]
+                )
+                {
+                }
+
+                over "SC_Concrete_Structure_Beams014" (
+                    prepend apiSchemas = ["NavMeshExcludeAPI"]
+                )
+                {
+                }
+
+                over "SC_Concrete_Structure_Beams015" (
+                    prepend apiSchemas = ["NavMeshExcludeAPI"]
+                )
+                {
+                }
+
+                over "SC_Concrete_Structure_Beams016" (
+                    prepend apiSchemas = ["NavMeshExcludeAPI"]
+                )
+                {
+                }
+
+                over "SC_Concrete_Structure_Beams017" (
+                    prepend apiSchemas = ["NavMeshExcludeAPI"]
+                )
+                {
+                }
+
+                over "SC_Concrete_Structure_Beams018" (
+                    prepend apiSchemas = ["NavMeshExcludeAPI"]
+                )
+                {
+                }
+
+                over "SC_Concrete_Structure_Beams019" (
+                    prepend apiSchemas = ["NavMeshExcludeAPI"]
+                )
+                {
+                }
+
+                over "SC_Linoleum_Arena_Slabs008" (
+                    prepend apiSchemas = ["NavMeshAreaAPI"]
+                )
+                {
+                    string nav:area = "arena_row_floor"
+                }
+
+                over "SC_Linoleum_Arena_Stairs014" (
+                    prepend apiSchemas = ["NavMeshAreaAPI"]
+                )
+                {
+                    string nav:area = "arena_stairs"
+                }
+
+                over "SC_Linoleum_Arena_Slabs009" (
+                    prepend apiSchemas = ["NavMeshAreaAPI"]
+                )
+                {
+                    string nav:area = "arena_row_floor"
+                }
+
+                over "SC_Linoleum_Arena_Stairs000" (
+                    prepend apiSchemas = ["NavMeshAreaAPI"]
+                )
+                {
+                    string nav:area = "arena_stairs"
+                }
+
+                over "SC_Linoleum_Arena_Slabs010" (
+                    prepend apiSchemas = ["NavMeshAreaAPI"]
+                )
+                {
+                    string nav:area = "arena_row_floor"
+                }
+
+                over "SC_Linoleum_Arena_Slabs011" (
+                    prepend apiSchemas = ["NavMeshAreaAPI"]
+                )
+                {
+                    string nav:area = "arena_row_floor"
+                }
+
+                over "SC_Linoleum_Arena_Stairs001" (
+                    prepend apiSchemas = ["NavMeshAreaAPI"]
+                )
+                {
+                    string nav:area = "arena_stairs"
+                }
+
+                over "SC_Linoleum_Arena_Stairs002" (
+                    prepend apiSchemas = ["NavMeshAreaAPI"]
+                )
+                {
+                    string nav:area = "arena_stairs"
+                }
+
+                over "SC_Linoleum_Arena_Slabs012" (
+                    prepend apiSchemas = ["NavMeshAreaAPI"]
+                )
+                {
+                    string nav:area = "arena_row_floor"
+                }
+
+                over "SC_Linoleum_Arena_Stairs003" (
+                    prepend apiSchemas = ["NavMeshAreaAPI"]
+                )
+                {
+                    string nav:area = "arena_stairs"
+                }
+
+                over "SC_Linoleum_Arena_Slabs013" (
+                    prepend apiSchemas = ["NavMeshAreaAPI"]
+                )
+                {
+                    string nav:area = "arena_row_floor"
+                }
+
+                over "SC_Linoleum_Arena_Stairs004" (
+                    prepend apiSchemas = ["NavMeshAreaAPI"]
+                )
+                {
+                    string nav:area = "arena_stairs"
+                }
+
+                over "SC_Linoleum_Arena_Slabs014" (
+                    prepend apiSchemas = ["NavMeshAreaAPI"]
+                )
+                {
+                    string nav:area = "arena_row_floor"
+                }
+
+                over "SC_Linoleum_Arena_Stairs005" (
+                    prepend apiSchemas = ["NavMeshAreaAPI"]
+                )
+                {
+                    string nav:area = "arena_stairs"
+                }
+
+                over "SC_Linoleum_Arena_Slabs015" (
+                    prepend apiSchemas = ["NavMeshAreaAPI"]
+                )
+                {
+                    string nav:area = "arena_row_floor"
+                }
+
+                over "SC_Linoleum_Arena_Stairs006" (
+                    prepend apiSchemas = ["NavMeshAreaAPI"]
+                )
+                {
+                    string nav:area = "arena_stairs"
+                }
+
+                over "SC_Linoleum_Arena_Stairs007" (
+                    prepend apiSchemas = ["NavMeshAreaAPI"]
+                )
+                {
+                    string nav:area = "arena_stairs"
+                }
+
+                over "SC_Linoleum_Arena_Slabs000" (
+                    prepend apiSchemas = ["NavMeshAreaAPI"]
+                )
+                {
+                    string nav:area = "arena_row_floor"
+                }
+
+                over "SC_Linoleum_Arena_Slabs001" (
+                    prepend apiSchemas = ["NavMeshAreaAPI"]
+                )
+                {
+                    string nav:area = "arena_row_floor"
+                }
+
+                over "SC_Linoleum_Arena_Stairs008" (
+                    prepend apiSchemas = ["NavMeshAreaAPI"]
+                )
+                {
+                    string nav:area = "arena_stairs"
+                }
+
+                over "SC_Linoleum_Arena_Slabs002" (
+                    prepend apiSchemas = ["NavMeshAreaAPI"]
+                )
+                {
+                    string nav:area = "arena_row_floor"
+                }
+
+                over "SC_Linoleum_Arena_Slabs003" (
+                    prepend apiSchemas = ["NavMeshAreaAPI"]
+                )
+                {
+                    string nav:area = "arena_row_floor"
+                }
+
+                over "SC_Linoleum_Arena_Stairs009" (
+                    prepend apiSchemas = ["NavMeshAreaAPI"]
+                )
+                {
+                    string nav:area = "arena_stairs"
+                }
+
+                over "SC_Linoleum_Arena_Stairs010" (
+                    prepend apiSchemas = ["NavMeshAreaAPI"]
+                )
+                {
+                    string nav:area = "arena_stairs"
+                }
+
+                over "SC_Linoleum_Arena_Slabs004" (
+                    prepend apiSchemas = ["NavMeshAreaAPI"]
+                )
+                {
+                    string nav:area = "arena_row_floor"
+                }
+
+                over "SC_Linoleum_Arena_Stairs011" (
+                    prepend apiSchemas = ["NavMeshAreaAPI"]
+                )
+                {
+                    string nav:area = "arena_stairs"
+                }
+
+                over "SC_Linoleum_Arena_Slabs005" (
+                    prepend apiSchemas = ["NavMeshAreaAPI"]
+                )
+                {
+                    string nav:area = "arena_row_floor"
+                }
+
+                over "SC_Linoleum_Arena_Stairs012" (
+                    prepend apiSchemas = ["NavMeshAreaAPI"]
+                )
+                {
+                    string nav:area = "arena_stairs"
+                }
+            }
+        }
+
+        over "ArenaStairs"
+        {
+            over "ArenaStairs"
+            {
+                over "ArenaStairs"
+                {
+                    over "Trappa_nedre_parkett011"
+                    {
+                        over "Trappa_nedre_parkett001" (
+                            prepend apiSchemas = ["NavMeshAreaAPI"]
+                        )
+                        {
+                            string nav:area = "arena_stairs"
+                        }
+                    }
+
+                    over "Trappa_nedre_parkett010"
+                    {
+                        over "Trappa_nedre_parkett001" (
+                            prepend apiSchemas = ["NavMeshAreaAPI"]
+                        )
+                        {
+                            string nav:area = "arena_stairs"
+                        }
+                    }
+
+                    over "Trappa_nedre_parkett009"
+                    {
+                        over "Trappa_nedre_parkett001" (
+                            prepend apiSchemas = ["NavMeshAreaAPI"]
+                        )
+                        {
+                            string nav:area = "arena_stairs"
+                        }
+                    }
+
+                    over "Trappa_nedre_parkett008"
+                    {
+                        over "Trappa_nedre_parkett001" (
+                            prepend apiSchemas = ["NavMeshAreaAPI"]
+                        )
+                        {
+                            string nav:area = "arena_stairs"
+                        }
+                    }
+
+                    over "Trappa_nedre_parkett001"
+                    {
+                        over "Trappa_nedre_parkett001" (
+                            prepend apiSchemas = ["NavMeshAreaAPI"]
+                        )
+                        {
+                            string nav:area = "arena_stairs"
+                        }
+                    }
+
+                    over "Trappa_nedre_parkett002"
+                    {
+                        over "Trappa_nedre_parkett001" (
+                            prepend apiSchemas = ["NavMeshAreaAPI"]
+                        )
+                        {
+                            string nav:area = "arena_stairs"
+                        }
+                    }
+
+                    over "Trappa_nedre_parkett003"
+                    {
+                        over "Trappa_nedre_parkett001" (
+                            prepend apiSchemas = ["NavMeshAreaAPI"]
+                        )
+                        {
+                            string nav:area = "arena_stairs"
+                        }
+                    }
+
+                    over "Trappa_nedre_parkett004"
+                    {
+                        over "Trappa_nedre_parkett001" (
+                            prepend apiSchemas = ["NavMeshAreaAPI"]
+                        )
+                        {
+                            string nav:area = "arena_stairs"
+                        }
+                    }
+
+                    over "Trappa_nedre_parkett005"
+                    {
+                        over "Trappa_nedre_parkett001" (
+                            prepend apiSchemas = ["NavMeshAreaAPI"]
+                        )
+                        {
+                            string nav:area = "arena_stairs"
+                        }
+                    }
+
+                    over "Trappa_nedre_parkett006"
+                    {
+                        over "Trappa_nedre_parkett001" (
+                            prepend apiSchemas = ["NavMeshAreaAPI"]
+                        )
+                        {
+                            string nav:area = "arena_stairs"
+                        }
+                    }
+
+                    over "Trappa_nedre_parkett007"
+                    {
+                        over "Trappa_nedre_parkett001" (
+                            prepend apiSchemas = ["NavMeshAreaAPI"]
+                        )
+                        {
+                            string nav:area = "arena_stairs"
+                        }
+                    }
+
+                    over "Trappa_nedre_parkett013"
+                    {
+                        over "Trappa_nedre_parkett001" (
+                            prepend apiSchemas = ["NavMeshAreaAPI"]
+                        )
+                        {
+                            string nav:area = "arena_stairs"
+                        }
+                    }
+
+                    over "Trappa_nedre_parkett012"
+                    {
+                        over "Trappa_nedre_parkett001" (
+                            prepend apiSchemas = ["NavMeshAreaAPI"]
+                        )
+                        {
+                            string nav:area = "arena_stairs"
+                        }
+                    }
+                }
+            }
+        }
+
+        over "NS_NULL"
+        {
+            over "SC_Linoleum_Arena_Bleachers000" (
+                prepend apiSchemas = ["NavMeshAreaAPI"]
+            )
+            {
+                string nav:area = "arena_row_floor"
+            }
+
+            over "SC_Linoleum_Arena_Bleachers002" (
+                prepend apiSchemas = ["NavMeshAreaAPI"]
+            )
+            {
+                string nav:area = "arena_row_floor"
+
+                over "SC_Linoleum_Arena_Bleachers084"
+                {
+                    over "SC_Linoleum_Arena_Bleachers083"
+                    {
+                        over "SC_Linoleum_Arena_Bleachers082"
+                        {
+                            over "SC_Linoleum_Arena_Bleachers081"
+                            {
+                                over "SC_Linoleum_Arena_Bleachers080" (
+                                    delete apiSchemas = ["NavMeshAreaAPI"]
+                                )
+                                {
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            over "SC_Linoleum_Arena_Bleachers001" (
+                prepend apiSchemas = ["NavMeshAreaAPI"]
+            )
+            {
+                string nav:area = "arena_row_floor"
+            }
+
+            over "SC_Linoleum_Arena_Bleachers011" (
+                prepend apiSchemas = ["NavMeshAreaAPI"]
+            )
+            {
+                string nav:area = "arena_row_floor"
+            }
+
+            over "SC_Linoleum_Arena_Bleachers020" (
+                prepend apiSchemas = ["NavMeshAreaAPI"]
+            )
+            {
+                string nav:area = "arena_row_floor"
+            }
+
+            over "SC_Linoleum_Arena_Bleachers021" (
+                prepend apiSchemas = ["NavMeshAreaAPI"]
+            )
+            {
+                string nav:area = "arena_row_floor"
+            }
+
+            over "SC_Linoleum_Arena_Bleachers030" (
+                prepend apiSchemas = ["NavMeshAreaAPI"]
+            )
+            {
+                string nav:area = "arena_row_floor"
+            }
+
+            over "SC_Linoleum_Arena_Bleachers005" (
+                prepend apiSchemas = ["NavMeshAreaAPI"]
+            )
+            {
+                string nav:area = "arena_row_floor"
+            }
+
+            over "SC_Linoleum_Arena_Bleachers073" (
+                prepend apiSchemas = ["NavMeshAreaAPI"]
+            )
+            {
+                string nav:area = "arena_row_floor"
+            }
+
+            over "SC_Linoleum_Arena_Bleachers079" (
+                prepend apiSchemas = ["NavMeshAreaAPI"]
+            )
+            {
+                string nav:area = "arena_row_floor"
+            }
+
+            over "SC_Linoleum_Arena_Bleachers033" (
+                prepend apiSchemas = ["NavMeshAreaAPI"]
+            )
+            {
+                string nav:area = "arena_row_floor"
+            }
+
+            over "SC_Linoleum_Arena_Bleachers050" (
+                prepend apiSchemas = ["NavMeshAreaAPI"]
+            )
+            {
+                string nav:area = "arena_row_floor"
+            }
+
+            over "SC_Linoleum_Arena_Bleachers044" (
+                prepend apiSchemas = ["NavMeshAreaAPI"]
+            )
+            {
+                string nav:area = "arena_row_floor"
+            }
+
+            over "SC_Linoleum_Arena_Bleachers054" (
+                prepend apiSchemas = ["NavMeshAreaAPI"]
+            )
+            {
+                string nav:area = "arena_row_floor"
+            }
+        }
+    }
+
+    def NavMeshVolume "NavMeshVolume_01" (
+        prepend apiSchemas = ["NavMeshAreaAPI"]
+    )
+    {
+        float3[] extent = [(-50, -50, -50), (50, 50, 50)]
+        string nav:area = "Walkable"
+        token nav:volume:type = "Exclude"
+        float3 xformOp:rotateXYZ = (0, -0, 0)
+        float3 xformOp:scale = (2, 2, 2)
+        double3 xformOp:translate = (534.6562771351491, 2261.8000488281673, -5060.4910463091655)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def NavMeshVolume "NavMeshVolume_02" (
+        prepend apiSchemas = ["NavMeshAreaAPI"]
+    )
+    {
+        float3[] extent = [(-50, -50, -50), (50, 50, 50)]
+        string nav:area = "Walkable"
+        token nav:volume:type = "Exclude"
+        float3 xformOp:rotateXYZ = (0, -0, 0)
+        float3 xformOp:scale = (5.406052, 2, 2)
+        double3 xformOp:translate = (-912.5147425686828, 2329.738166143667, -6542.363589914061)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def NavMeshVolume "NavMeshVolume_03" (
+        prepend apiSchemas = ["NavMeshAreaAPI"]
+    )
+    {
+        float3[] extent = [(-50, -50, -50), (50, 50, 50)]
+        string nav:area = "Walkable"
+        token nav:volume:type = "Exclude"
+        float3 xformOp:rotateXYZ = (0, -0, 0)
+        float3 xformOp:scale = (5.406052, 0.86466146, -1.9198294)
+        double3 xformOp:translate = (-1381.0740204408976, 2298.3218969666723, -6428.200587976635)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def NavMeshVolume "NavMeshVolume_04" (
+        prepend apiSchemas = ["NavMeshAreaAPI"]
+    )
+    {
+        float3[] extent = [(-50, -50, -50), (50, 50, 50)]
+        string nav:area = "Walkable"
+        token nav:volume:type = "Exclude"
+        float3 xformOp:rotateXYZ = (0, -0, 0)
+        float3 xformOp:scale = (5.406052, 0.86466146, -1.9198294)
+        double3 xformOp:translate = (-1921.3909567494884, 2298.321896966674, -6278.052092883007)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def NavMeshVolume "NavMeshVolume_05" (
+        prepend apiSchemas = ["NavMeshAreaAPI"]
+    )
+    {
+        float3[] extent = [(-50, -50, -50), (50, 50, 50)]
+        string nav:area = "Walkable"
+        token nav:volume:type = "Exclude"
+        float3 xformOp:rotateXYZ = (0, -0, 0)
+        float3 xformOp:scale = (3.3741634, 2, 2)
+        double3 xformOp:translate = (1161.0103701226162, 2261.800048828169, -6577.343657339992)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def NavMeshVolume "NavMeshVolume_06" (
+        prepend apiSchemas = ["NavMeshAreaAPI"]
+    )
+    {
+        float3[] extent = [(-50, -50, -50), (50, 50, 50)]
+        string nav:area = "Walkable"
+        token nav:volume:type = "Exclude"
+        float3 xformOp:rotateXYZ = (0, -0, 0)
+        float3 xformOp:scale = (2, 2, 2)
+        double3 xformOp:translate = (1541.3891204642696, 2261.800048828171, -6465.203391262952)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def NavMeshVolume "NavMeshVolume_07" (
+        prepend apiSchemas = ["NavMeshAreaAPI"]
+    )
+    {
+        float3[] extent = [(-50, -50, -50), (50, 50, 50)]
+        string nav:area = "Walkable"
+        token nav:volume:type = "Exclude"
+        float3 xformOp:rotateXYZ = (0, -0, 0)
+        float3 xformOp:scale = (2, 2, 2)
+        double3 xformOp:translate = (2521.6602996898127, 2261.800048828197, -6293.454783264969)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "npc"
+    {
+        double3 xformOp:rotateXYZ = (0, 0, 0)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (-937.893859514943, 2261.8000488281746, -4302.740558981609)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+
+        def Xform "npc_1_start_point"
+        {
+            double3 xformOp:rotateXYZ = (0, 0, 0)
+            double3 xformOp:scale = (1, 1, 1)
+            double3 xformOp:translate = (-60.78125, 37.77264286495347, -198.75)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+        }
+
+        def Xform "npc_1_end_point"
+        {
+            double3 xformOp:rotateXYZ = (0, 0, 0)
+            double3 xformOp:scale = (1, 1, 1)
+            double3 xformOp:translate = (1098.28125, 110.0009765625, 9990)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+        }
+
+        def Xform "npc_2_start_point"
+        {
+            double3 xformOp:rotateXYZ = (0, 0, 0)
+            double3 xformOp:scale = (1, 1, 1)
+            double3 xformOp:translate = (282.40625, 110.0009765625, 10031.84375)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+        }
+
+        def Xform "npc_2_end_point"
+        {
+            double3 xformOp:rotateXYZ = (0, 0, 0)
+            double3 xformOp:scale = (1, 1, 1)
+            double3 xformOp:translate = (1235.09375, 0, -450.53125)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+        }
+
+        def Xform "npc_3_start_point"
+        {
+            double3 xformOp:rotateXYZ = (0, 0, 0)
+            double3 xformOp:scale = (1, 1, 1)
+            double3 xformOp:translate = (-423.75415377737954, 0, 445.9887363940943)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+        }
+
+        def Xform "npc_3_end_point"
+        {
+            double3 xformOp:rotateXYZ = (0, 0, 0)
+            double3 xformOp:scale = (1, 1, 1)
+            double3 xformOp:translate = (4576.21875, 120.29349905868003, 8660.84375)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+        }
+    }
+}
+

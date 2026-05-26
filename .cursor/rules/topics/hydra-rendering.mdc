@@ -1,0 +1,95 @@
+---
+description: Hydra rendering architecture — how Hydra translates USD scene data into GPU draw calls, change processing model, caching behaviour, known issues with PointInstancers. Read when working on rendering, LOD, visibility, scene changes, or investigating ghost geometry.
+---
+
+# Hydra Rendering Architecture
+
+Hydra is the rendering framework in Omniverse Kit. It sits between the USD scene graph (the data model) and the GPU (the actual rendering). Understanding how Hydra processes changes is essential for features that modify the scene at runtime — LOD switching, visibility toggling, prim activation/deactivation, and dynamic scene composition.
+
+## Core architecture
+
+```
+USD Stage (scene graph)
+    │
+    ├── composition (variants, payloads, references, layers)
+    ├── prim activation / deactivation
+    ├── attribute changes (visibility, transforms, materials)
+    │
+    ▼  change notices
+Hydra (render delegate)
+    │
+    ├── scene index (mirrors USD prims as render prims)
+    ├── geometry cache (meshes, instances, materials)
+    ├── draw call batching
+    │
+    ▼  GPU commands
+Renderer (RTX / Storm)
+```
+
+USD and Hydra are **decoupled subsystems**. USD owns the scene description; Hydra owns the render state. They communicate through **change notices** — when a USD prim changes, Hydra receives a notification and updates its internal scene index and caches accordingly. This decoupling is intentional (it allows multiple render delegates and keeps USD renderer-agnostic), but it means scene changes are not instantaneous from the renderer's perspective.
+
+## Change processing model
+
+1. **USD change** — a variant switch, payload load, attribute edit, or layer change modifies the composed stage.
+2. **Change notice** — USD emits a notice describing which prims changed and how.
+3. **Hydra sync** — on the next render frame, Hydra processes the notice, updates its scene index, and invalidates affected caches.
+4. **Draw** — the renderer issues GPU commands based on the updated scene index.
+
+Steps 3–4 happen during the render loop, not at the moment the USD change is made. This means:
+- A `SetVariantSelection` call returns immediately, but Hydra hasn't processed the recomposition yet.
+- Multiple USD changes within a single frame are batched into one Hydra sync.
+- There is a minimum 1-frame latency between a USD change and its visual effect.
+
+## Caching and invalidation
+
+Hydra aggressively caches geometry, materials, and instance data for performance. Most cache invalidation works correctly for simple prims (meshes, transforms, materials). However, certain prim types have known invalidation gaps:
+
+### PointInstancer behaviour
+
+PointInstancer prims represent thousands of identical objects (e.g. stadium seats) as a single batched draw call with per-instance transforms. This is far more efficient than individual mesh prims (~100x fewer draw calls for 18,000 seats).
+
+**Known issue:** When a PointInstancer prim is deactivated or removed via variant switch or composition change, Hydra's incremental update may not fully discard the cached instance draw calls. The instances continue to render as "ghost" geometry even though the USD stage correctly shows the prim as inactive/absent.
+
+This happens because:
+- Hydra treats composition changes (variant switches) as incremental updates, not full rebuilds.
+- The PointInstancer cache stores flattened instance data (positions, orientations, scales) separately from the prim's existence in the scene index.
+- When the prim is removed incrementally, the scene index entry may be cleaned up but the instanced draw data may persist until a full cache flush.
+
+### Workaround: Unload/frame-gap/Load
+
+The most effective runtime workaround is to force a full cache discard by unloading the parent prim, letting Hydra process the unload across render frames, then reloading:
+
+```python
+stage.Unload(sdf_path)
+await app.next_update_async()  # frame 1: Hydra processes unload
+await app.next_update_async()  # frame 2: cache fully flushed
+stage.Load(sdf_path)           # Hydra rebuilds from clean state
+```
+
+The two-frame gap gives Hydra time to fully process the unload before new content arrives. Without the gap, Hydra may process unload and load in the same sync pass, retaining stale cache entries.
+
+A full stage reload (`omni.usd.get_context().open_stage()`) is the only guaranteed fix, but is too expensive for interactive use.
+
+## Comparison with game engines
+
+In engines like Unreal or Unity, the renderer owns the geometry lifecycle end-to-end. LOD switching is atomic within a single frame — the engine swaps mesh buffers directly, with no intermediate composition layer. There is no equivalent of the USD/Hydra decoupling.
+
+Omniverse's architecture trades single-frame atomicity for the benefits of USD's composition system: non-destructive layering, collaborative authoring, variant sets, and payload streaming. The cost is that structural scene changes (adding/removing prims, switching variants) have multi-frame latency and require awareness of the render cache lifecycle.
+
+## Practical guidelines
+
+| Scenario | Approach |
+|----------|----------|
+| Hiding a prim visually | Set `visibility = "invisible"` — Hydra handles this correctly in a single frame, but the geometry stays in GPU memory. |
+| Removing a prim from rendering and memory | Set `active = false` — USD prunes the prim from composition. Works for regular meshes; may ghost for PointInstancers. |
+| Switching LOD variants | `SetVariantSelection` + async `Unload` → 2-frame gap → `Load` to force clean Hydra cache. |
+| Session-layer overrides | Applied on a separate layer; Hydra processes these as attribute changes (fast, single-frame for visibility/transforms). |
+| Payload loading/unloading | `stage.Load()` / `stage.Unload()` — Hydra adds/removes the entire subtree. Use frame gaps between unload and load if ghosting occurs. |
+
+## Key terms
+
+- **Scene index** — Hydra's internal mirror of the USD stage, mapping prims to render primitives.
+- **Render delegate** — the backend that translates Hydra's scene index into GPU commands (RTX for path tracing, Storm for rasterisation).
+- **Change notice** — USD's mechanism for notifying observers (including Hydra) about stage modifications.
+- **Incremental update** — Hydra's default mode: only re-process prims that changed, reuse cached data for everything else.
+- **PointInstancer** — USD prim type that renders many identical objects as a single batched draw call with per-instance transforms.

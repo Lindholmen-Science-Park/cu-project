@@ -1,0 +1,74 @@
+---
+description: Turn-by-turn navigation guide from NavMesh polylines — RDP, turn detection, Kit events, CU seat pill
+---
+
+# Turn-by-turn navigation guide (UI only)
+
+Interprets the **same** walked-route polyline that `NavMeshRouteService` already computes and draws. **Does not** change pathfinding, auto-mover, or corridor waypoint logic.
+
+**Lives in**: `younite.navmesh_route_extension`  
+**Module**: `younite/navmesh_route_extension/.../services/kit_services/navigation_guide.py`  
+**Wiring**: `navmesh_route_service/waypoint_dispatch.py` (`dispatch_navmesh_route_waypoints`), `route_engine/arrival.py` (`_emit_lightweight_measure`), `RouteInstance` navigation runtime (`route_engine/`)
+
+Uses **younite.messaging_core_extension** for outbound events (`navmeshRouteGuide`, extra fields on `navmeshRouteMeasure`).
+
+## Which routes get a guide
+
+Only these `routeId` values (see `NAV_GUIDE_ROUTE_IDS` in `navmesh_route_service/constants.py`):
+
+| `routeId` | `destinationKind` (payload) |
+|-----------|-----------------------------|
+| `seat_nav` | `seat` |
+| `exit_nav` | `exit` |
+| `poi_nav` | `poi` |
+| `quiet_zone_nav` | `quiet_zone` |
+
+## Geometry pipeline (`navigation_guide.py`)
+
+All tuning constants are at module top (stage units = **cm** unless noted):
+
+1. **Douglas–Peucker** on **XZ** with **`RDP_EPSILON_CM`** (default 150) — merges gentle curves so long corridors read as straight legs.
+2. **`merge_short_edges`** — drops intermediate vertices when consecutive kept vertices are closer than **`MIN_EDGE_LENGTH_CM`** (default 100) in XZ (reduces stair/landing noise).
+3. **Turn detection** — at each interior vertex of the simplified index chain, signed angle between incoming and outgoing segments in XZ; if **|angle| ≥ `TURN_ANGLE_THRESHOLD_DEG`** (default 25°), emit **`turn_left`** or **`turn_right`**.
+
+**Left vs right (USD / stage):** raw `atan2(cross, dot)` sign does not match pedestrian left/right for this scene; **`detect_turns`** maps **positive angle → `right`**, **negative → `left`**. If a future stage needs the math convention instead, swap that mapping.
+
+4. **Milestones** — cumulative distance (**cm**) from path start along the **original** polyline to each turn vertex and to the endpoint. Used for live “distance to next maneuver”.
+5. **Steps** (for web): alternating **`straight`** legs with `distanceMeters`, **`turn_left` / `turn_right`**, final **`approach`** with remaining distance and destination kind. If there are no sharp turns, a single **`approach`** step covers the whole route.
+
+## Kit dispatch order
+
+On successful waypoint dispatch for a guide-enabled route:
+
+1. `navmeshRouteWaypoints` (unchanged; Kit-internal consumers).
+2. **`navmeshRouteGuide`** — `{ routeId, success, destinationKind, steps, totalDistanceMeters }`.
+3. **`navmeshRouteMeasure`** — full measure payload plus optional **`navigationNextMeters`**, **`navigationNextAction`** (`turn_left` | `turn_right` | `approach`) from `next_maneuver_from_player()` (player projected onto stored polyline).
+
+`navigation_measure_extras()` on `_RouteInstance` uses **`MILESTONE_ADVANCE_EPS_CM`** in `navigation_guide.py` to reduce flicker at vertices.
+
+## Lightweight update interval
+
+Between full recalcs, `_periodic_loop` in `route_engine/instance_base.py` sleeps **`LIGHTWEIGHT_MEASURE_INTERVAL_SEC`** (`route_engine/constants.py`), then either runs a full recalc (when needed) or `_emit_lightweight_measure()` (`route_engine/arrival.py`). Each lightweight tick dispatches **`navmeshRouteMeasure`** with updated remaining distance/time **and** navigation extras when a guide is active.
+
+- **Lower interval** (e.g. **0.5 s**) — smoother turn-by-turn pill; more WebRTC traffic (watch for `NVST_R_BUSY`-style noise; see `.cursor/rules/topics/events-api.mdc`).
+- **Higher interval** (e.g. **1.5 s**) — fewer updates, lighter channel.
+
+Full NavMesh **re-queries** still follow **`recalc_interval`** on `RouteConfig` (default 5 s wall time); changing the lightweight interval does not shorten that unless you change `recalc_interval` separately.
+
+## Web
+
+- **Types**: `RouteMeasure` in `web-viewer-sample-main/src/features/streaming/types.ts` — optional `navigationDestinationKind`, `navigationSteps`, `navigationTotalMeters`, `navigationNextMeters`, `navigationNextAction`.
+- **Handlers**: `navigationHandlers.ts` — `navmeshRouteGuide`, merged fields on `navmeshRouteMeasure`.
+- **CU UI**: `AppStream.tsx` — seat navigation pill (`stream-seat-nav-info__turns-hint`); arrow icon mirrored for left turns, pin icon for approach.
+- **i18n**: `seat.navNextTurnLeft`, `navNextTurnRight`, `navContinueStraight`, `navApproachSeat`, `navApproachExit`, `navApproachRestroom`, `navApproachQuietZone`, `navApproachGeneric` (EN/SV/FR/ES).
+
+## Messaging registration
+
+`navmeshRouteGuide` is registered in **`younite.messaging_core_extension`** `extension.py` outbound list (alongside `navmeshRouteMeasure`).
+
+## Related
+
+- Distance/time and lightweight measure overview: `.cursor/rules/topics/route-measurement.mdc`
+- Path polyline refinement (straighten, smooth): `.cursor/rules/topics/navmesh-path-refinement.mdc`
+- Corridor multi-segment routes: `.cursor/rules/topics/waypoint-routing.mdc`
+- Seat flow: `.cursor/rules/topics/seat-navigation.mdc`

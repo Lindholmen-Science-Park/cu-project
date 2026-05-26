@@ -1,0 +1,202 @@
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+ *
+ * NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+ * property and proprietary rights in and to this material, related
+ * documentation and any modifications thereto. Any use, reproduction,
+ * disclosure or distribution of this material and related documentation
+ * without an express license agreement from NVIDIA CORPORATION or
+ * its affiliates is strictly prohibited.
+ */
+
+.weather-widget {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(15px);
+  border: 1px solid rgba(118, 185, 0, 0.4);
+  border-radius: 16px;
+  padding: 16px;
+  color: white;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  min-width: 220px;
+  z-index: 1000;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  transition: all 0.3s ease;
+}
+
+.weather-widget:hover {
+  border-color: rgba(118, 185, 0, 0.6);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+}
+
+.weather-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.weather-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #76b900;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+
+.weather-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.weather-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.weather-icon {
+  font-size: 28px;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+}
+
+.weather-temp {
+  font-size: 22px;
+  font-weight: bold;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.weather-details {
+  flex: 1;
+  min-width: 0;
+}
+
+.weather-condition {
+  font-size: 12px;
+  text-transform: capitalize;
+  margin-bottom: 2px;
+  color: #e0e0e0;
+}
+
+.weather-city {
+  font-size: 11px;
+  color: #ccc;
+  margin-bottom: 4px;
+}
+
+.rain-indicator {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 2px;
+  padding: 2px 6px;
+  background: rgba(0, 150, 255, 0.1);
+  border-radius: 8px;
+  border: 1px solid rgba(0, 150, 255, 0.2);
+}
+
+.rain-icon {
+  font-size: 12px;
+}
+
+.rain-text {
+  font-size: 10px;
+  color: #4fc3f7;
+  font-weight: 500;
+}
+
+.weather-updated {
+  font-size: 9px;
+  color: #888;
+  margin-top: 4px;
+}
+
+.weather-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 0;
+}
+
+.loading-spinner {
+  font-size: 20px;
+  animation: spin 1s linear infinite;
+}
+
+.loading-text {
+  font-size: 11px;
+  color: #ccc;
+}
+
+.weather-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+}
+
+.error-icon {
+  font-size: 20px;
+}
+
+.error-text {
+  font-size: 11px;
+  color: #ff6b6b;
+  text-align: center;
+}
+
+
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .weather-widget {
+    top: 10px;
+    right: 10px;
+    min-width: 180px;
+    padding: 12px;
+  }
+  
+  .weather-icon {
+    font-size: 24px;
+  }
+  
+  .weather-temp {
+    font-size: 18px;
+  }
+  
+  .weather-content {
+    gap: 8px;
+  }
+}
+
+@media (max-width: 480px) {
+  .weather-widget {
+    min-width: 160px;
+    padding: 10px;
+  }
+  
+  .weather-icon {
+    font-size: 20px;
+  }
+  
+  .weather-temp {
+    font-size: 16px;
+  }
+  
+  .weather-condition {
+    font-size: 11px;
+  }
+}
+

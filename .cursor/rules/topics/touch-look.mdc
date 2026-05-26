@@ -1,0 +1,150 @@
+---
+description: Touch/drag look — touchLookDelta + touchLookEnd, FP + bird-eye post-release coast, pointer gestures via useRemoteVideoPointerGestures, placed camera rotation, invert toggle. Read when working on camera drag, swipe-to-look, coast tuning, or stream viewport pointers.
+globs:
+  - "**/touch_look_handler*"
+  - "**/useRemoteVideoPointerGestures*"
+  - "**/player_input_controller*"
+  - "**/StreamOnlyWindow*"
+---
+
+# Touch look (drag-to-rotate camera)
+
+## Overview
+
+Hold-and-drag on the stream viewport rotates the camera (first-person look-around). Works with both mouse and touch. A quick tap (no drag) is treated as a pick/click request instead.
+
+## Pipeline
+
+```
+Frontend (pointer drag on #remote-video)
+  → sendCustomMessage('touchLookDelta', { dx, dy }) while dragging
+  → sendCustomMessage('touchLookEnd', {}) on pointer-up after a drag
+    → Kit: TouchLookHandler accumulates yaw/pitch deltas; arms release coast on end
+      → PlayerInputController.update() → tick(dt) applies drag + exponential coast
+        → camera RotateXYZ
+```
+
+### Frontend: `useRemoteVideoPointerGestures.ts`
+
+Hook wired from `AppStream.tsx` / `StreamOnlyWindow` (not inline in `AppStream.tsx`).
+
+- `DRAG_THRESHOLD_PX = 8` — drag must exceed 8 px before counting as a drag (avoids treating taps as look).
+- `pointerdown`: captures pointer (left button only), records start position.
+- `pointermove`: frame deltas `dx`, `dy`. If threshold exceeded, sends either:
+  - **Placed camera**: `placedCameraRotate` with `{ cameraId, deltaYaw: -dx * 0.15, deltaPitch: -dy * 0.15 }`
+  - **Stream drag** (FP or bird-eye): `touchLookDelta` with `{ dx, dy }` (invert applied when `invertTouchLook`)
+- `pointerup`: after a drag on stream look (not placed-cam / vertex drag / map twist), sends **`touchLookEnd`** `{}`; if no drag, sends pick request (NDC, object-fit: cover).
+
+### Kit: `TouchLookHandler`
+
+**File:** `younite.usd_viewer_player_core_extension` → `inputs/point_click/touch_look_handler.py`
+
+- Subscribes to **`touchLookDelta`** and **`touchLookEnd`** (Events 2.0; both registered via `register_event_alias`).
+- Sensitivity: `0.15` (constructor default) — `yaw += -dx * sensitivity`, `pitch += dy * sensitivity`.
+- **`ACTIVE_TIMEOUT_S = 0.15`** — recent delta ⇒ dragging; `is_active()` is also true during release coast (auto-mover defers path look-ahead while coast runs).
+- **`tick(dt)`** — **first-person only** (called from `PlayerInputController`): applies drag deltas this frame, then optional **release coast** after `touchLookEnd`. Coast uses velocity from the last drag frame (`vel = delta / dt`) and exponential decay. **`dt`** must come from `PlayerUpdateLoop` → `event.payload["dt"]` (see `events-api.mdc` / `cct-movement.mdc`).
+- **`tick_bird_eye_pan(dt)`** — **bird-eye pan** (called from `PlayerInputController`): drag deltas this frame, then a **very short** post-release coast after `touchLookEnd` (same event as FP; both coast flags arm together).
+
+#### Release coast tuning (class constants in `touch_look_handler.py`)
+
+| Constant | Default | Effect |
+|----------|---------|--------|
+| `COAST_DECAY_PER_SEC` | `12.0` | Lower = longer coast (was `22.5`, too short) |
+| `COAST_STOP_VEL` | `0.25` | deg/s cutoff — coast ends below this |
+
+Coast is armed only on **`touchLookEnd`** (not when the finger is held still without new deltas), so mid-drag pauses do not drift.
+
+#### Bird-eye pan coast tuning (same file)
+
+| Constant | Default | Effect |
+|----------|---------|--------|
+| `BIRD_EYE_COAST_DECAY_PER_SEC` | `95.0` | Higher = shorter coast |
+| `BIRD_EYE_COAST_STOP_VEL` | `0.18` | analog units/s cutoff for forward/right coast |
+
+Shared exponential decay: `inputs/point_click/ease_helpers.py` → `apply_exponential_coast`.
+
+### Kit: `PlayerInputController.update()`
+
+**File:** `younite.usd_viewer_player_core_extension` → `inputs/player_input_controller.py`
+
+Merges multiple look sources (desktop mouse, Q/E keyboard, mobile joystick, touch look):
+
+```
+self._yaw  += t_yaw          # from tick(dt) in first-person (drag + coast)
+self._pitch += -t_pitch       # negated
+```
+
+Final camera write: `RotateXYZ(pitch, yaw, 0)` in degrees, pitch clamped to ±89.
+
+### Net sign mapping (default / direct mode)
+
+| Action | dx/dy | Accumulated | Camera |
+|--------|-------|-------------|--------|
+| Drag right | dx > 0 | yaw -= dx × 0.15 | Camera turns right |
+| Drag left | dx < 0 | yaw += \|dx\| × 0.15 | Camera turns left |
+| Drag down | dy > 0 | pitch += dy × 0.15, then negated | Camera looks down |
+| Drag up | dy < 0 | pitch -= \|dy\| × 0.15, then negated | Camera looks up |
+
+## Invert toggle (mobile-natural scrolling)
+
+For mobile-first UX, an **Invert Touch Look** toggle is available in dev mode under **Navigation → Touch Look Direction**.
+
+When inverted, `dx` and `dy` are negated in `useRemoteVideoPointerGestures.ts` before sending to Kit. Effect: swipe right → look left (like dragging a map).
+
+### State flow
+
+```
+StreamOnlyWindow.tsx
+  invertTouchLook state (default false)
+    → UIControls.tsx (toggle: Direct | Inverted)
+    → AppStream.tsx prop → negates dx/dy when true
+```
+
+The toggle only appears in dev mode (`UIControls` is rendered when `appMode === 'dev'`). Default CU mode keeps direct mapping.
+
+## Placed camera rotation
+
+Placed cameras (`placed_cam_*`) use a separate message `placedCameraRotate` handled by `camera_placement_extension`:
+
+- **Kit file:** `younite.camera_placement_extension` → `extension.py` → `_on_rotate`
+- Adds `deltaYaw` / `deltaPitch` to stored orientation, clamps pitch to ±89, writes rotation.
+- Invert toggle also applies to placed camera drag.
+
+## Related: other look inputs
+
+| Source | Message | Handler |
+|--------|---------|---------|
+| Mobile look joystick | `lookInput { yaw, pitch }` | `WebJoystickInput.set_look` → `player_input_controller.py` |
+| Desktop mouse (Kit carb) | native carb mouse move | `keyboard_mouse_input.py` `_on_mouse_event` (sensitivity 0.1) |
+| Viewport default gestures | disabled | `viewport_safety_extension` removes scroll zoom, RMB look, MMB pan |
+
+## Bird-eye view: same `touchLookDelta` events, different consumer
+
+When `viewType === "birdEye"`, `PlayerInputController.update()` uses **`tick_bird_eye_pan(dt)`** (not `tick(dt)`) to fill `movement_state["forward"]` / `["right"]` with sign inversion for "grab the world" panning. **`touchLookEnd`** arms bird-eye pan coast as well as FP look coast. Map **rotation** coast is separate (`birdEyeYawEnd` → `BirdEyeYawService`). See `bird-eye-map-controls.mdc`.
+
+## Events (Web → Kit)
+
+| Event | Payload | Consumer |
+|-------|---------|----------|
+| `touchLookDelta` | `{ dx, dy }` | `TouchLookHandler` — accumulate rotation |
+| `touchLookEnd` | `{}` | `TouchLookHandler` — arm FP look coast + bird-eye pan coast |
+
+## Key files
+
+| File | Role |
+|------|------|
+| `web-viewer-sample-main/src/features/streaming/useRemoteVideoPointerGestures.ts` | Pointer drag → `touchLookDelta`, pointer-up → `touchLookEnd`, invert, pick vs drag |
+| `web-viewer-sample-main/src/features/streaming/AppStream.tsx` | Wires `useRemoteVideoPointerGestures` |
+| `.../inputs/point_click/touch_look_handler.py` | Deltas + coast; class constants for tuning |
+| `.../inputs/player_input_controller.py` | `tick(dt)` (FP) vs `tick_bird_eye_pan(dt)` (bird-eye); writes `RotateXYZ` |
+| `.../inputs/point_click/ease_helpers.py` | Shared smoothstep + exponential coast helpers |
+| `.../runtime/update_loop.py` | Supplies `payload["dt"]` to `PlayerInputController` |
+| `...camera_placement_extension/.../extension.py` | Placed camera `placedCameraRotate` (no coast) |
+| `web-viewer-sample-main/src/features/dev/controls/UIControls.tsx` | Dev toggle: Navigation → Touch Look Direction |
+| `web-viewer-sample-main/src/features/streaming/StreamOnlyWindow.tsx` | `invertTouchLook` state |
+
+## Related topics
+
+- Auto-move walk ease + frame `dt`: `cct-movement.mdc`
+- Bird-eye pan + map rotation coast: `bird-eye-map-controls.mdc`
+- Events 2.0 `payload["dt"]`: `events-api.mdc`

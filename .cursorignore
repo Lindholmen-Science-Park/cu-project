@@ -1,0 +1,35 @@
+# Strong ignore — Cursor blocks these from semantic search, @ discovery, Agent/Tab
+# (see https://cursor.com/docs/reference/ignore-file ). Prefer putting large pulled
+# assets in .cursorindexingignore instead so Explorer / Quick Open stay usable.
+
+# --- JavaScript / frontend (web-viewer-sample-main) ---
+**/node_modules/
+web-viewer-sample-main/dist/
+web-viewer-sample-main/dist-ssr/
+
+# --- Python / Kit ---
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+
+# Kit build / cache (see project-base.mdc; often gitignored locally)
+kit-app-template-main/source/extscache/
+
+# Local-only Kit folders (per kit-app-template-main/.gitignore)
+kit-app-template-main/_*/
+
+# Repo scratch temp dirs (root .gitignore)
+_tmp_*/
+
+# --- Secrets / local env ---
+.env
+**/.env
+
+# --- Logs & traces ---
+**/*.log
+logs/
+**/*.etli
+
+# --- Editor / OS junk (optional; small but clutter) ---
+.DS_Store
+Thumbs.db

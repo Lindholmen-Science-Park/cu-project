@@ -1,0 +1,507 @@
+/* Fullscreen audio overlay with sound wave visualization. Translucent
+   backdrop — no opaque veil needed since the context gates mount on
+   the teleport ack (see `xformViewCameraChannel.ts`). */
+.ssp-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 10051;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background: rgba(0, 0, 0, 0.45);
+    animation: ssp-fade-in 0.22s ease;
+}
+
+/* Intro: same dim as `.v360-overlay` default (cinematic splash). */
+.ssp-overlay--intro {
+    background: rgba(0, 0, 0, 0.6);
+}
+
+@keyframes ssp-fade-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+/* Top bar — fades with chrome. Inset matches `.cu-controls` (hamburger / icon-btn stack). */
+.ssp-top-bar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 10052;
+    display: flex;
+    align-items: flex-start;
+    justify-content: flex-end;
+    padding: 40px var(--page-edge-right, 16px) 0 0;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.ssp-top-bar--visible {
+    opacity: 1;
+}
+
+.ssp-top-bar-right {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 16px;
+    pointer-events: auto;
+}
+
+/* When faded out, don't intercept the tap that wakes the chrome. */
+.ssp-top-bar:not(.ssp-top-bar--visible) .ssp-top-bar-right {
+    pointer-events: none;
+}
+
+.ssp-close-btn {
+    width: 48px;
+    height: 48px;
+}
+
+/* Settings button styling: see `MediaPlayerControls.css` (`.mpc-btn--settings`). */
+
+/* Header text area */
+.ssp-header {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    margin-top: max(100px, env(safe-area-inset-top, 100px));
+    z-index: 3;
+    pointer-events: none;
+}
+
+/* Intro: label + title centered in the viewport. */
+.ssp-header--intro-center {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    margin-top: 0;
+    padding: max(24px, env(safe-area-inset-top, 24px)) 24px max(24px, env(safe-area-inset-bottom, 24px));
+    box-sizing: border-box;
+}
+
+.ssp-header--intro-center .ssp-label,
+.ssp-header--intro-center .ssp-title {
+    text-shadow: 0 2px 12px rgba(0, 0, 0, 0.65);
+}
+
+/* Eyebrow — Lemon / Lexend Medium 26 (design spec). */
+.ssp-label {
+    color: var(--Lemon, #DCFF7D);
+    text-align: center;
+    font-family: Lexend, sans-serif;
+    font-size: 26px;
+    font-style: normal;
+    font-weight: 500;
+    line-height: 110%;
+    letter-spacing: 0;
+    margin: 0;
+    text-transform: uppercase;
+}
+
+/* Title — Off-white / Lexend Semibold 42 (design spec). */
+.ssp-title {
+    color: var(--Off-white, #F6F6F6);
+    text-align: center;
+    font-family: Lexend, sans-serif;
+    font-size: 42px;
+    font-style: normal;
+    font-weight: 600;
+    line-height: 120%;
+    letter-spacing: 0;
+    margin: 0;
+    max-width: min(90vw, 640px);
+    text-wrap: balance;
+}
+
+/* Visualization area — padding-bottom reserves space for fixed bottom controls. */
+.ssp-visualization {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    width: 100%;
+    min-height: 0;
+    padding-bottom: max(140px, env(safe-area-inset-bottom, 0px) + 140px);
+    box-sizing: border-box;
+}
+
+.ssp-visualization--draggable {
+    cursor: grab;
+    touch-action: none;
+}
+
+.ssp-visualization--draggable:active {
+    cursor: grabbing;
+}
+
+/* Intro: stage fills width; trim bottom padding for the helper row. */
+.ssp-visualization--intro {
+    align-items: stretch;
+    justify-content: stretch;
+    padding-bottom: max(24px, env(safe-area-inset-bottom, 24px));
+}
+
+.ssp-rings {
+    position: relative;
+    width: 381px;
+    height: 381px;
+    --ssp-ring-edge-inset: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.ssp-ring {
+    position: absolute;
+    border-radius: 50%;
+    background: rgba(246, 246, 246, 0.20);
+}
+
+/* Outermost ring — 4px inset; inner rings centered, same band thickness as before. */
+.ssp-ring--4 {
+    inset: var(--ssp-ring-edge-inset);
+    width: auto;
+    height: auto;
+}
+
+.ssp-ring--3,
+.ssp-ring--2,
+.ssp-ring--1 {
+    top: 50%;
+    left: 50%;
+    translate: -50% -50%;
+}
+
+.ssp-ring--3 {
+    width: 245px;
+    height: 245px;
+}
+
+.ssp-ring--2 {
+    width: 154px;
+    height: 154px;
+}
+
+.ssp-ring--1 {
+    width: 67px;
+    height: 67px;
+}
+
+@keyframes ssp-pulse {
+    0%   { transform: scale(1);    opacity: 1; }
+    50%  { transform: scale(1.04); opacity: 0.7; }
+    100% { transform: scale(1);    opacity: 1; }
+}
+
+.ssp-ring--playing {
+    animation: ssp-pulse 2.5s ease-in-out infinite;
+}
+
+.ssp-ring--4.ssp-ring--playing { animation-delay: 0s; }
+.ssp-ring--3.ssp-ring--playing { animation-delay: 0.15s; }
+.ssp-ring--2.ssp-ring--playing { animation-delay: 0.3s; }
+.ssp-ring--1.ssp-ring--playing { animation-delay: 0.45s; }
+
+.ssp-icon {
+    position: relative;
+    z-index: 1;
+    width: 220px;
+    height: auto;
+    pointer-events: none;
+    user-select: none;
+}
+
+/* Bottom controls — fade with chrome. `pointer-events` flips so the wake-tap
+   reaches the visualization when controls are hidden. */
+.ssp-controls {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 10052;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 0 var(--page-edge-right, 16px) max(24px, env(safe-area-inset-bottom, 24px)) var(--page-edge-left, 16px);
+    background: linear-gradient(0deg, rgba(0, 0, 0, 0.7) 0%, transparent 100%);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.ssp-controls--visible,
+.ssp-controls:focus-within {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.ssp-top-bar:focus-within {
+    opacity: 1;
+}
+
+.ssp-top-bar:focus-within .ssp-top-bar-right {
+    pointer-events: auto;
+}
+
+/* Seek bar */
+.ssp-seek-row {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    max-width: min(420px, var(--page-max-width-gutter, 100%));
+    gap: 10px;
+    margin-bottom: 4px;
+}
+
+.ssp-seek-bar {
+    position: relative;
+    flex: 1;
+    align-self: stretch;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    touch-action: none;
+}
+
+.ssp-seek-track {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    height: 6px;
+    box-sizing: border-box;
+    border-radius: var(--Extra-Small, 5px);
+    border: 1px solid rgba(33, 23, 64, 0.30);
+    background: var(--Off-white, #F6F6F6);
+}
+
+.ssp-seek-fill {
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    height: 6px;
+    box-sizing: border-box;
+    background: var(--Dark-Purple, #351a84);
+    border-radius: var(--Extra-Small, 5px);
+    pointer-events: none;
+}
+
+.ssp-seek-thumb {
+    position: absolute;
+    top: 50%;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #DCFF7D;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    box-shadow: 0 0 4px rgba(0, 0, 0, 0.3);
+    transition: transform 0.1s ease;
+}
+
+.ssp-seek-bar:hover .ssp-seek-thumb {
+    transform: translate(-50%, -50%) scale(1.2);
+}
+
+/* Time row */
+.ssp-time-row {
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+    max-width: min(420px, var(--page-max-width-gutter, 100%));
+    padding: 0 0 8px 22px;
+}
+
+.ssp-time {
+    font-family: Lexend, sans-serif;
+    font-size: 12px;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.8);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.02em;
+}
+
+/* Transport buttons — mute left, play center, CC right. */
+.ssp-transport {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    max-width: min(420px, var(--page-max-width-gutter, 100%));
+}
+
+/* Visual styling lives in `MediaPlayerControls.css` (`.mpc-btn--*`). */
+.ssp-transport .mpc-btn--mute {
+    position: absolute;
+    left: 0;
+}
+
+.ssp-transport .mpc-btn--cc {
+    position: absolute;
+    right: 0;
+}
+
+/* Captions readout — pointer-events off so drag-to-look passes through.
+   `bottom` animates to lift above chrome when controls wake. */
+.ssp-captions {
+    position: absolute;
+    left: 50%;
+    bottom: 24px;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    width: 100%;
+    max-width: min(640px, calc(100% - 48px));
+    padding: 0 16px;
+    pointer-events: none;
+    z-index: 2;
+    transition: bottom 0.3s ease;
+}
+
+/* Lift captions above visible bottom controls (~180px chrome height). */
+.ssp-captions--with-controls {
+    bottom: 200px;
+}
+
+.ssp-caption-line {
+    display: inline-block;
+    padding: 6px 12px;
+    background: rgba(0, 0, 0, 0.72);
+    color: #fff;
+    font-family: Lexend, sans-serif;
+    font-weight: 400;
+    font-size: 18px;
+    line-height: 130%;
+    letter-spacing: 0;
+    text-align: center;
+    border-radius: 6px;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+}
+
+/* Same caption tokens as videobook / 360° (see `videoBookSettings.ts`). */
+.ssp-captions[data-caption-size="0"] .ssp-caption-line {
+    font-size: 14px;
+}
+
+.ssp-captions[data-caption-size="2"] .ssp-caption-line {
+    font-size: 30px;
+    line-height: 120%;
+}
+
+/* Focus rings live in `MediaPlayerControls.css` (.mpc-btn:focus-visible). */
+
+/* Intro only: swipe icon + copy — lower area, centered on screen. */
+.ssp-onboarding-hint {
+    position: fixed;
+    inset-inline: 0;
+    bottom: max(2px, env(safe-area-inset-bottom, 0px));
+    z-index: 10053;
+    box-sizing: border-box;
+    display: flex;
+    width: min(389px, calc(100% - 24px));
+    margin-inline: auto;
+    padding: 0 16px 80px 16px;
+    justify-content: center;
+    align-items: center;
+    gap: 24px;
+    color: var(--Off-white, #F6F6F6);
+    pointer-events: none;
+}
+
+.ssp-intro-swipe-icon {
+    flex-shrink: 0;
+    width: 35.721px;
+    height: 64px;
+    aspect-ratio: 24 / 43;
+    display: block;
+}
+
+/* Body text - Medium - 16 */
+.ssp-onboarding-hint .ssp-onboarding-desc {
+    margin: 0;
+    flex: 0 1 auto;
+    min-width: 0;
+    color: var(--Off-white, #F6F6F6);
+    text-align: left;
+    font-family: Lexend, sans-serif;
+    font-size: 16px;
+    font-style: normal;
+    font-weight: 400;
+    line-height: 130%;
+    white-space: pre-line;
+}
+
+/* Responsive — landscape / short viewports */
+@media (max-height: 500px) {
+    .ssp-header {
+        margin-top: max(60px, env(safe-area-inset-top, 60px));
+    }
+
+    .ssp-rings {
+        width: 240px;
+        height: 240px;
+    }
+
+    .ssp-ring--3 { width: 152px; height: 152px; }
+    .ssp-ring--2 { width: 96px; height: 96px; }
+    .ssp-ring--1 { width: 42px; height: 42px; }
+
+    .ssp-icon { width: 143px; }
+
+    .ssp-label {
+        font-size: 18px;
+    }
+
+    .ssp-title {
+        font-size: 28px;
+    }
+
+    .ssp-controls {
+        padding-bottom: 12px;
+    }
+
+    .ssp-transport {
+        gap: 8px;
+    }
+
+    /* Settings/play/mute/CC sizing at this breakpoint lives in
+       `MediaPlayerControls.css` so all three players shrink in lockstep. */
+
+    .ssp-onboarding-hint {
+        width: min(389px, calc(100% - 24px));
+        padding: 0 12px 48px 12px;
+        gap: 24px;
+    }
+
+    .ssp-intro-swipe-icon {
+        width: 28px;
+        height: 50px;
+    }
+
+    .ssp-caption-line {
+        padding: 4px 10px;
+    }
+
+    .ssp-captions {
+        bottom: 12px;
+        gap: 2px;
+    }
+
+    .ssp-captions--with-controls {
+        bottom: 140px;
+    }
+}

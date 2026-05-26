@@ -1,0 +1,10 @@
+#usda 1.0
+(
+    customLayerData = {
+        string description = "Camera tracker (sphere) visualization layer."
+    }
+)
+
+over "World"
+{
+}

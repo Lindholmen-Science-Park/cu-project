@@ -1,0 +1,20 @@
+#usda 1.0
+(
+    defaultPrim = "Cctv1AreaTransparent"
+)
+
+def Material "Cctv1AreaTransparent"
+{
+    token outputs:surface.connect = </Cctv1AreaTransparent/SurfaceShader.outputs:surface>
+
+    def Shader "SurfaceShader"
+    {
+        uniform token info:id = "UsdPreviewSurface"
+        color3f inputs:diffuseColor = (0.5, 0.5, 0.5)
+        float inputs:ior = 1.5
+        float inputs:opacity = 0
+        float inputs:opacityThreshold = 1
+        float inputs:roughness = 0.5
+        token outputs:surface
+    }
+}

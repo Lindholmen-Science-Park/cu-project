@@ -1,0 +1,51 @@
+<!--
+SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+
+NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+property and proprietary rights in and to this material, related
+documentation and any modifications thereto. Any use, reproduction,
+disclosure or distribution of this material and related documentation
+without an express license agreement from NVIDIA CORPORATION or
+its affiliates is strictly prohibited.
+-->
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+        <meta
+            name="viewport"
+            content="width=device-width, initial-scale=1, viewport-fit=cover"
+        />
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700&family=Schibsted+Grotesk:wght@400;500;600&display=swap" rel="stylesheet" />
+        <!-- Default title; replaced in i18n init via document.title once a locale is resolved. -->
+        <title>Goteverse — Gothenburg</title>
+        <!-- Match CUControls THEME_STORAGE_KEY: default light before JS bundle; explicit dark if saved -->
+        <script>
+            (function () {
+                try {
+                    var v = localStorage.getItem('cuThemeMode');
+                    document.documentElement.setAttribute(
+                        'data-theme',
+                        v === 'dark' ? 'dark' : 'light'
+                    );
+                } catch (e) {
+                    document.documentElement.setAttribute('data-theme', 'light');
+                }
+            })();
+        </script>
+    </head>
+    <body>
+        <!-- WCAG 2.4.1: first Tab stop — React wires i18n + focus handler after hydrate -->
+        <div id="skip-to-main">
+            <a href="#main-content" id="skip-to-content-link" class="skip-to-content" tabindex="1">Skip to main content</a>
+        </div>
+        <div id="root"></div>
+        <!-- gfn-client-sdk.js source only needed when connecting to GDN/GFN stream -->
+        <script src="https://sdk.nvidia.com/gfn/client-sdk/1.x/gfn-client-sdk.js"></script>
+        <script type="module" src="/src/main.tsx"></script>
+    </body>
+</html>

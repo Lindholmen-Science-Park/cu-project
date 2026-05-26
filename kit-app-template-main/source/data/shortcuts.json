@@ -1,0 +1,78 @@
+{
+  "version": 1,
+  "doc": "Navigation shortcut configuration. Phase-1 Goteverse delivery covers elevators only; the schema is intentionally generic so bus stops, tunnels, stairs etc. can be added later by adding new groups with a different `type`. Group `id` mirrors the USD Xform name under /World/NavShortcuts (e.g. `elevator_1`); user-facing strings use `labelEn` / `i18nKey` (e.g. \"Section A elevator\"). Dijkstra compares each hop using (traversalSeconds+waitSeconds)*130 cm equivalent walk — lower times bias toward using the lift vs long stair NavMesh paths. Optional `servesSections` (array of seat-section letters) tells the shortcut router which seat sections may use this group: omit the field (or use `[]`) for elevators that only serve POIs / generic positions; list the sections (e.g. `[\"P\",\"S\"]`) for elevators whose exit lands within walking distance of those sections' upper-bowl branch heads. Adding a new elevator that serves new seat sections only requires editing this JSON + `nav_shortcuts_layer.usda` — no Python edit. See .cursor/rules/topics/shortcuts.mdc for the full schema.",
+  "groups": [
+    {
+      "id": "elevator_1",
+      "type": "elevator",
+      "i18nKey": "shortcuts.elevatorSectionA",
+      "labelEn": "Section A elevator",
+      "traversalSeconds": 4.0,
+      "waitSeconds": 1.0,
+      "servesSections": [],
+      "edges": "all",
+      "nodes": [
+        {
+          "id": "floor_0",
+          "level": 0,
+          "labelEn": "Section A — Ground floor",
+          "i18nKey": "shortcuts.sectionA.floor0",
+          "primPath": "/World/NavShortcuts/elevator_1/floor_0",
+          "surface": "navmesh"
+        },
+        {
+          "id": "floor_1",
+          "level": 1,
+          "labelEn": "Section A — Floor 1",
+          "i18nKey": "shortcuts.sectionA.floor1",
+          "primPath": "/World/NavShortcuts/elevator_1/floor_1",
+          "surface": "navmesh"
+        },
+        {
+          "id": "floor_2",
+          "level": 2,
+          "labelEn": "Section A — Floor 2",
+          "i18nKey": "shortcuts.sectionA.floor2",
+          "primPath": "/World/NavShortcuts/elevator_1/floor_2",
+          "surface": "navmesh"
+        },
+        {
+          "id": "floor_3",
+          "level": 3,
+          "labelEn": "Section A — Floor 3",
+          "i18nKey": "shortcuts.sectionA.floor3",
+          "primPath": "/World/NavShortcuts/elevator_1/floor_3",
+          "surface": "navmesh"
+        }
+      ]
+    },
+    {
+      "id": "elevator_2",
+      "type": "elevator",
+      "i18nKey": "shortcuts.elevatorSectionR",
+      "labelEn": "Section R elevator",
+      "traversalSeconds": 4.0,
+      "waitSeconds": 1.0,
+      "servesSections": ["P", "S"],
+      "edges": "all",
+      "nodes": [
+        {
+          "id": "floor_1",
+          "level": 1,
+          "labelEn": "Section R — Floor 1",
+          "i18nKey": "shortcuts.sectionR.floor1",
+          "primPath": "/World/NavShortcuts/elevator_2/floor_1",
+          "surface": "navmesh"
+        },
+        {
+          "id": "floor_2",
+          "level": 2,
+          "labelEn": "Section R — Floor 2",
+          "i18nKey": "shortcuts.sectionR.floor2",
+          "primPath": "/World/NavShortcuts/elevator_2/floor_2",
+          "surface": "navmesh"
+        }
+      ]
+    }
+  ]
+}

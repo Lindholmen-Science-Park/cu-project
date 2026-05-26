@@ -1,0 +1,64 @@
+/*
+ * Shared bottom credits used by both loading screens.
+ * Disclaimer is intentionally rendered at the Figma-spec 7px — small, but the
+ * required EU funding-attribution copy. We honor `safe-area-inset-bottom` so
+ * the lockup never sits under the iOS home-indicator.
+ */
+/*
+ * Footer is rendered in the layout flow (row 2 of the loading-screen grid)
+ * rather than absolutely positioned, so the centered content above it stays
+ * symmetric in both portrait and landscape. Bottom padding honors the iOS
+ * home-indicator safe area.
+ */
+.loading-footer {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 0 16px max(16px, env(safe-area-inset-bottom, 0px));
+    color: #FFFFFF;
+    pointer-events: none;
+    user-select: none;
+}
+
+.loading-footer__logos {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 40px;
+    flex-wrap: wrap;
+}
+
+.loading-footer__logo {
+    display: block;
+    height: 36px;
+    width: auto;
+    /* Keep logos crisp on retina displays. */
+    image-rendering: -webkit-optimize-contrast;
+}
+
+.loading-footer__logo--citiverses {
+    /* SVG is 159×32 — height drives the size, width auto-fits. */
+    height: 32px;
+}
+
+.loading-footer__logo--eu {
+    /* Source PNG is 1024×… white on transparent. Scale to match Figma 159×35.48. */
+    height: 36px;
+}
+
+.loading-footer__disclaimer {
+    margin: 0;
+    width: 100%;
+    max-width: 358px;
+    text-align: center;
+    font-family: 'Schibsted Grotesk', system-ui, sans-serif;
+    font-weight: 400;
+    font-size: 7px;
+    line-height: 1.4;
+    letter-spacing: 0;
+    color: #FFFFFF;
+}

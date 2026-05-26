@@ -1,0 +1,883 @@
+#usda 1.0
+(
+    """ This file describes an example schema for code generation using
+        usdGenSchema.
+    """
+    subLayers = [
+        @usd/schema.usda@,
+        @usdGeom/schema.usda@
+    ]
+)
+
+over "GLOBAL" (
+    customData = {
+        string libraryName       = "CesiumUsdSchemas"
+        string libraryPath       = "./"
+        string libraryPrefix     = "Cesium"
+        string tokensPrefix      = "Cesium"
+    }
+) {
+}
+
+class CesiumDataPrim "CesiumDataPrim" (
+    doc = """Stores stage level data for Cesium for Omniverse/USD."""
+    inherits = </Typed>
+    customData = {
+        string className = "Data"
+    }
+) {
+    rel cesium:selectedIonServer (
+        customData = {
+            string apiName = "selectedIonServer"
+        }
+        displayName = "Selected ion Server context"
+        doc = "The current ion Server prim used in the Cesium for Omniverse UI."
+    )
+
+    bool cesium:debug:disableMaterials = false (
+        customData = {
+            string apiName = "debugDisableMaterials"
+        }
+        displayName = "Disable Materials"
+        doc = "Debug option that renders tilesets with materials disabled."
+    )
+
+    bool cesium:debug:disableTextures = false (
+        customData = {
+            string apiName = "debugDisableTextures"
+        }
+        displayName = "Disable Textures"
+        doc = "Debug option that renders tilesets with textures disabled."
+    )
+
+    bool cesium:debug:disableGeometryPool = false (
+        customData = {
+            string apiName = "debugDisableGeometryPool"
+        }
+        displayName = "Disable Geometry Pool"
+        doc = "Debug option that disables geometry pooling."
+    )
+
+    bool cesium:debug:disableMaterialPool = false (
+        customData = {
+            string apiName = "debugDisableMaterialPool"
+        }
+        displayName = "Disable Material Pool"
+        doc = "Debug option that disables material pooling."
+    )
+
+    bool cesium:debug:disableTexturePool = false (
+        customData = {
+            string apiName = "debugDisableTexturePool"
+        }
+        displayName = "Disable Texture Pool"
+        doc = "Debug option that disables texture pooling."
+    )
+
+    uint64 cesium:debug:geometryPoolInitialCapacity = 2048 (
+        customData = {
+            string apiName = "debugGeometryPoolInitialCapacity"
+        }
+        displayName = "Geometry Pool Initial Capacity"
+        doc = "Debug option that controls the initial capacity of the geometry pool."
+    )
+
+    uint64 cesium:debug:materialPoolInitialCapacity = 2048 (
+        customData = {
+            string apiName = "debugMaterialPoolInitialCapacity"
+        }
+        displayName = "Material Pool Initial Capacity"
+        doc = "Debug option that controls the initial capacity of the material pool."
+    )
+
+    uint64 cesium:debug:texturePoolInitialCapacity = 2048 (
+        customData = {
+            string apiName = "debugTexturePoolInitialCapacity"
+        }
+        displayName = "Texture Pool Initial Capacity"
+        doc = "Debug option that controls the initial capacity of the texture pool."
+    )
+
+    bool cesium:debug:randomColors = false (
+        customData = {
+            string apiName = "debugRandomColors"
+        }
+        displayName = "Random Colors"
+        doc = "Debug option that renders tiles with random colors."
+    )
+
+    bool cesium:debug:disableGeoreferencing = false (
+        customData = {
+            string apiName = "debugDisableGeoreferencing"
+        }
+        displayName = "Disable Georeferencing"
+        doc = "Debug option to disable georeferencing. Tiles will be rendered in EPSG:4978 (ECEF) coordinates where (0, 0, 0) is the center of the globe, the X axis points towards the prime meridian, the Y axis points towards the 90th meridian east, and the Z axis points towards the North Pole."
+    )
+}
+
+class CesiumIonServerPrim "CesiumIonServerPrim" (
+    doc = """Stores metadata related to Cesium ion server connections for tilesets."""
+    inherits = </Typed>
+    customData = {
+        string className = "IonServer"
+    }
+) {
+    string cesium:displayName (
+        customData = {
+            string apiName = "displayName"
+        }
+        displayName = "Display Name"
+        doc = "The name to display for this server."
+    )
+
+    string cesium:ionServerUrl (
+        customData = {
+            string apiName = "ionServerUrl"
+        }
+        displayName = "Server URL"
+        doc = "The base URL for the Cesium ion Server."
+    )
+
+    string cesium:ionServerApiUrl (
+        customData = {
+            string apiName = "ionServerApiUrl"
+        }
+        displayName = "API URL"
+        doc = "The base URL for the Cesium ion Server API."
+    )
+
+    int64 cesium:ionServerApplicationId (
+        customData = {
+            string apiName = "ionServerApplicationId"
+        }
+        displayName = "OAuth Application ID"
+        doc = "The application ID for the Cesium ion Server connection."
+    )
+
+    string cesium:projectDefaultIonAccessToken = "" (
+        customData = {
+            string apiName = "projectDefaultIonAccessToken"
+        }
+        displayName = "Default Cesium ion Access Token"
+        doc = "A string representing the token for accessing Cesium ion assets."
+    )
+
+    string cesium:projectDefaultIonAccessTokenId = "" (
+        customData = {
+            string apiName = "projectDefaultIonAccessTokenId"
+        }
+        displayName = "Default Cesium ion Access Token ID"
+        doc = "A string representing the token ID for accessing Cesium ion assets."
+    )
+}
+
+class CesiumGeoreferencePrim "CesiumGeoreferencePrim" (
+    doc = """Stores Georeference data for Cesium for Omniverse. Every stage should have at least one of these."""
+    inherits = </Typed>
+    customData = {
+        string className = "Georeference"
+    }
+) {
+    double cesium:georeferenceOrigin:longitude = -105.25737 (
+        customData = {
+            string apiName = "georeferenceOriginLongitude"
+        }
+        displayName = "Georeference Origin Longitude"
+        doc = "The longitude of the origin in degrees, in the range [-180, 180]."
+    )
+
+    double cesium:georeferenceOrigin:latitude = 39.736401  (
+        customData = {
+            string apiName = "georeferenceOriginLatitude"
+        }
+        displayName = "Georeference Original Latitude"
+        doc = "The latitude of the origin in degrees, in the range [-90, 90]."
+    )
+
+    double cesium:georeferenceOrigin:height = 2250.0 (
+        customData = {
+            string apiName = "georeferenceOriginHeight"
+        }
+        displayName = "Georeference Origin Height"
+        doc = "The height of the origin in meters above the ellipsoid. Do not confuse this with a geoid height or height above mean sea level, which can be tens of meters higher or lower depending on where in the world the origin is located."
+    )
+
+    matrix4d cesium:ecefToUsdTransform (
+        customData = {
+            string apiName = "ecefToUsdTransform"
+        }
+        displayName = "ECEF to USD Transform (read only)"
+        doc = "The 4x4 transformation matrix (row major) from global ECEF coordinates to USD stage coordinates based on the georeference origin (read only)."
+    )
+
+    rel cesium:ellipsoidBinding (
+        customData = {
+            string apiName = "ellipsoidBinding"
+        }
+        displayName = "Ellipsoid Binding"
+        doc = "The ellipsoid."
+    )
+}
+
+class CesiumTilesetPrim "CesiumTilesetPrim" (
+    doc = """A prim representing a tileset."""
+    inherits = </Gprim>
+    customData = {
+        string className = "Tileset"
+
+    }
+) {
+    uniform token cesium:sourceType = "ion" (
+        customData = {
+            string apiName = "sourceType"
+        }
+        allowedTokens = ["ion", "url"]
+        displayName = "Source Type"
+        doc = "Selects whether to use the Cesium ion Asset ID or the provided URL for this tileset."
+    )
+
+    string cesium:url = "" (
+        customData = {
+            string apiName = "url"
+        }
+        displayName = "URL"
+        doc = "The URL of this tileset's tileset.json file. Usually blank if this is an ion asset."
+    )
+
+    int64 cesium:ionAssetId = 0 (
+        customData = {
+            string apiName = "ionAssetId"
+        }
+        displayName = "ion Asset ID"
+        doc = "The ID of the Cesium ion asset to use. Usually blank if using URL."
+    )
+
+    string cesium:ionAccessToken = "" (
+        customData = {
+            string apiName = "ionAccessToken"
+        }
+        displayName = "ion Access Token"
+        doc = "The access token to use to access the Cesium ion resource. Overrides the default token. Usually blank if using URL."
+    )
+
+    float cesium:maximumScreenSpaceError = 16 (
+        customData = {
+            string apiName = "maximumScreenSpaceError"
+        }
+        displayName = "Maximum Screen Space Error"
+        doc = "The maximum number of pixels of error when rendering this tileset. This is used to select an appropriate level-of-detail: A low value will cause many tiles with a high level of detail to be loaded, causing a finer visual representation of the tiles, but with a higher performance cost for loading and rendering. A higher value will cause a coarser visual representation, with lower performance requirements. When a tileset uses the older layer.json / quantized-mesh format rather than 3D Tiles, this value is effectively divided by 8.0. So the default value of 16.0 corresponds to the standard value for quantized-mesh terrain of 2.0."
+    )
+
+    bool cesium:preloadAncestors = true (
+        customData = {
+            string apiName = "preloadAncestors"
+        }
+        displayName = "Preload Ancestors"
+        doc = "Whether to preload ancestor tiles. Setting this to true optimizes the zoom-out experience and provides more detail in newly-exposed areas when panning. The down side is that it requires loading more tiles."
+    )
+
+    bool cesium:preloadSiblings = true (
+        customData = {
+            string apiName = "preloadSiblings"
+        }
+        displayName = "Preload Siblings"
+        doc = "Whether to preload sibling tiles. Setting this to true causes tiles with the same parent as a rendered tile to be loaded, even if they are culled. Setting this to true may provide a better panning experience at the cost of loading more tiles."
+    )
+
+    bool cesium:forbidHoles = false (
+        customData = {
+            string apiName = "forbidHoles"
+        }
+        displayName = "Forbid Holes"
+        doc = "Whether to prevent refinement of a parent tile when a child isn't done loading. When this is set to true, the tileset will guarantee that the tileset will never be rendered with holes in place of tiles that are not yet loaded, even though the tile that is rendered instead may have low resolution. When false, overall loading will be faster, but newly-visible parts of the tileset may initially be blank."
+    )
+
+    uint cesium:maximumSimultaneousTileLoads = 20 (
+        customData = {
+            string apiName = "maximumSimultaneousTileLoads"
+        }
+        displayName = "Maximum Simultaneous Tile Loads"
+        doc = "The maximum number of tiles that may be loaded at once. When new parts of the tileset become visible, the tasks to load the corresponding tiles are put into a queue. This value determines how many of these tasks are processed at the same time. A higher value may cause the tiles to be loaded and rendered more quickly, at the cost of a higher network and processing load."
+    )
+
+    uint64 cesium:maximumCachedBytes = 536870912 (
+        customData = {
+            string apiName = "maximumCachedBytes"
+        }
+        displayName = "Maximum Cached Bytes"
+        doc = "The maximum number of bytes that may be cached. Note that this value, even if 0, will never cause tiles that are needed for rendering to be unloaded. However, if the total number of loaded bytes is greater than this value, tiles will be unloaded until the total is under this number or until only required tiles remain, whichever comes first."
+    )
+
+    uint cesium:loadingDescendantLimit = 20 (
+        customData = {
+            string apiName = "loadingDescendantLimit"
+        }
+        displayName = "Loading Descendant Limit"
+        doc = "The number of loading descendants a tile should allow before deciding to render itself instead of waiting. Setting this to 0 will cause each level of detail to be loaded successively. This will increase the overall loading time, but cause additional detail to appear more gradually. Setting this to a high value like 1000 will decrease the overall time until the desired level of detail is achieved, but this high-detail representation will appear at once, as soon as it is loaded completely."
+    )
+
+    bool cesium:enableFrustumCulling = true (
+        customData = {
+            string apiName = "enableFrustumCulling"
+        }
+        displayName = "Enable Frustum Culling"
+        doc = "Whether to cull tiles that are outside the frustum. By default this is true, meaning that tiles that are not visible with the current camera configuration will be ignored. It can be set to false, so that these tiles are still considered for loading, refinement and rendering. This will cause more tiles to be loaded, but helps to avoid holes and provides a more consistent mesh, which may be helpful for physics and shadows. Note that this will always be disabled if Use Lod Transitions is set to true."
+    )
+
+    bool cesium:enableFogCulling = true (
+        customData = {
+            string apiName = "enableFogCulling"
+        }
+        displayName = "Enable Fog Culling"
+        doc = "Whether to cull tiles that are occluded by fog. This does not refer to the atmospheric fog rendered by Unity, but to an internal representation of fog: Depending on the height of the camera above the ground, tiles that are far away (close to the horizon) will be culled when this flag is enabled. Note that this will always be disabled if Use Lod Transitions is set to true."
+    )
+
+    bool cesium:enforceCulledScreenSpaceError = true (
+        customData = {
+            string apiName = "enforceCulledScreenSpaceError"
+        }
+        displayName = "Enforce Culled Screen Space Error"
+        doc = "Whether a specified screen-space error should be enforced for tiles that are outside the frustum or hidden in fog. When Enable Frustum Culling and Enable Fog Culling are both true, tiles outside the view frustum or hidden in fog are effectively ignored, and so their level-of-detail doesn't matter. And in this scenario, this property is ignored. However, when either of those flags are false, these would-be-culled tiles continue to be processed, and the question arises of how to handle their level-of-detail. When this property is false, refinement terminates at these tiles, no matter what their current screen-space error. The tiles are available for physics, shadows, etc., but their level-of-detail may be very low. When set to true, these tiles are refined until they achieve the specified Culled Screen Space Error. This allows control over the minimum quality of these would-be-culled tiles."
+    )
+
+    float cesium:culledScreenSpaceError = 64 (
+        customData = {
+            string apiName = "culledScreenSpaceError"
+        }
+        displayName = "Culled Screen Space Error"
+        doc = "The screen-space error to be enforced for tiles that are outside the frustum or hidden in fog. When Enable Frustum Culling and Enable Fog Culling are both true, tiles outside the view frustum or hidden in fog are effectively ignored, and so their level-of-detail doesn't matter. And in this scenario, this property is ignored. However, when either of those flags are false, these would-be-culled tiles continue to be processed, and the question arises of how to handle their level-of-detail. When this property is false, refinement terminates at these tiles, no matter what their current screen-space error. The tiles are available for physics, shadows, etc., but their level-of-detail may be very low. When set to true, these tiles are refined until they achieve the specified Culled Screen Space Error. This allows control over the minimum quality of these would-be-culled tiles."
+    )
+
+    bool cesium:suspendUpdate = false (
+        customData = {
+            string apiName = "suspendUpdate"
+        }
+        displayName = "Suspend Update"
+        doc = "Pauses level-of-detail and culling updates of this tileset."
+    )
+
+    bool cesium:smoothNormals = false (
+        customData = {
+            string apiName = "smoothNormals"
+        }
+        displayName = "Smooth Normals"
+        doc = "Generate smooth normals instead of flat normals when normals are missing."
+    )
+
+    bool cesium:showCreditsOnScreen = false (
+        customData = {
+            string apiName = "showCreditsOnScreen"
+        }
+        displayName = "Show Credits On Screen"
+        doc = "Whether or not to show this tileset's credits on screen."
+    )
+
+    float cesium:mainThreadLoadingTimeLimit = 0.0 (
+        customData = {
+            string apiName = "mainThreadLoadingTimeLimit"
+        }
+        displayName = "Main Thread Loading Time Limit"
+        doc = "A soft limit on how long (in milliseconds) to spend on the main-thread part of tile loading each frame. A value of 0.0 indicates that all pending main-thread loads should be completed each tick."
+    )
+
+    rel cesium:georeferenceBinding (
+        customData = {
+            string apiName = "georeferenceBinding"
+        }
+        displayName = "Georeference Binding"
+        doc = "Specifies which Cesium Georeference object to use for this tileset."
+    )
+
+    rel cesium:ionServerBinding (
+        customData = {
+            string apiName = "ionServerBinding"
+        }
+        displayName = "Cesium ion Server Binding"
+        doc = "Specifies which Cesium ion Server prim to use for this tileset."
+    )
+
+    rel cesium:rasterOverlayBinding (
+        customData = {
+            string apiName = "rasterOverlayBinding"
+        }
+        displayName = "Raster Overlay Binding"
+        doc = "Specifies which raster overlays to use for this tileset."
+    )
+
+    float cesium:pointSize = 1.0 (
+        customData = {
+            string apiName = "pointSize"
+        }
+        displayName = "Point Size"
+        doc = "The size in meters to display each point."
+    )
+}
+
+class "CesiumRasterOverlayPrim" (
+    doc = """Abstract base class for prims that represent a raster overlay."""
+    inherits = </Typed>
+    customData = {
+        string className = "RasterOverlay"
+    }
+) {
+    uniform bool cesium:showCreditsOnScreen = false (
+        customData = {
+            string apiName = "showCreditsOnScreen"
+        }
+        displayName = "Show Credits on Screen"
+        doc = "Whether or not to show this raster overlay's credits on screen."
+    )
+
+   uniform float cesium:alpha = 1.0 (
+        customData = {
+            string apiName = "alpha"
+        }
+        displayName = "Alpha"
+        doc = "The alpha blending value, from 0.0 to 1.0, where 1.0 is fully opaque."
+    )
+
+    uniform token cesium:overlayRenderMethod = "overlay" (
+        customData = {
+            string apiName = "overlayRenderMethod"
+        }
+        allowedTokens = ["overlay", "clip"]
+        displayName = "Overlay Render Method"
+        doc = "The Cesium default material will give the raster overlay a different rendering treatment based on this selection."
+    )
+
+    uniform float cesium:maximumScreenSpaceError = 2.0 (
+        customData = {
+            string apiName = "maximumScreenSpaceError"
+        }
+        displayName = "Maximum Screen Space Error"
+        doc = "The maximum number of pixels of error when rendering this overlay. This is used to select an appropriate level-of-detail. When this property has its default value, 2.0, it means that raster overlay images will be sized so that, when zoomed in closest, a single pixel in the raster overlay maps to approximately 2x2 pixels on the screen."
+    )
+
+    uniform int cesium:maximumTextureSize = 2048 (
+        customData = {
+            string apiName = "maximumTextureSize"
+        }
+        displayName = "Maximum Texture Size"
+        doc = "The maximum texel size of raster overlay textures, in either direction. Images created by this overlay will be no more than this number of texels in either direction. This may result in reduced raster overlay detail in some cases."
+    )
+
+    uniform int cesium:maximumSimultaneousTileLoads = 20 (
+        customData = {
+            string apiName = "maximumSimultaneousTileLoads"
+        }
+        displayName = "Maximum Simultaneous Tile Loads"
+        doc = "The maximum number of overlay tiles that may simultaneously be in the process of loading."
+    )
+
+    uniform int cesium:subTileCacheBytes = 16777216 (
+        customData = {
+            string apiName = "subTileCacheBytes"
+        }
+        displayName = "Sub Tile Cache Bytes"
+        doc = "The maximum number of bytes to use to cache sub-tiles in memory. This is used by provider types, that have an underlying tiling scheme that may not align with the tiling scheme of the geometry tiles on which the raster overlay tiles are draped. Because a single sub-tile may overlap multiple geometry tiles, it is useful to cache loaded sub-tiles in memory in case they're needed again soon. This property controls the maximum size of that cache."
+    )
+}
+
+class CesiumIonRasterOverlayPrim "CesiumIonRasterOverlayPrim" (
+    doc = """Adds a prim for representing an ion raster overlay."""
+    inherits = </CesiumRasterOverlayPrim>
+    customData = {
+        string className = "IonRasterOverlay"
+    }
+) {
+    int64 cesium:ionAssetId = 0 (
+        customData = {
+            string apiName = "ionAssetId"
+        }
+        displayName = "ion Asset ID"
+        doc = "The ID of the Cesium ion asset to use."
+    )
+
+    string cesium:ionAccessToken = "" (
+        customData = {
+            string apiName = "ionAccessToken"
+        }
+        displayName = "ion Access Token"
+        doc = "The access token to use to access the Cesium ion resource. Overrides the default token. Blank if using URL."
+    )
+
+    rel cesium:ionServerBinding (
+        customData = {
+            string apiName = "ionServerBinding"
+        }
+        displayName = "Cesium ion Server Binding"
+        doc = "Specifies which Cesium ion Server prim to use for this tileset."
+    )
+}
+
+class CesiumPolygonRasterOverlayPrim "CesiumPolygonRasterOverlayPrim" (
+    doc = """Adds a prim for representing a polygon raster overlay."""
+    inherits = </CesiumRasterOverlayPrim>
+    customData = {
+        string className = "PolygonRasterOverlay"
+    }
+) {
+    rel cesium:cartographicPolygonBinding (
+        customData = {
+            string apiName = "cartographicPolygonBinding"
+        }
+        displayName = "Cartographic Polygon Binding"
+        doc = "Specifies which Cartographic Polygons to use in the raster overlay"
+    )
+
+    bool cesium:invertSelection = false (
+        customData = {
+            string apiName = "invertSelection"
+        }
+        displayName = "Invert Selection"
+        doc = "Whether to invert the selection specified by the polygons. If this is true, only the areas outside of the polygons will be rasterized."
+    )
+
+    bool cesium:excludeSelectedTiles = true (
+        customData = {
+            string apiName = "excludeSelectedTiles"
+        }
+        displayName = "Exclude Selected Tiles"
+        doc = "Whether tiles that fall entirely within the rasterized selection should be excluded from loading and rendering. For better performance, this should be enabled when this overlay will be used for clipping. But when this overlay is used for other effects, this option should be disabled to avoid missing tiles. Note that if InvertSelection is true, this will cull tiles that are outside of all the polygons. If it is false, this will cull tiles that are completely inside at least one polygon."
+    )
+
+    uniform token cesium:overlayRenderMethod = "clip"
+}
+
+class CesiumWebMapServiceRasterOverlayPrim "CesiumWebMapServiceRasterOverlayPrim" (
+    doc = """Adds a prim for representing a Web Map Service raster overlay."""
+    inherits = </CesiumRasterOverlayPrim>
+    customData = {
+        string className = "WebMapServiceRasterOverlay"
+    }
+) {
+
+    string cesium:baseUrl = "" (
+        customData = {
+            string apiName = "baseUrl"
+        }
+        displayName = "Base URL"
+        doc = "The base url of the Web Map Service (WMS). e.g. https://services.ga.gov.au/gis/services/NM_Culture_and_Infrastructure/MapServer/WMSServer"
+    )
+
+    string cesium:layers = "1" (
+        customData = {
+            string apiName = "layers"
+        }
+        displayName = "Layers"
+        doc = "Comma-separated layer names to request from the server."
+    )
+
+    int cesium:tileWidth = 256 (
+        customData = {
+            string apiName = "tileWidth"
+        }
+        displayName = "Tile Width"
+        doc = "Image width"
+    )
+
+    int cesium:tileHeight = 256 (
+        customData = {
+            string apiName = "tileHeight"
+        }
+        displayName = "Tile Height"
+        doc = "Image height"
+    )
+
+    int cesium:minimumLevel = 0 (
+        customData = {
+            string apiName = "minimumLevel"
+        }
+        displayName = "Minimum Level"
+        doc = "Take care when specifying this that the number of tiles at the minimum level is small, such as four or less. A larger number is likely to result in rendering problems."
+    )
+
+    int cesium:maximumLevel = 14 (
+        customData = {
+            string apiName = "maximumLevel"
+        }
+        displayName = "Maximum Level"
+        doc = "Maximum zoom level."
+    )
+}
+
+class CesiumTileMapServiceRasterOverlayPrim "CesiumTileMapServiceRasterOverlayPrim" (
+    doc = """Adds a prim for representing a Tile Map Service (TMS) raster overlay."""
+    inherits = </CesiumRasterOverlayPrim>
+    customData = {
+        string className = "TileMapServiceRasterOverlay"
+    }
+) {
+    string cesium:url = "" (
+        customData = {
+            string apiName = "url"
+        }
+        displayName = "Url"
+        doc = "The base url of the Tile Map Service (TMS)."
+    )
+
+    bool cesium:specifyZoomLevels = false (
+        customData = {
+            string apiName = "specifyZoomLevels"
+        }
+        displayName = "Specify Zoom Levels"
+        doc = "True to directly specify minum and maximum zoom levels available from the server, or false to automatically determine the minimum and maximum zoom levels from the server's tilemapresource.xml file."
+    )
+
+    int cesium:minimumZoomLevel = 0 (
+        customData = {
+            string apiName = "minimumZoomLevel"
+        }
+        displayName = "Minimum Zoom Level"
+        doc = "Minimum zoom level"
+    )
+
+    int cesium:maximumZoomLevel = 10 (
+        customData = {
+            string apiName = "maximumZoomLevel"
+        }
+        displayName = "Maximum Zoom Level"
+        doc = "Maximum zoom level"
+    )
+}
+
+class CesiumWebMapTileServiceRasterOverlayPrim "CesiumWebMapTileServiceRasterOverlayPrim" (
+    doc = """Adds a prim for representing a Web Map Tile Service (WMTS) raster overlay."""
+    inherits = </CesiumRasterOverlayPrim>
+    customData = {
+        string className = "WebMapTileServiceRasterOverlay"
+    }
+) {
+    string cesium:url = "" (
+        customData = {
+            string apiName = "url"
+        }
+        displayName = "Url"
+        doc = "The base url of the Web Map Tile Service (WMTS)."
+    )
+
+    string cesium:layer = "" (
+        customData = {
+            string apiName = "layer"
+        }
+        displayName = "Layer"
+        doc = "Layer name."
+    )
+
+    string cesium:style = "" (
+        customData = {
+            string apiName = "style"
+        }
+        displayName = "Style"
+        doc = "Style."
+    )
+
+    string cesium:format = "image/jpeg" (
+        customData = {
+            string apiName = "format"
+        }
+        displayName = "Format"
+        doc = "Format."
+    )
+
+    string cesium:tileMatrixSetId = "" (
+        customData = {
+            string apiName = "tileMatrixSetId"
+        }
+        displayName = "Tile Matrix Set ID"
+        doc = "Tile Matrix Set ID"
+    )
+
+    bool cesium:specifyTileMatrixSetLabels = false (
+        customData = {
+            string apiName = "specifyTileMatrixSetLabels"
+        }
+        displayName = "Specify Tile Matrix Set Labels"
+        doc = "True to specify tile matrix set labels manually, or false to automatically determine from level and prefix."
+    )
+
+    string cesium:tileMatrixSetLabelPrefix = "" (
+        customData = {
+            string apiName = "tileMatrixSetLabelPrefix"
+        }
+        displayName = "Tile Matrix Set Label Prefix"
+        doc = 'Prefix for tile matrix set labels. For instance, setting "EPSG:4326:" as prefix generates label list ["EPSG:4326:0", "EPSG:4326:1", "EPSG:4326:2", ...]'
+    )
+
+    string cesium:tileMatrixSetLabels (
+        customData = {
+            string apiName = "tileMatrixSetLabels"
+        }
+        displayName = "Tile Matrix Set Labels"
+        doc = "Comma-separated tile matrix set labels"
+    )
+
+    bool cesium:useWebMercatorProjection = true (
+        customData = {
+            string apiName = "useWebMercatorProjection"
+        }
+        displayName = "Use Web Mercator Projection"
+        doc = "False to use geographic projection, true to use webmercator projection. For instance, EPSG:4326 uses geographic and EPSG:3857 uses webmercator."
+    )
+
+    bool cesium:specifyTilingScheme = false (
+        customData = {
+            string apiName = "specifyTilingScheme"
+        }
+        displayName = "Specify Tiling Scheme"
+        doc = "True to specify quadtree tiling scheme according to projection and bounding rectangle, or false to automatically determine from projection."
+    )
+
+    int cesium:rootTilesX = 1 (
+        customData = {
+            string apiName = "rootTilesX"
+        }
+        displayName = "Root Tiles X"
+        doc = "Tile number corresponding to TileCol, also known as TileMatrixWidth"
+    )
+
+    int cesium:rootTilesY = 1 (
+        customData = {
+            string apiName = "rootTilesY"
+        }
+        displayName = "Root Tiles Y"
+        doc = "Tile number corresponding to TileRow, also known as TileMatrixHeight"
+    )
+
+    double cesium:west = -180 (
+        customData = {
+            string apiName = "west"
+        }
+        displayName = "West"
+        doc = "The longitude of the west boundary on globe in degrees, in the range [-180, 180]"
+    )
+
+    double cesium:east = 180 (
+        customData = {
+            string apiName = "east"
+        }
+        displayName = "East"
+        doc = "The longitude of the east boundary on globe in degrees, in the range [-180, 180]"
+    )
+
+    double cesium:south = -90 (
+        customData = {
+            string apiName = "south"
+        }
+        displayName = "South"
+        doc = "The longitude of the south boundary on globe in degrees, in the range [-90, 90]"
+    )
+
+    double cesium:north = 90 (
+        customData = {
+            string apiName = "north"
+        }
+        displayName = "North"
+        doc = "The longitude of the north boundary on globe in degrees, in the range [-90, 90]"
+    )
+
+    bool cesium:specifyZoomLevels = false (
+        customData = {
+            string apiName = "specifyZoomLevels"
+        }
+        displayName = "Specify Zoom Levels"
+        doc = "True to directly specify minum and maximum zoom levels available from the server, or false to automatically determine the minimum and maximum zoom levels from the server's tilemapresource.xml file."
+    )
+
+    int cesium:minimumZoomLevel = 0 (
+        customData = {
+            string apiName = "minimumZoomLevel"
+        }
+        displayName = "Minimum Zoom Level"
+        doc = "Minimum zoom level"
+    )
+
+    int cesium:maximumZoomLevel = 25 (
+        customData = {
+            string apiName = "maximumZoomLevel"
+        }
+        displayName = "Maximum Zoom Level"
+        doc = "Maximum zoom level"
+    )
+}
+
+class "CesiumGlobeAnchorSchemaAPI" (
+    doc = """Adds Globe Anchoring information to a Prim for use with Cesium for Omniverse."""
+    inherits = </APISchemaBase>
+    customData = {
+        string className = "GlobeAnchorAPI"
+        token apiSchemaType = "singleApply"
+    }
+) {
+    bool cesium:anchor:adjustOrientationForGlobeWhenMoving = true (
+        customData = {
+            string apiName = "adjustOrientationForGlobeWhenMoving"
+        }
+        displayName = "Adjust Orientation for Globe when Moving"
+        doc = "Gets or sets whether to adjust the Prim's orientation based on globe curvature as the game object moves."
+    )
+
+    bool cesium:anchor:detectTransformChanges = true (
+        customData = {
+            string apiName = "detectTransformChanges"
+        }
+        displayName = "Detect Transform Changes"
+        doc = "Gets or sets whether to automatically detect changes in the Prim's transform and update the precise globe coordinates accordingly."
+    )
+
+    double cesium:anchor:longitude = 0.0 (
+        customData = {
+            string apiName = "anchorLongitude"
+        }
+        displayName = "Longitude"
+        doc = "The longitude in degrees, in the range [-180, 180]."
+    )
+
+    double cesium:anchor:latitude = 0.0  (
+        customData = {
+            string apiName = "anchorLatitude"
+        }
+        displayName = "Latitude"
+        doc = "The latitude in degrees, in the range [-90, 90]."
+    )
+
+    double cesium:anchor:height = 0.0 (
+        customData = {
+            string apiName = "anchorHeight"
+        }
+        displayName = "Height"
+        doc = "The height in meters above the ellipsoid."
+    )
+
+    double3 cesium:anchor:position = (0.0, 0.0, 0.0) (
+        customData = {
+            string apiName = "position"
+        }
+        displayName = "Position (ECEF)"
+        doc = "The actual position of the globally anchored prim in the ECEF coordinate system."
+    )
+
+    rel cesium:anchor:georeferenceBinding (
+        customData = {
+            string apiName = "georeferenceBinding"
+        }
+        displayName = "Georeference Origin Binding"
+        doc = "The Georeference Origin prim used for the globe anchor calculations."
+    )
+}
+
+class CesiumEllipsoidPrim "CesiumEllipsoidPrim" (
+    doc = """An ellipsoid."""
+    inherits = </Typed>
+    customData = {
+        string className = "Ellipsoid"
+    }
+) {
+    double3 cesium:radii = (0.0, 0.0, 0.0) (
+        customData = {
+            string apiName = "radii"
+        }
+        displayName = "Radii"
+        doc = "The radii of this ellipsoid. The X coordinate should be the radius of the largest axis and the Z coordinate should be the radius of the smallest axis."
+    )
+}

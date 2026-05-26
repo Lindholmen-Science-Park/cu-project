@@ -1,0 +1,311 @@
+---
+description: Bird-eye "Pin Anywhere" — zoom via focalLength, click-anywhere pinning with magnet snap when nearest waypoint/spawn is within MAX_MAGNET_SNAP_XZ_CM else nearest OSM node, solo pin-marker channel on the projector, directions panel hand-off to the RouteComposer for unified multi-leg route planning, cached composed polyline replayed for Play/Pause
+globs:
+  - "**/bird_eye_zoom_service*"
+  - "**/bird_eye_pin_service*"
+  - "**/MapMarkerPoiSheet*"
+  - "**/MapMarkerDirectionsPanel*"
+  - "**/BirdEyeRouteOverlay*"
+  - "**/bird_eye_route_projector*"
+alwaysApply: false
+---
+
+# Bird-Eye Pin Anywhere
+
+Three sub-features that turn the bird-eye overview into an interactive map:
+
+1. **Zoom** — wheel / pinch adjusts the bird-eye camera's `focalLength` on the session layer.
+2. **Click-anywhere pinning** — a tap on the stream places a pin snapped to the nearest magnet (waypoint or named spawn) in **XZ** when within `MAX_MAGNET_SNAP_XZ_CM`; otherwise to the nearest OSM road node, and opens the POI sheet.
+3. **Directions** — the "Get directions" button hands the pin's world position to the **RouteComposer** (see `route-composer.mdc`), which computes a walkable polyline covering any combination of NavMesh and OSM legs. Play / Pause replay the composer's cached polyline.
+
+All three phases reuse existing infrastructure: the POI sheet, the bird-eye directions panel, the `PointClickAutoMover`, the bird-eye route projector, the `OsmGraphService` (for the outside-click snap) and the `RouteComposer` (for everything else).
+
+---
+
+## Architecture overview
+
+```
+USER TAPS BIRD-EYE STREAM
+       │  sendMessage('younite.pick.request', { intent: 'birdEyePin', ndcX, ndcY })
+       ▼
+younite.picking_extension — raycasts, emits younite.pick.result
+       ▼
+BirdEyePinService._on_pick_result              (navmesh_route_extension)
+       │
+       ├─ magnets.nearest_magnet_with_xz_dist2() — nearest nav_waypoint_* / PlayerSpawnPoint_*
+       │
+       ├─ XZ distance ≤ MAX_MAGNET_SNAP_XZ_CM
+       │       → _emit_magnet_pin() → projector.set_pin_marker(pos)
+       │       → dispatch 'birdEyePinSheet' (magnet pos + label + isInsideNavmesh:true)
+       │
+       └─ else → _handle_outside() → BirdEyePinOsmSnap.snap_click() (nearest OSM graph node)
+                  → projector.set_pin_marker(snapped)
+                  → dispatch 'birdEyePinSheet' (snapped pos + label + isInsideNavmesh:false)
+       │
+       ▼
+MapMarkerPoiSheet — "Teleport" (inside pins only) / "Get directions"
+       │
+       └─ Get directions → forceActivatePinRoute({ id, title, worldPos })
+                         → sendMessage('birdEyeRouteRequest', { endPos: worldPos })
+       ▼
+extension.py::_on_bird_eye_route_request
+       │  composer.compose(player_world, end_world)
+       │  → BirdEyeRouteProjector.on_route_computed(navmesh_points)
+       │  → BirdEyeRouteProjector.set_osm_segment(osm_points)
+       │  → dispatch 'navmeshRouteMeasure' (distance / ETA)
+       ▼
+MapMarkerDirectionsPanel — "Start navigation"
+       │  sendMessage('mapMarkerDirectionsStart',
+       │              { startPos, endPos, endUseStoredFp })
+       ▼
+feature_commands_service/map_marker_directions.py::MapMarkerDirectionsHandler._run
+       │  composer.compose(start_world, end_world)   ← preview-only (yaw + fail-fast)
+       │  async_first_person_enter(startSpawn, dispatch_ready=False)
+       │  optional teleport_to_coordinates(start_pos, world_body_yaw_deg)  (swap case)
+       │  dispatch navigationStateSet { routeId:'poi_nav', autoMove:false,
+       │                                 endPos, useComposer:true, drawPath:true }
+       │     └── orchestrator._apply_state → navmeshRouteCalculate
+       │     └── NavMeshRouteService.set_route_for_id(use_composer=True)
+       │     └── RouteInstance._compute_path → RouteComposer.compose(enable_corridor_routing=True)
+       │     └── RouteEngine: waypoints + sphere trail + measure
+       │  await await_navmesh_route_settled('poi_nav')
+       │  dispatch viewTransitionReady(firstPerson)
+       ▼
+User presses Play / Pause
+       │  Play : sendMessage('navigationStateSet',
+       │          { routeId:'poi_nav', autoMove:true,
+       │            endPos|endpointPath, useComposer:true })
+       │  Pause: sendMessage('navigationStateSet',
+       │          { routeId:'poi_nav', autoMove:false })
+       │  → orchestrator._apply_state re-dispatches navmeshRouteCalculate
+       │  → engine recomputes via composer (handles drift after free-walk)
+       ▼
+PointClickAutoMover — exact same path seat / POI / toilet use
+       │  autoMove flip False→True reactivates from cached waypoints
+```
+
+The web side never knows whether a route is NavMesh-only, OSM-bridged, or cross-island — that's the composer's job. Web only ships start / end world positions.
+
+---
+
+## Phase 1 — Zoom (`BirdEyeZoomService`)
+
+**Files**: `bird_eye_zoom_service.py`, `player_core_extension/extension.py`, `AppStream.tsx`
+
+- Wheel events on `#remote-video` (accumulated + throttled) and two-finger pinch both dispatch `sendMessage('birdEyeZoomLevel', { delta })` while `env.currentCamera === 'bird_eye'`.
+- `BirdEyeZoomService.on_zoom_delta()` mutates the active bird-eye camera's `focalLength` on the session layer (wipes on scene reload).
+- `BirdEyeZoomService.snap_restore()` is called from `settings_watchers.on_view_type_change` when leaving bird-eye to return the focal length to its authored value.
+- `focalLength` (not FOV) keeps the world-to-NDC pipeline aligned, so the route overlay stays in sync with the zoomed stream.
+- Soft min / max clamps prevent a rogue pinch spinning into tunnel vision.
+
+---
+
+## Phase 2 — Click-anywhere pin with magnet snap
+
+### Pick intent
+
+`AppStream.tsx` adds a `birdEyePin` branch to its pick-request pipeline **before** the default `!isBirdEye` guard so bird-eye pick results route to the pin service rather than to teleport / interaction.
+
+The branch is **suppressed once a route polyline is already drawn** on the bird-eye overlay (`birdEyeRouteActive`) — the directions panel is already locked to its target, and re-pinning would silently mutate the destination with no way for the user to confirm it.
+
+### Magnet targets (in-arena snap)
+
+| Magnet | USD prim | Label source |
+|---|---|---|
+| Corridor waypoint | `nav_waypoint_*` (from `waypoint_router._scan_waypoints`) | `labels.waypoint_label()` — entrance suffix → "Entrance N", single-letter → "Section X", two-letter → "Near X / Y" |
+| Named spawn point | `/World/PlayerSpawnPoint_<Name>` (digit-suffixed are camera spawns, skipped) | `constants.SPAWN_POINT_LABELS`, else humanized suffix |
+
+`magnets.nearest_magnet_with_xz_dist2()` returns the nearest magnet by **horizontal** distance from the 3D hit (roof clicks use the same plan-view column as ground). If that squared XZ distance is ≤ `MAX_MAGNET_SNAP_XZ_CM`², the pin lands **on** the magnet; otherwise the click is treated as outside (OSM snap). Adding waypoints shrinks dead zones inside that radius without navmesh queries.
+
+### Outside (no nearby magnet) snap
+
+`BirdEyePinOsmSnap.snap_click()` (`bird_eye_pin_service/osm.py`) runs `OsmGraphService.nearest_node(click - roadsOffset, mode=<active OSM mode>, component=main_component)` and re-applies the offset. The pin lands on the closest **mode-reachable** OSM graph node (using the node's authored Y so the flag sits on the road plane, not on a roof / lawn / waterway picked by the raycast).
+
+Mode resolution reads the production CU accessibility state from `NavMeshModeCache.get_active_mode()` and maps it onto the OSM mode (`walking` / `wheelchair`); the component id is resolved against the same mode-scoped labelling, so in wheelchair mode the pin cannot snap to a foot-only node that is unreachable from the main wheelchair-connected subgraph.
+
+No OSM route is planned at pin time — route composition is entirely deferred to the `RouteComposer` when the user presses "Get directions". The composer resolves the same mode via its own `_active_osm_mode()` helper, so the snap and the composed route always agree on reachability.
+
+### Sheet payload (`birdEyePinSheet`)
+
+| Field | Purpose |
+|---|---|
+| `id` | Synthetic `pin_{int(x)}_{int(z)}` stable key |
+| `title` | Magnet label (inside) or "Pinned location" (outside / no magnet) |
+| `worldPos` | Where the pin flag renders; used as the composer end-point on "Get directions" |
+| `isInsideNavmesh` | UI gate for the teleport button only (outside pins would land in dead geometry) |
+| `magnetName` | Debug / future affordance |
+| `spawnPoint` | Inside pin that snapped to a `PlayerSpawnPoint_*` — enables the regular POI-sheet teleport path |
+
+### UI branches (`MapMarkerPoiSheet`)
+
+- **Teleport** — enabled for inside pins (dispatches `pinTeleport` with world coords) or regular POIs (existing `teleportToSpawnpoint`). Outside pins cannot teleport.
+- **Get directions** — enabled for any pin with a `worldPos`. Always dispatches `birdEyeRouteRequest { endPos: worldPos }`; the RouteComposer figures out the rest.
+
+### Deferred route draw (pin sheet = markers only)
+
+The pin sheet is purely informational — it does not pre-commit route geometry:
+
+- On pin placement Kit pushes only the **solo pin marker** via `projector.set_pin_marker(world)`.
+- `BirdEyeRouteOverlay` renders the pin marker as a standalone flag bubble when no polyline is active (`layout.pinOnly`). The user-location arrow continues to show via the existing `userLocation` projectable.
+- "Get directions" dispatches `birdEyeRouteRequest`; the Kit handler calls `clear_pin_marker()` (the route's destination bubble replaces the flag), then the composer produces a polyline fed via `on_route_computed` + `set_osm_segment`.
+- Dismissing without committing (X, back, teleport) fires `birdEyePinDismiss` which clears both the pin marker and any stale OSM segment. The dismiss is gated by a `transitioningToDirectionsRef` in the sheet so "Get directions" does not race with its own `birdEyeRouteRequest`.
+
+---
+
+## Phase 3 — Directions via RouteComposer
+
+All route planning — inside-NavMesh only, NavMesh ↔ OSM, OSM ↔ NavMesh, OSM ↔ OSM, and cross-island NavMesh ↔ OSM ↔ NavMesh — is centralised in `RouteComposer` (`younite.navmesh_route_extension/services/kit_services/route_composer/`, see `route-composer.mdc`). The composer produces a `ComposedRoute` with:
+
+- `polyline: list[Vec3]` — contiguous walkable points from start to end
+- `segment_speeds: list[float]` — per-segment speed multiplier (OSM = 5×, NavMesh = 1×)
+- `navmesh_points` / `osm_points` — separated channels for the bird-eye projector
+- `distance_meters`, `estimated_time_seconds` — for the directions panel pill
+
+### Bird-eye preview (`extension.py::_on_bird_eye_route_request`)
+
+1. Clears any solo pin marker (the overlay provides its own endpoint bubbles).
+2. Stops any prior `bird_eye` route in the route engine (defensive — the engine's periodic recalc would otherwise keep dispatching stale `navmeshRouteWaypoints`).
+3. Resolves `start_ref` and `end_ref` to world coordinates (`_resolve_bird_eye_world`).
+4. If `useWaypoints` is set (seat corridor case), falls through to the legacy route-engine path — the composer does not model the corridor algorithm.
+5. Otherwise `composer.compose(start_world, end_world)` → pushes `navmesh_points` into `BirdEyeRouteProjector.on_route_computed` and `osm_points` into `set_osm_segment`.
+6. Dispatches `navmeshRouteMeasure` for `routeId: 'poi_nav'` so the directions panel pill shows the total distance / ETA before the user commits.
+
+### Start navigation (`MapMarkerDirectionsHandler._run`)
+
+Lives in `feature_commands_service/map_marker_directions.py`. The handler is a thin wrapper — once it has teleported the player and dispatched `navigationStateSet`, the orchestrator-driven pipeline takes over and behaves *identically* to seat_nav / find-toilets / POI search:
+
+1. **Preview compose** via `directions_utils.compose_route(start_world, end_world)` — used **only** to (a) fail fast with the no-route overlay before we teleport the player, and (b) derive the body yaw for the start rotation. The route engine composes again internally; this preview compose is throwaway.
+2. **Resolve end world position** — precedence is `end_pos_explicit` > stored FP (swap) > `endpoint_path`.
+3. **`async_first_person_enter(start_spawn, dispatch_ready=False)`** — LOD + navmesh-bake prep; `viewTransitionReady` is held back so the black overlay stays up until the route is drawable.
+4. **Optional teleport to `start_pos` + yaw** for the swap case (pin is the route origin). `teleport_to_coordinates(..., world_body_yaw_deg=yaw_from_polyline(polyline))` so the player spawns facing along the first segment.
+5. **Hand off to the orchestrator** — dispatch `navigationStateSet { routeId:'poi_nav', endPos, autoMove:false, useComposer:true, drawPath:true }`. `NavigationOrchestratorService._apply_state` reads this and dispatches `navmeshRouteCalculate` (same dispatch seat_nav uses); `useComposer:true` propagates through `_on_calc` → `set_route_for_id(use_composer=True)` → `RouteInstance._compute_path` → `RouteComposer.compose(enable_corridor_routing=True, …)`. Engine then dispatches `navmeshRouteWaypoints` (with `faceDirection`, `segmentSpeeds`, measure), draws the sphere trail, and runs the lightweight arrival loop.
+6. **`await svc.await_navmesh_route_settled('poi_nav')`** — blocks on the next `navmeshRouteWaypoints` event so the black overlay only lifts after the route is actually drawable.
+7. **`svc.dispatch_view_transition_ready('firstPerson', True)`** — lifts the overlay.
+
+The orchestrator drives Play / Pause / pause+free-walk recompose for `poi_nav` via the **exact same** `_apply_state` re-dispatch loop seat_nav uses. There is no preset-injection layer, no `set_route_with_preset`, no recompute closure, no auto-mover special case, and **no separate pathfinder** — `poi_nav` runs through the same `RouteInstance._compute_path` → `RouteComposer.compose` chain as every other route in the engine. The `useComposer` flag just flips `enable_corridor_routing` on the composer call; everything else (pause/play/recalc, smoothing, validated straightening, draw, dispatch, arrival) is unchanged.
+
+### Per-segment speeds + time-budget walking
+
+Auto-move runs on a time budget, not a distance budget. `PointClickAutoMover` consumes `dt` seconds each frame (`dt` from `PlayerUpdateLoop` → `event.payload["dt"]` on `GLOBAL_EVENT_UPDATE`; see `events-api.mdc` § Delta time / `cct-movement.mdc` § Frame delta time); each segment takes `seg_len / (base_speed * seg_mult)` of the budget so the player transitions cleanly between OSM (5× = ~15 m/s) and NavMesh (1× = ~3 m/s) at the boundary. Consumers that omit `segmentSpeeds` (POI search, seat, exit, …) get the default `1.0` everywhere. The mover also interpolates `pos_y` along each segment (rather than snapping to the target waypoint's Y) so the camera glides across bridges instead of popping.
+
+### Play / Pause / pause+free-walk recompose — unified `navigationStateSet`
+
+No bespoke Play/Pause event. The web directions panel dispatches `navigationStateSet { movementMode: 'pointClick', routeId: 'poi_nav', autoMove: true | false, … }` — the same event the seat / restroom / quiet-zone navigation panels use. The payload shape is identical to `handleSeatMoveStart` / `handleSeatMoveStop` in `useSeatNavigation.ts`; poi_nav is not special-cased anywhere in Kit.
+
+**Play always re-sends the endpoint.** `handlePoiMoveStart` (in `usePoiNavigation.ts`, `mapMarker` branch) includes `endPos` / `endpointPath` from `lastPoiEndPosRef` / `lastPoiPrimPathRef`, plus `useComposer: true`. This mirrors `handleSeatMoveStart`'s always-include-endpoint contract and is the critical invariant: a ground click during pause legitimately overwrites the orchestrator's `s.end_pos` (it becomes the player-route click target while `_ensure_auto_move` flips `route_id` to `"player"`), so on resume the web side MUST re-assert the correct poi_nav endpoint or the orchestrator would recompute poi_nav with the click location → start ≈ end → empty polyline → nothing moves. Treat the orchestrator as stateless about per-route endpoints; the web hook owns them.
+
+The complete behaviour is shared with seat_nav:
+
+- **Pause** → `navigationStateSet { routeId:'poi_nav', autoMove:false }` → `PointClickAutoMover.stop()` clears its waypoint cache → orchestrator's `_apply_state` re-dispatches `navmeshRouteCalculate` (autoMove=false, endpoint unchanged). The engine recomputes via the composer (which now starts from the player's *current* position because `start_ref="/World/PlayerCharacter"`), redraws, and emits fresh `navmeshRouteWaypoints`.
+- **Free-walk while paused** → the engine's periodic recalc loop (5 s interval, gated by `position_recalc_threshold`) re-runs `_compute_path` so the polyline tracks the player. Same loop seat_nav uses. A ground click during pause is treated as a new player-route target (standard `_ensure_auto_move` flow) — it does *not* disturb the poi_nav RouteInstance in the engine (still alive, periodic recalc continues), so Play can resume straight onto it.
+- **Play** → `navigationStateSet { routeId:'poi_nav', autoMove:true, endPos|endpointPath, useComposer:true }` → orchestrator re-dispatches `navmeshRouteCalculate` with the correct endpoint → engine emits the latest waypoints → auto-mover reactivates from the cached or freshly arriving waypoints.
+
+There is no `poi_nav`-specific resume path in the auto-mover. The `on_navigation_state` resume branch (cached fast-path reactivate) is shared with every other route type.
+
+### Cleanup lifecycle
+
+Route cleanup also goes through the standard path: `navmeshRouteStop { routeId: 'poi_nav' }` tears down the `RouteEngine` route instance (sphere trail, event observers, cached polyline) and `birdEyeRouteClear` wipes the bird-eye overlay. No bespoke caches to invalidate.
+
+---
+
+## Projector channels (`BirdEyeRouteProjector` + `BirdEyeRouteOverlay`)
+
+Three independent overlay channels, projected each frame through the shared world-to-NDC pipeline:
+
+| Channel | Public method | Rendered as |
+|---|---|---|
+| Primary NavMesh polyline | `on_route_computed(points_3d)` / `clear_route()` | Solid dashed line (RDP-simplified) |
+| Auxiliary OSM polyline | `set_osm_segment(points_3d)` / `clear_osm_segment()` | Wider-gap dashed line, slightly paler ("this part will be auto-walked for you") |
+| Solo pin marker | `set_pin_marker(world)` / `clear_pin_marker()` | Standalone flag bubble for the "pin sheet open, no route yet" state |
+
+All three channels have independent lifetimes (the pin sheet may still be open after a navmesh route was cancelled; an OSM preview can live alongside a recalculating NavMesh leg). `clear_route()` does NOT wipe the pin marker or OSM segment — callers must clear each channel explicitly.
+
+`_dispatch_if_empty()` emits one final empty payload when the last active channel clears so the client stops rendering the previous snapshot.
+
+**Endpoint bubble logic (multi-segment):**
+- Start bubble = first NavMesh point if any, else first OSM point.
+- Destination bubble = last OSM point if any, else last NavMesh point.
+
+---
+
+## Key files
+
+| File | Role |
+|---|---|
+| `kit/.../bird_eye_zoom_service.py` | `focalLength` mutation on session layer |
+| `kit/.../bird_eye_pin_service/` | Package — `service.BirdEyePinService` (Events 2.0 pick / teleport / dismiss); `magnets` (waypoint + spawn scan, nearest magnet); `osm.BirdEyePinOsmSnap`; `labels`, `constants`, `sheet`, `projector` |
+| `kit/.../bird_eye_route_projector/` | Package — `projector.BirdEyeRouteProjector`; `projection`, `overlay_dispatch`, `resolution`, `constants` (NavMesh + OSM + pin + start/end anchors) |
+| `kit/.../route_composer/` | Unified route planning package — see `route-composer.mdc` |
+| `kit/.../feature_commands_service/map_marker_directions.py` | `MapMarkerDirectionsHandler` — orchestrates compose-preview → FP-enter → teleport → `navigationStateSet`(useComposer=True) → overlay lift |
+| `kit/.../feature_commands_service/directions_utils.py` | `compose_route`, `yaw_from_polyline` helpers (preview + start rotation only) |
+| `kit/.../navmesh_route_extension/.../navmesh_route_service/service.py` | `NavMeshRouteService.set_route_for_id(use_composer=True)` — single entry point shared with seat_nav |
+| `kit/.../navmesh_route_extension/.../route_engine/compute.py` + `.../route_engine/player_route.py` | `_compute_path` — single composer-driven pathfinder for every non-player route; `_player_compute_in_thread` for point-and-click |
+| `kit/.../usd_viewer_player_core_extension/.../navigation_orchestrator_service.py` | `NavigationState.use_composer` propagated through `_apply_state` → `navmeshRouteCalculate` |
+| `kit/.../navmesh_route_extension/extension_lifecycle.py` | Constructs `BirdEyePinService` on startup |
+| `kit/.../navmesh_route_extension/events/bird_eye_routes.py` | `_on_bird_eye_route_request` composer invocation + overlay hooks |
+| `web/.../AppStream.tsx` | Wheel / pinch zoom, `birdEyePin` pick branch |
+| `web/.../MapMarkerPoiSheet.tsx` | Teleport (inside only) / Get directions |
+| `web/.../MapMarkerDirectionsPanel.tsx` | `pin` variant preview + Start Navigation dispatch |
+| `web/.../usePoiNavigation.ts` | `forceActivatePinRoute`, `mapMarker`-source-gated Play / Pause via `navigationStateSet` |
+| `web/.../useMapMarkerPoiNavigation.ts` | `MapMarkerSheetData` with `isAdHocPin`, `worldPos`, `isInsideNavmesh` |
+| `web/.../interactionHandlers.ts` | `birdEyePinSheet` / `birdEyePinError` handlers |
+| `web/.../BirdEyeRouteOverlay.tsx` | Two polylines + solo pin marker rendering |
+
+---
+
+## Events summary
+
+| Event | Direction | Purpose |
+|---|---|---|
+| `birdEyeZoomLevel` | Web → Kit | Wheel / pinch delta |
+| `younite.pick.request` (intent `birdEyePin`) | Web → Kit | 3D pick from screen NDC |
+| `younite.pick.result` (intent `birdEyePin`) | Kit → internal | Consumed by `BirdEyePinService` |
+| `birdEyePinSheet` | Kit → Web | Sheet payload (pos, isInsideNavmesh, label) |
+| `birdEyePinError` | Kit → Web | Diagnostic (no hit, OSM graph unavailable) |
+| `pinTeleport` | Web → Kit | Teleport to an inside pin's world coords |
+| `birdEyePinDismiss` | Web → Kit | Clear pin marker on sheet dismissal; skipped via `transitioningToDirectionsRef` on "Get directions" |
+| `birdEyeRouteRequest` | Web → Kit | Composer-driven preview — `{ startPos?, endPos \| endSpawnPoint \| endpointPath }` |
+| `birdEyeRouteOverlay` | Kit → Web | Projected overlay payload (`points`, `osmPoints`, `pinMarker`) |
+| `mapMarkerDirectionsStart` | Web → Kit | Commit the route — `{ routeId, startSpawnPoint, endpointPath \| endPos, startPos?, endUseStoredFp }` |
+| `navmeshRouteWaypoints` | Kit → internal | Polyline + optional `segmentSpeeds` to the PointClickAutoMover |
+| `navmeshRouteReady` | Kit → Web | Gates the Play FAB |
+| `navmeshRouteMeasure` | Kit → Web | Distance / ETA for the directions panel pill |
+| `navigationStateSet` | Web → Kit | Play / Pause — unified event shared with seat / restroom / quiet-zone navigation |
+
+---
+
+## Tuning constants
+
+| File | Constant | Value | Purpose |
+|---|---|---|---|
+| `bird_eye_pin_service/constants.py` | `MAX_MAGNET_SNAP_XZ_CM` | 2500.0 | Max horizontal distance from click to nearest waypoint/spawn for in-arena pin (25 m) |
+| `route_composer/composer.py` | `NAVMESH_TOLERANCE_CM` | 50.0 | Mirror for the composer's "is this position on a NavMesh?" check |
+| `route_composer/composer.py` | `OSM_SEGMENT_SPEED` | 5.0 | Per-segment speed boost for OSM crossings |
+| `route_composer/composer.py` | `NAVMESH_SEGMENT_SPEED` | 1.0 | Base speed multiplier for NavMesh segments |
+| `route_composer/composer.py` | `DEFAULT_WALK_SPEED_M_PER_S` | 1.3 | Baseline walking speed used for the ETA estimate |
+| `route_composer/composer.py` | `DEFAULT_ISLAND` | `"scandinavium"` | Legacy fallback when an entrance waypoint has no island prefix |
+| `view_switcher.py` | `STREAM_SETTLE_FRAMES` | 4 | Kit ticks awaited after FP entry before lifting the black overlay (NVST encode/decode buffer) |
+
+---
+
+## Known limitations / future work
+
+- **Magnet radius vs city clicks** — a large `MAX_MAGNET_SNAP_XZ_CM` keeps roof/centre picks on arena magnets; a click on nearby streets inside that radius still snaps to an arena waypoint. Tighten the constant or add a second rule (e.g. prim/bounds) if that becomes common.
+- **Pause / resume positioning** — re-feeding the polyline from index 0 teleports the route cursor back to the start; the player walks back before resuming forward. Revisit with polyline trimming if it becomes annoying.
+- **Arrival celebration for outside pins** — fires the generic POI celebration via `on_auto_move_complete`. A "you arrived at your pin" variant would be nicer.
+- **Entrance spawn points** — Kit falls back to `PlayerSpawnPoint_Foyer` + teleport to the entrance when no specific start spawn is authored. If entrance-adjacent spawn points are added later, the panel could pass them as `startSpawnPoint` directly to skip the teleport.
+- **Free-roam after OSM arrival** — players arrive at the pinned outside point off-mesh; no NavMesh there to walk on. Adding OSM-region NavMeshes for named sub-areas (and exposing them as additional composer islands) is the planned follow-up.
+- **Island-aware entrance naming** — the composer reads the island from `nav_waypoint_entrance_<island>_<idx>` prim names. Entrance waypoints without an island prefix fall back to `DEFAULT_ISLAND = "scandinavium"` for backwards compatibility. New islands should adopt the prefixed convention from the start.
+
+---
+
+## Related
+
+- RouteComposer (unified route planning): `.cursor/rules/topics/route-composer.mdc`
+- Bird-eye map controls (drag-pan, panel tilt, icon swap): `.cursor/rules/topics/bird-eye-map-controls.mdc`
+- Bird-eye route overlay (NavMesh projection, RDP, directions panel): `.cursor/rules/topics/bird-eye-route.mdc`
+- OSM city navigation (graph, Dijkstra, offset convention): `.cursor/rules/topics/osm-navigation.mdc`
+- Waypoint routing (corridor graph, `plan_route`): `.cursor/rules/topics/waypoint-routing.mdc`
+- Dual-mode NavMesh (walking / wheelchair cache): `.cursor/rules/topics/navmesh-dual-mode.mdc`
+- POI / spawn-point teleport: `.cursor/rules/topics/camera-teleport.mdc`
+- Map markers (bird-eye marker overlay, projectable style): `.cursor/rules/topics/map-markers.mdc`

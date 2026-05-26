@@ -1,0 +1,170 @@
+---
+description: Snow effect — PointInstancer flakes, snowflake USD prototype, simple white material, exclusivity with rain, ground linger, circular volume, staged ramp-up, wet ground side-effect, weather presets. Service lives in younite.weather_and_seasons_extension. Read when working on snow, winter weather, or sky presets.
+---
+
+# Snow effect
+
+## Overview
+
+3D snow is rendered with a single `UsdGeom.PointInstancer` on the **session layer**. Each instance is real geometry (naturally occluded by RTX). Flakes fall more slowly than rain, with lateral drift and flutter; on hitting a PhysX collider they **linger** on the ground briefly, then **respawn** aloft in the same slot (one instancer, no separate ground copies).
+
+## Architecture
+
+```
+Frontend (weatherPreset) → skyControlRequest → sky_control_service.py
+  → sky_service.py (applies sky + rain/snow orchestration)
+    → snow_service.start_snow(intensity) / stop_snow()
+```
+
+### Files
+
+| File | Role |
+|------|------|
+| `sky_service.py` | `WEATHER_PRESETS` entries include a `"snow"` scalar (0.0–1.0). After sky edits, starts or stops snow and enforces **mutual exclusion with rain** (snow wins if both were ever set; presets keep them disjoint). Lives in `younite.weather_and_seasons_extension`. |
+| `snow_service.py` | Resolves `snowflake.usd`, builds prototype + instancer, per-frame motion, floor raycasts, ground linger, cleanup. Lives in `younite.weather_and_seasons_extension`. |
+| `_shared.py` | Common utilities (`get_stage`, `get_player_pos`, `raycast_floor_y`, `get_camera_forward_xz`) used by snow, rain, leaf services. Lives in `younite.weather_and_seasons_extension`. |
+
+### Rain vs snow
+
+Only one particle effect runs at a time. If `snow_intensity > 0`, `stop_rain()` then `start_snow()`. If `rain_intensity > 0` and no snow, `stop_snow()` then `start_rain()`. If both intensities are zero, both stop.
+
+## Prototype geometry
+
+### Preferred: `source/data/Assets/Snowflake/snowflake.usd`
+
+- Session prim `/World/SnowSystem/Prototypes/Snowflake` is an **Xform** with uniform scale  
+  `(FLAKE_RADIUS / SNOWFLAKE_ASSET_HALF_EXTENT) * SNOWFLAKE_SIZE_SCALE`  
+  so the authored asset (composed `/World` bound ≈ ±121 units) matches the historical **0.78** sphere calibration, then the visual size multiplier.
+- Child `Ref` prim references **`/World`** from that file.
+- A **simple white** `UsdPreviewSurface` is defined at `/World/SnowSystem/Prototypes/SnowMaterial` and **bound to every `Mesh`** under the prototype in-session, overriding the file's MDL/textured look.
+
+### Path resolution (`_resolve_snowflake_usd_path`)
+
+Order of attempts (first existing file wins):
+
+1. Next to the seasons extension: `../../data/Assets/Snowflake/snowflake.usd` from `get_extension_path("younite.weather_and_seasons_extension")`.
+2. Walk **up** from the stage **root layer** directory until a folder named `data` is found, then `Assets/Snowflake/snowflake.usd`.
+3. Same filename beside the root layer and one directory up (same idea as player reference resolution).
+
+If no file loads or reference fails, logs and falls back to the **procedural** six-point star mesh (also uses the white material).
+
+### Asset folder notes
+
+- Keep `textures/snowflake/` (`snowflake.usd` + `Material_BaseColor.png`) for correct loading of the source asset in tools that do not apply the session material override.
+- Interchange **FBX** copies under `Assets/Snowflake` are not referenced by runtime USD and can be omitted from the repo (they were removed as duplicates).
+
+## Instancer setup
+
+Under `/World/SnowSystem` on the session layer:
+
+- **Prototype** (see above).
+- **Instancer** at `/World/SnowSystem/Instancer`: `positions`, `scales`, `protoIndices`; attribute `primvars:doNotCastShadows = true`.
+- Per-instance **scales** vary slightly in X/Y/Z for size variety (same pattern as earlier sphere flakes).
+
+### Spawn volume — circular
+
+Flakes spawn inside a **circular** area centred on the **player position** with radius `VOLUME_RADIUS` and height `VOLUME_HEIGHT`. Positions use `sqrt(random) * VOLUME_RADIUS` for **uniform area distribution** (avoids centre clustering). No forward bias — the circle follows the player regardless of camera direction.
+
+## Staged ramp-up
+
+To avoid an abrupt pop when snow starts, flakes are **born gradually** over `RAMP_DURATION` (default 5 s):
+
+1. `_init_flake_data` assigns each flake a random **birth time** in `[0, RAMP_DURATION]`.
+2. All flakes start with **scale (0,0,0)** — invisible.
+3. Each frame, `_on_update` advances `_elapsed`; when it passes a flake's birth time the flake's target scale is restored and it begins falling.
+4. After `RAMP_DURATION` all flakes are active and the effect is at full density.
+5. Flakes that are still hidden (`scale == 0`) are skipped in the physics/motion loop for free CPU time during ramp.
+
+Vertical positions are **pre-staggered** (uniform between floor and ceiling) so that newly born flakes appear mid-fall at natural heights rather than all starting from the ceiling.
+
+## Floor detection and ground linger
+
+On spawn/respawn, a **downward PhysX raycast** (`raycast_closest`) from the flake stores `_hit_floors[i]`. If nothing hits, `player_y - FALLBACK_FLOOR_OFFSET` is used.
+
+While falling, Y decreases with speed; X/Z get wind + flutter. When `y` reaches the floor:
+
+- Flake Y is clamped to the floor.
+- `_ground_linger` is set to a random value in `[GROUND_LINGER_MIN, GROUND_LINGER_MAX]` seconds.
+- While lingering, the flake stays on the floor; when the timer expires, `_respawn_flake_i` moves it back to the top of the volume (same instance index).
+
+## Per-frame update (Events 2.0)
+
+Snow subscribes with **`carb.eventdispatcher`** to **`omni.kit.app.GLOBAL_EVENT_UPDATE`** (not `get_update_event_stream()`). The subscription is removed when snow stops.
+
+`dt` is taken from the event payload when present; otherwise defaults to `1/60` s.
+
+## Cleanup (`stop_snow`)
+
+1. Clear the update observer and internal arrays (including `_scales_target`, `_birth_times`, `_elapsed`).
+2. Empty instancer arrays for an immediate visual cut.
+3. Remove the `/World/SnowSystem` prim spec from the **session** layer via `stage.RemovePrim()` with `Sdf.BatchNamespaceEdit` fallback.
+
+## Weather presets (snow)
+
+| Preset key | Typical snow | Notes |
+|------------|----------------|------|
+| `snowy` | 0.5 | Same sky numbers as `rainy`; snow instead of rain. |
+| `lightSnow` | 0.5 | Lighter sky than `snowy`. |
+| `heavySnow` | 1.0 | Denser flakes (upper end of count range). |
+| Others | 0.0 | `clearSky`, `rainy`, `darkStorm`, etc. use `snow: 0.0` unless changed. |
+
+Flake count: `MIN_FLAKE + intensity * (MAX_FLAKE - MIN_FLAKE)`.
+
+## Frontend (CU)
+
+- Weather type `snow` maps to Kit preset `'snowy'` (see `CuViewLayer.tsx`).
+- Picker / i18n: `WeatherSeasonPicker.tsx`, `WeatherIcons.tsx`, `people.snow` / `people.weatherSnow` in locale files.
+
+## Tuning constants (`snow_service.py`)
+
+| Constant | Role |
+|----------|------|
+| `FLAKE_RADIUS` | Baseline size (matches old sphere radius before scale multiplier). |
+| `SNOWFLAKE_SIZE_SCALE` | Extra uniform scale on USD prototype and procedural mesh (e.g. `2.0` to double). |
+| `SNOWFLAKE_ASSET_HALF_EXTENT` | Authoring half-extent used to normalize referenced `/World` (~`121.25`); change if the mesh asset changes. |
+| `SNOWFLAKE_MESH_RADIAL_SCALE` / `SNOWFLAKE_VALLEY_FRAC` | Procedural star only. |
+| `MIN_FLAKE` / `MAX_FLAKE` | Instance count range vs intensity (scaled proportionally to `VOLUME_RADIUS²`). |
+| `MIN_SPEED` / `MAX_SPEED` | Fall speed (slower than rain). |
+| `WIND_DRIFT` / `FLUTTER_STRENGTH` | Lateral motion and wobble. |
+| `GROUND_LINGER_MIN` / `MAX` | Seconds resting on ground before respawn. |
+| `VOLUME_RADIUS` | Circular spawn radius centred on the player. |
+| `VOLUME_HEIGHT` | Vertical extent of the spawn column. |
+| `RAMP_DURATION` | Seconds over which flakes gradually appear at startup (default 5 s). |
+| `FALLBACK_FLOOR_OFFSET` / `RAYCAST_MAX_DIST` | Raycast fallback and max ray length. |
+
+When changing `VOLUME_RADIUS`, scale `MIN_FLAKE` / `MAX_FLAKE` proportionally to `radius²` to maintain visual density.
+
+Performance is driven mainly by **instance count** and mesh complexity of the prototype.
+
+## Bird eye view: Canvas overlay instead of 3D particles
+
+In bird eye view, the 3D PointInstancer snow is **not started**. Instead, the frontend renders a **Canvas particle overlay** (`WeatherOverlay.tsx`) with animated snowflakes (circles with sine-wave drift) on top of the video stream. When the user switches to first person, the overlay is removed and 3D flakes resume.
+
+**Kit side**: `sky_service.py` stores desired precipitation in module-level `_desired_rain` / `_desired_snow` and checks `/younite/camera/viewType` before calling `start_snow()`. `SeasonsExtension` subscribes to `younite.camera.viewTypeChanged` to stop/restart 3D particles on view switches. When switching to first person, particle restart is **deferred** by `_PRECIPITATION_SETTLE_FRAMES` (10 frames) via `_deferred_start_precipitation()` to let the camera/teleport settle. Snow is less sensitive than rain (no `FORWARD_BIAS`) but the delay is applied uniformly for consistency.
+
+**Frontend**: `WeatherOverlay` reads `weather` and `currentCamera` from `useEnvironment()` and activates only when `currentCamera === 'bird_eye' && weather === 'snow'`.
+
+## Weather change view transition
+
+Weather preset changes (sun/rain/fog/snow) are wrapped in the shared `ViewTransitionOverlay` — the same fade-in/fade-out mechanism used by season changes, seat teleports, and view switches. This hides the brief GPU texture-loading flash that can occur when wet ground textures are applied or cleared.
+
+The flow is frontend-only (no Kit-side completion event):
+
+1. `applyWeather(w)` calls `beginViewTransition({ message, onFadeOutComplete })`
+2. Screen fades to black (~1s), shows localized "Changing weather…" label
+3. `onFadeOutComplete` fires: updates React state (`setWeather`), sends `skyControlRequest` to Kit
+4. After 500ms (`setTimeout`), `notifyViewTransitionKitReady()` triggers fade-in (~1s)
+
+The 500ms timer gives the GPU ~15 frames at 30fps to load/swap textures. Unlike season changes (which use a Kit-dispatched `seasonChangeCompleted` after settle frames), weather preset application is synchronous in `apply_sky_control()`.
+
+Localized label: `loading.changingWeather` (EN: "Changing weather…", SV: "Byter väder…", FR: "Changement de météo…", ES: "Cambiando el clima…").
+
+## Wet ground side-effect
+
+When snow starts, `sky_service.py` calls `wet_ground_service.set_wet("weather", True)`, which darkens paved surfaces (roads, concrete, cobblestone) to simulate wet salted pavement. When snow stops (and no rain or winter season is active), the textures are cleared. See `.cursor/rules/topics/wet-ground.mdc` for details.
+
+## Related
+
+- Rain (drops, splash, faster fall): `.cursor/rules/topics/rain-effect.mdc`
+- Wet ground & terrain winter textures: `.cursor/rules/topics/wet-ground.mdc`
+- Kit Events 2.0: `.cursor/rules/topics/events-api.mdc`

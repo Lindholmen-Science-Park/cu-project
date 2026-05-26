@@ -1,0 +1,516 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+#
+# NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+# property and proprietary rights in and to this material, related
+# documentation and any modifications thereto. Any use, reproduction,
+# disclosure or distribution of this material and related documentation
+# without an express license agreement from NVIDIA CORPORATION or
+# its affiliates is strictly prohibited.
+#
+# Base layer: shared [settings] + production [dependencies].
+# Launch: younite.usd_viewer_streaming_base.kit (prod) or younite.usd_viewer_streaming_dev.kit (dev, adds extra extensions).
+
+[package]
+title = "Younite USD Viewer Streaming Base"
+version = "0.1.0"
+description = "Shared streaming settings and production extension set for Younite USD viewer"
+keywords = ["experience", "app", "streaming"]
+template_name = "omni.usd_viewer"
+
+[dependencies]
+"omni.anim.curve.core" = {}
+"omni.anim.timeline" = {}
+"omni.graph.action" = {}
+"omni.hydra.rtx" = {}
+"omni.hydra.usdrt_delegate" = {}
+# MDL / material plugin chain — REQUIRED so Hydra can register SdrShaderNodes
+# for `info:mdl:sourceAsset` references in our scene .usdc files (e.g. seated
+# crowd materials). These are normally pulled in transitively, but on a fresh
+# clone where the user only ever runs `startstream_prod.bat` (or after a Kit
+# version bump that invalidates `_build/.../release/extscache/`), the prod
+# dependency closure misses them — Hydra then can't translate MDL references
+# and every affected mesh renders as the fallback red error material with
+# "[omni.rtx.materials] Unable to find SdrShaderNode" log spam. Listing them
+# explicitly here guarantees `repo precache_exts` and the runtime resolver
+# both pick them up without needing dev/composer to be built first.
+"omni.mdl" = {}
+"omni.mdl.neuraylib" = {}
+"omni.mdl.usd_converter" = {}
+"omni.kit.material.library" = {}
+"omni.kit.usd.mdl" = {}
+"omni.kit.manipulator.camera" = {} # Right mouse click and other editor mouse controlling
+"omni.kit.renderer.core" = {}
+"omni.kit.sequencer.core" = {}
+"omni.kit.commands" = { version = "1.4.10" }
+"omni.kit.actions.core" = { version = "1.0.0" }
+"omni.kit.primitive.mesh" = { version = "1.0.17" }
+"omni.usd" = {}
+"omni.kit.viewport.window" = {}
+"omni.ujitso.client" = {}
+"usdrt.scenegraph" = {}
+"omni.physx.bundle" = {}
+"omni.physx.cct" = {}  # loaded for stage_core (teleport); player CCT activation is on-demand
+"omni.timeline" = {}
+# Core extensions - explicit ordering for clarity (they're also transitive deps of setup_extension)
+"younite.messaging_core_extension" = { order = 900 }  # Loads first (no younite dependencies)
+"younite.usd_viewer_stage_core_extension" = { order = 950 }  # Depends on messaging_core
+"younite.payload_orchestrator_core_extension" = { order = 955 }  # Centralised payload/visibility queue
+"younite.usd_viewer_player_core_extension" = { order = 980 }  # Depends on stage_core
+"younite.lod_management_extension" = { order = 960 }  # Auto LOD variant switch based on camera view
+"younite.distance_culling_extension" = { order = 960 }  # Three-zone tile management via orchestrator
+"younite.usd_viewer_setup_extension" = { order = 1000 }  # Depends on all core extensions
+"younite.scene_switch_extension" = { order = 1100 }
+# Production feature extensions (subset aligned with current production web UI)
+"younite.picking_extension" = { order = 1200 }
+"younite.navmesh_route_extension" = { order = 1200 }
+"younite.npc_controller_extension" = { order = 1300 }
+"younite.markers_extension" = { order = 1200 }
+"younite.interactions_extension" = { order = 1200 }
+"younite.sound_emitter_extension" = { order = 1200 }  # Ambient emitter engine — dormant until sound_emitters.json has entries
+"younite.people_toggle_extension" = { order = 1200 }
+"younite.light_culling_extension" = { order = 1200 }
+"younite.video_extension" = { order = 1200 }
+"younite.weather_and_seasons_extension" = { order = 1200 }
+"omni.kit.livestream.app" = {}  # Livestream extension
+"omni.kit.livestream.webrtc" = {}  # WebRTC streaming server
+"omni.kit.livestream.messaging" = {}  # Messaging bridge (used only to forward customEvent)
+"omni.kit.environment.core" = {}  # Required for dynamic sky controls (TimeOfDay, CloudCoverage, etc.)
+"omni.services.core" = {}
+"omni.services.transport.server.http" = {}
+"omni.services.livestream.webrtc" = {}
+
+[settings.persistent.app]
+viewport.autoFrame.mode = "never"  # Disable auto framing to prevent camera issues
+viewport.defaults.tickRate = 60  # Lock to 60fps
+viewport.noPadding = true  # Remove default frame around viewport
+
+[settings.persistent.exts]
+"omni.kit.window.sequencer".useSequencerCamera = true  # Sequencer Camera Sync ON
+
+# Navigation / NavMesh stability (persistent defaults)
+# `omni.anim.navigation.core` reads several defaults from `/persistent/...` at startup.
+# In the "light" profile you run with UJITSO disabled, so we must prevent navmesh
+# caching/baking from touching UJITSO by default. GPU is enabled for faster baking.
+[settings.persistent.exts."omni.anim.navigation.core"]
+navMesh.cache.enabled = false
+navMesh.cache.enableUjitso = false
+navMesh.config.autoRebakeOnChanges = false
+navMesh.useGpu = true
+
+[settings.persistent]
+metricsAssembler.showUnitsOverlay = false
+omnigraph.useSchemaPrims = true
+omnigraph.disablePrimNodes = false
+rtx.mdltranslator.distillMaterial = false  # Render Preferences - Material Distilling OFF for better quality
+rtx-transient.resourcemanager.enableTextureStreaming = true  # Texture Streaming
+
+[settings.younite.camera]
+defaultViewType = "firstPerson"  # "firstPerson" or "birdEye" — initial camera mode on startup
+
+[settings.app]
+titleVersion = "0.1.0"
+auto_load_usd = "./source/data/scenes/main_scene.usda"  # Load main_scene.usda directly
+content.emptyStageOnStart = false  # Don't create empty stage, we'll load our USD file
+fastShutdown = true  # Skip long full shutdown and exit quickly
+livestream.allowResize = 1  # Let the livestream app's resizeAppWindow match the renderer to the client's connect resolution
+livestream.skipCapture = 1  # livestream skipCapture ON for local streaming
+name = "Younite USD Viewer Streaming"
+renderer.resolution.width = 640  # Small default — resizeAppWindow overrides to the client's connect resolution; must be ≤ any possible aligned resolution so first frames don't exceed encoder max
+renderer.resolution.height = 360
+useFabricSceneDelegate = true  # Turn on the Fabric scene delegate by default
+enableDeveloperWarnings = true  # Enable developer warnings for better debugging
+window.height = 360
+window.width = 640
+
+[settings.log]
+level = "info"  # Enable info level logging
+console = true  # Enable console logging
+# Suppress deprecation warnings - should be minimal with new Events 2.0 system
+suppressDeprecationWarnings = true  # Suppress deprecation warnings
+enableEventStreamWarnings = false  # Disable event stream deprecation warnings
+# Additional warning suppression
+suppressCarbWarnings = true  # Suppress carb deprecation warnings
+suppressEventStreamWarnings = true  # Suppress event stream warnings
+# Suppress messaging extension warnings
+suppressMessageBusWarnings = true  # Suppress message bus deprecation warnings
+suppressLivestreamWarnings = true  # Suppress livestream extension warnings
+
+# Modern Events 2.0 system - movement handled by PhysX character controller, custom messages by WebRTC data channel
+
+[settings.app.environment]
+name = "Younite USD Viewer Streaming"
+
+[settings.app.usdrt.population.utils]
+mergeInstances = false
+mergeMaterials = false
+
+[settings.app.viewport.defaults]
+fillViewport = true  # Viewport fills the window; the livestream app's resizeAppWindow controls the window size to match the client's connect resolution
+guide.grid.visible = false
+guide.axis.visible = false
+hud.visible = false
+outline.enabled = false  # Disable selection outline/highlighting
+pickingMode = "none"  # Disable picking - no prims should be selectable
+scene.cameras.visible = true
+scene.lights.visible = true
+# Disable transform gizmo and manipulator visibility
+transform.gizmoVisible = false
+transform.gizmoEnabled = false
+
+[settings.app.viewport]
+outline.enabled = false  # Disable selection outline/highlighting at viewport level
+
+[settings.app.file]
+ignoreUnsavedOnExit = true  # enable quitting without confirmation
+
+[settings.app.font]
+file = "${fonts}/OpenSans-SemiBold.ttf"
+size = 16
+
+[settings.app.layout]  # this is a custom setting used by our app setup to choose the Layout
+name = "default"
+
+[settings.app.window]
+title = "Younite USD Viewer Streaming"
+width = 640
+height = 360
+x = -1
+y = -1
+
+[settings.crashreporter]
+compressDumpFiles = true
+
+[settings.crashreporter.data]
+experience = "Younite USD Viewer Streaming"
+
+[settings.exts]
+"omni.kit.renderer.core".present.enabled = true  # Enable the present thread
+"omni.kit.renderer.core".present.presentAfterRendering = true  # Ensure the present thread waits for the rendering to complete
+"omni.kit.window.viewport".showContextMenu = false  # Disable context menu, viewer not editor.
+# Disable manipulator extensions if they're loaded (defensive settings)
+# NOTE: These extensions must be loaded (for PhysX dependencies) but can be disabled
+"omni.kit.manipulator.prim".enabled = false  # Disable prim manipulator
+"omni.kit.manipulator.transform".enabled = false  # Disable transform manipulator (prevents gizmo)
+"omni.kit.manipulator.selection".enabled = false  # Disable selection manipulator
+"omni.kit.manipulator.selector".enabled = false  # Disable selector manipulator (selection tool)
+"omni.kit.viewport.manipulator.transform".enabled = false  # Disable viewport transform manipulator
+# Disable selection and box selection in viewport window
+"omni.kit.viewport.window".selection.enabled = false  # Disable selection
+"omni.kit.viewport.window".boxSelection.enabled = false  # Disable box/marquee selection
+
+# Navigation / NavMesh stability (prevents auto-bake crashes during scene switch in headless/light runs)
+[settings.exts."omni.anim.navigation.core"]
+# Disable UJITSO-backed navmesh cache (your light profile disables UJITSO; core tried to use it and crashed)
+navMesh.cache.enabled = false
+navMesh.cache.enableUjitso = false
+# Disable automatic rebake on stage changes; we'll trigger baking explicitly when needed
+navMesh.config.autoRebakeOnChanges = false
+# Enable GPU baking for faster performance (GPU baking is now stable)
+navMesh.useGpu = true
+
+# Reduce messaging extension verbosity
+[settings.exts."omni.kit.livestream.messaging"]
+logLevel = "error"
+
+# Disable default environment to avoid texture path issues
+[settings.app.stage_templates]
+defaultEnvironment = false  # Don't add default environment
+defaultLighting = false  # Don't add default lighting
+
+[settings.renderer]
+# Force RTX renderer for fog support
+active = "rtx"
+enabled = "rtx"
+# By default rtx is setup to be mgpu but in some context you might want to run on
+# a single gpu if so set this setting to false
+multiGpu.enabled = false  # Single GPU — disables unused multi-GPU sync overhead
+
+[settings.rendergraph]
+maxFramesInFlight = 2
+
+[settings.rtx-transient]
+dlssg.enabled=false  # Frame Generation OFF — interpolated frames add artifacts on procedural sky when stationary
+dlss.enabled = true   # DLSS Super Resolution — renders at lower internal res, AI-upscales via Tensor Cores
+dlss.mode = 2         # 2 = Quality (67% internal res); 1 = Balanced (58%); 0 = MaxPerformance (50%)
+ecoMode.enabled = true  # Throttle GPU when scene is truly static — saves thermal headroom for active moments
+scenedb.forceMaxTLASInstancesLimit = 500000  # Increased TLAS instances
+scenedb.instanceBudget = 250000  # Increased scene database instances
+
+[settings.rtx.hydra]
+# RTX Geometry Streaming settings (only active when geometry streaming is enabled)
+geometrystreaming.instanceBudget = 500000  # Max instances to render
+
+[settings.rtx.post]
+aa.op = 0  # AA disabled — DLSS Super Resolution includes temporal anti-aliasing; FXAA on top blurs the upscaled output
+tonemap.ditherStrength = 0.0  # Disable tonemap dithering — causes visible stippling on smooth sky gradients
+tvNoise.enabled = false
+filmGrain.enabled = false
+
+[settings.rtx]
+verifyDriverVersion.enabled = false
+reflections.maxBounces = 1  # Single bounce — saves significant ray cost with many lights; no visible difference in streamed output
+
+[settings.rtx.domeLight]
+upperLowerStrategy = 4  # Approximated IBL — artifact-free in real-time mode (default 0 causes sampling noise on sky)
+
+# RTX Ambient Light Settings - Use scene-defined ambient lighting
+[settings.rtx.sceneDb]
+ambientLightIntensity = 0.2  # Subtle ambient fill to lift overall scene darkness
+
+# RTX Direct Lighting Settings
+[settings.rtx.directLighting.sampledLighting]
+enabled = true
+maxRayUnexposedIntensity = 6399.999
+
+[settings.exts."omni.appwindow"]
+listenF11 = false
+listenF7 = false
+
+[settings.telemetry]
+# Anonymous Kit application usage telemetry
+enableAnonymousData = true
+enableAnonymousAppName = true
+
+[settings.UJITSO]
+# UJITSO disabled — no agent available in current setup.
+# Re-enable when UJITSO agent infrastructure is available for digital twin workflows.
+enabled = false
+textures = false
+geometry = false
+materials = false
+datastore.localCachePath=""
+readCacheWithAssetRoot=""
+
+# Override persistent settings from previous sessions that had UJITSO geometry enabled
+[settings.persistent.UJITSO]
+enabled = false
+textures = false
+geometry = false
+materials = false
+
+[settings.privacy]
+externalBuild = true
+
+[settings.app.livestream]
+maxPushStreamDataAttempts = 5  # Increased attempts to push stream data
+# webrtcEtli = false  # Disable ETLI to reduce error logging (deprecated)
+webrtc.logLevel = "critical"  # Only log critical errors
+webrtc.enableErrorLogging = false  # Disable error logging to prevent spam
+webrtc.enabled = true  # Enable WebRTC streaming
+# Suppress deprecation warnings from livestream messaging
+messaging.suppressDeprecationWarnings = true  # Suppress deprecation warnings
+messaging.enableEventTracing = false  # Disable event tracing to reduce warnings
+webrtc.port = 49100  # WebRTC signaling port (base port)
+webrtc.mediaPort = 49101  # WebRTC media port (base port)
+webrtc.portRange = "49100-49200"  # Port range for multiple instances
+webrtc.enableDynamicPorts = true  # Enable dynamic port assignment
+webrtc.maxInstances = 10  # Maximum concurrent instances
+webrtc.iceServers = []  # Use default ICE servers
+webrtc.iceTransportPolicy = "all"  # Allow all ICE transport types
+webrtc.timeout = 60  # Increased WebRTC connection timeout
+# Multi-user WebRTC settings for game-like environment
+webrtc.maxConnections = 50  # Support up to 50 concurrent users per instance
+webrtc.connectionTimeout = 30  # Reduced timeout for faster connection attempts
+webrtc.keepAliveInterval = 15  # More frequent keep-alive for stability
+webrtc.retryDelay = 500  # Faster retry for better user experience
+webrtc.maxRetries = 3  # Allow 3 retries for better reliability
+# Additional stability settings
+webrtc.enableHeartbeat = true  # Enable heartbeat to detect dead connections
+webrtc.heartbeatInterval = 5000  # Heartbeat interval in milliseconds
+webrtc.connectionPoolSize = 64  # Increased pool size for multiple concurrent users
+webrtc.enableGracefulShutdown = true  # Enable graceful shutdown
+webrtc.shutdownTimeout = 10000  # Shutdown timeout in milliseconds
+# State management fixes
+webrtc.enableIdleStateManagement = true  # Enable idle state management
+webrtc.idleTimeout = 30000  # 30 seconds idle timeout
+webrtc.enableStateRecovery = true  # Enable automatic state recovery
+webrtc.stateRecoveryTimeout = 5000  # State recovery timeout
+webrtc.enableConnectionThrottling = true  # Enable connection throttling
+webrtc.connectionThrottleDelay = 50  # Reduced delay for faster user connections
+
+# Ensure the app reads USD render settings
+[settings.app.hydra.renderSettings]
+useUsdAttributes = true
+
+# RTX Fog Settings - Using dotted keys (not slash format)
+[settings.rtx.fog]
+enabled = false  # Start disabled, user can enable via UI
+fogStartDist = 1000.0  # 10 meters in world units (metersPerUnit = 0.01)
+fogEndDist = 20000.0   # 200 meters in world units
+fogColor = [0.75, 0.75, 0.75]
+fogColorIntensity = 0.0  # Start at 0 intensity
+
+[settings.app.rendergraph]
+maxFramesInFlight = 2  # Match rendergraph setting — lower = less input latency for interactive streaming
+
+# Suppress PhysX UI overlays — extensions are loaded at startup for CCT but
+# their visual UI is not wanted in a streaming viewer.
+[settings.persistent.physics]
+showSimulationToolbar = false
+supportUiActionBarEnabled = false
+visualizationDisplayColliders = false
+visualizationDisplayJoints = false
+visualizationDisplayContacts = false
+mouseInteractionEnabled = false
+overlapVisualizationEnabled = false
+
+
+[settings.exts."omni.kit.livestream.webrtc"]
+# Multi-user WebRTC plugin settings for game-like environment
+logLevel = "warning"  # Reduce log level to suppress error spam
+enableErrorLogging = false  # Disable error logging to prevent spam
+maxConnections = 50  # Support up to 50 concurrent users per instance
+connectionTimeout = 30  # Reduced timeout for faster connections
+keepAliveInterval = 15  # More frequent keep-alive for stability
+retryAttempts = 3  # Allow 3 retries for better reliability
+retryDelay = 500  # Faster retry for better user experience
+bufferSize = 2048  # Increased buffer size for multiple streams
+enableConnectionPooling = true  # Enable connection pooling
+connectionPoolSize = 64  # Pool size for multiple users
+enableSessionIsolation = true  # Enable session isolation for user privacy
+dynamicResize = true  # Enable dynamic resize to handle resolution changes
+# Input forwarding — must be in .kit so they're available before the extension initializes
+transferKeyboardEvents = true
+transferMouseEvents = true
+captureKeyboard = true
+enablePointerLock = true
+consumeAltKey = true
+relativeMouse = true
+focusOnClick = true
+
+# Warning suppression settings
+[settings.warnings]
+# Suppress specific warning categories
+suppressDeprecationWarnings = true
+suppressEventStreamWarnings = true
+suppressMessageBusWarnings = true
+suppressCarbWarnings = true
+suppressPythonWarnings = true
+suppressIObjectWarnings = true
+suppressUJITSOWarnings = true
+suppressNVMLWarnings = true
+suppressArchitectureWarnings = true
+
+# Per-channel log level filtering (Carb native plugins)
+# Suppresses harmless startup warnings from NVIDIA's remote CumulusLight/ProceduralSky
+# MDL assets and Fabric scene-delegate incompatibilities.
+[settings.log.channels]
+"rtx.neuraylib.plugin" = "error"
+"omni.rtx.materials" = "error"
+"omni.fabric.plugin" = "error"
+"gpu.foundation.plugin" = "error"
+"rtx.materialdb.plugin" = "error"
+"carb.cudainterop.plugin" = "error"
+
+[settings.exts."omni.kit.livestream.app"]
+primaryStream.enableEventTracing = true
+primaryStream.allowDynamicResize = true
+# Spectator stream MUST be disabled for the primary stream's NVST encoder to
+# support static/dynamic resize.  The plugin blocks ALL resize operations when
+# any spectatorStream entry is present, regardless of whether a viewer is
+# actually connected.  Re-enable only when viewer mode is needed AND resize is
+# not required.
+# spectatorStream.0.streamType = "webrtc"
+# spectatorStream.0.signalPort = 49200
+# spectatorStream.0.streamPort = 48000
+
+[settings.exts."omni.services.transport.server.http"]
+port = 8011
+
+[settings.app.extensions]
+registryEnabled = true
+supportedTargets.platform = []  # Skip checking supported platform/config when building
+excluded = [
+    "omni.kit.developer.bundle",
+    # "omni.kit.livestream.messaging",  # enabled to route UI messages in local mode
+    # NOTE: Do NOT exclude manipulator extensions - they're needed as dependencies by PhysX extensions
+    # Instead, we disable them via settings and viewport API to prevent selection/gizmos
+    # NOTE: All PhysX extensions (including UI) are loaded at startup so that
+    # omni.physx.cct is available without calling set_extension_enabled_immediate()
+    # at runtime. Dynamic loading triggers an extension restart cascade that
+    # destroys carb.input subscriptions and breaks native WASD keyboard input.
+    # PhysX UI is suppressed via carb settings and the setup extension's
+    # layout/window-hiding pass. Do NOT re-exclude any omni.physx.* extensions —
+    # they have internal cross-dependencies (e.g. CCT imports omni.physxdemos).
+]
+
+[template]
+type = "ApplicationLayerTemplate" # Repo Template Metadata
+
+# Extension search paths — Kit needs these BEFORE resolving [dependencies].
+# Must live outside the generated block so they persist across regenerations.
+# Required for production (base.kit launched directly) and pullnucleus.bat.
+[settings.app.exts]
+folders.'++' = [
+    "${app}/../exts",
+    "${app}/../extensions",
+    "${app}/../apps",
+    "${app}/../extscache",
+    "${kit}/exts",
+    "${kit}/extscache"
+]
+
+
+
+########################################################################################################################
+# BEGIN GENERATED PART (Remove from 'BEGIN' to 'END' to regenerate)
+########################################################################################################################
+
+# Kit SDK Version: 110.1.1+production.305458.6312fa25.gl
+
+# Version lock for all dependencies:
+[settings.app.exts]
+enabled = [
+	"omni.anim.curve.core-1.6.0",
+	"omni.anim.navigation.core-110.0.7",
+	"omni.anim.navigation.schema-110.0.1",
+	"omni.anim.timeline-110.0.0",
+	"omni.asset_validator.core-1.18.0",
+	"omni.convexdecomposition-110.1.1",
+	"omni.graph.action-2.10.2",
+	"omni.graph.action_nodes-2.10.3",
+	"omni.graph.action_nodes_core-2.10.2",
+	"omni.kit.environment.core-1.4.2",
+	"omni.kit.livestream.app-10.1.1",
+	"omni.kit.livestream.core-10.2.1",
+	"omni.kit.livestream.messaging-1.3.0",
+	"omni.kit.livestream.webrtc-10.3.2",
+	"omni.kit.property.physics-110.1.1",
+	"omni.kit.sequencer.core-110.0.0",
+	"omni.kit.sequencer.usd-110.0.0",
+	"omni.kit.widget.sliderbar-1.1.0",
+	"omni.physics-110.1.1",
+	"omni.physics.isaacsimready-110.1.1",
+	"omni.physics.physx-110.1.1",
+	"omni.physics.physx.ui-110.1.1",
+	"omni.physics.stageupdate-110.1.1",
+	"omni.physics.ui-110.1.1",
+	"omni.physx-110.1.1",
+	"omni.physx.asset_validator-110.1.1",
+	"omni.physx.bundle-110.1.1",
+	"omni.physx.camera-110.1.1",
+	"omni.physx.cct-110.1.1",
+	"omni.physx.commands-110.1.1",
+	"omni.physx.cooking-110.1.1",
+	"omni.physx.demos-110.1.1",
+	"omni.physx.foundation-110.1.1",
+	"omni.physx.gpu-110.1.1",
+	"omni.physx.graph-110.1.1",
+	"omni.physx.supportui-110.1.1",
+	"omni.physx.ui-110.1.1",
+	"omni.physx.vehicle-110.1.1",
+	"omni.services.core-1.10.0",
+	"omni.services.facilities.base-1.0.5",
+	"omni.services.livestream.webrtc-10.0.0",
+	"omni.services.transport.server.base-1.1.2",
+	"omni.services.transport.server.http-1.3.2",
+	"omni.usd.schema.physx-110.1.1",
+	"omni.usd.schema.sequence-3.2.0",
+	"omni.usdphysics-110.1.1",
+	"omni.usdphysics.ui-110.1.1",
+]
+
+########################################################################################################################
+# END GENERATED PART
+########################################################################################################################

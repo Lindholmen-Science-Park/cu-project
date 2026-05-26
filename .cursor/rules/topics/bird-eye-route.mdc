@@ -1,0 +1,478 @@
+---
+description: Bird's-eye route overlay — unified NavMesh pathfinding via NavMeshRouteService, RDP simplification, per-frame world-to-screen projection, SVG polyline web overlay, endpoint bubbles during directions preview, corridor waypoint support for complex routes, MapMarkerDirectionsPanel for POI + seat directions with swap support
+globs:
+  - "**/bird_eye_route_projector*"
+  - "**/BirdEyeRouteOverlay*"
+  - "**/MapMarkerDirectionsPanel*"
+  - "**/overlayUtils*"
+  - "**/directions-icons*"
+alwaysApply: false
+---
+
+# Bird's-Eye Route Overlay
+
+Draws a dashed polyline on the web UI showing a navigation route between two world positions in bird's-eye view. The route is calculated via the **shared `NavMeshRouteService` engine** (same as walking/seat/exit routes), simplified via Douglas-Peucker, projected to screen coordinates every frame by `BirdEyeRouteProjector`, and rendered as an SVG overlay on the frontend.
+
+**Currently wired in dev mode only** (test buttons in `NavigationSubmenu.tsx`). The service layer and overlay component are mode-agnostic — they live in shared infrastructure and can be activated from CU mode without changes.
+
+## Architecture overview
+
+```
+Web UI button click
+       │
+       ▼
+sendMessage('birdEyeRouteRequest', { startPos, endSpawnPoint|endSeatNumber|endPos, useWaypoints?, section? })
+       │
+       ▼
+navmesh_route_extension/extension.py  (_on_bird_eye_route_request)
+       │
+       ├─ _resolve_bird_eye_start()     → start_ref  (explicit pos, spawn point, or stored lastFpPos)
+       ├─ resolve end_ref               (explicit pos, seat via seat_lookup, or spawn point)
+       ├─ _compute_bird_eye_waypoints() → via_points  (corridor waypoints, only if useWaypoints=true)
+       │
+       ▼
+NavMeshRouteService.set_route_for_id("bird_eye", start, end, draw_path=False, auto_move=False, ...)
+       │
+       ├─ RouteInstance calculates path (same engine as walking/seat routes)
+       ├─ Applies cost areas, smoothing, multi-segment via-points automatically
+       │
+       ▼
+dispatch_to_events2('navmeshRouteWaypoints', { routeId: "bird_eye", points, ... })
+       │
+       ▼
+extension.py  (_on_bird_eye_waypoints)  — intercepts routeId == "bird_eye"
+       │
+       ▼
+BirdEyeRouteProjector.on_route_computed(points_3d)
+       │
+       ├─ douglas_peucker_indices()          (RDP simplification, ε = 200 cm)
+       ├─ store simplified waypoints
+       │
+       ▼
+_on_update (per-frame, throttled 100ms)
+       │
+       ├─ check viewType == "birdEye"
+       ├─ world_to_ndc projection
+       ├─ NDC → pixel conversion
+       │
+       ▼
+dispatch_to_events2('birdEyeRouteOverlay', { points, viewport })
+       │
+       ▼
+Web: interactionHandlers.ts → setBirdEyeRoutePoints()
+       │
+       ▼
+BirdEyeRouteOverlay.tsx  (SVG <polyline> + optional bubbles)
+       │
+       ├─ Kit pixel → browser pixel via computeVideoContentRect (object-fit:cover mapping)
+       ├─ Render dotted polyline (lemon #DCFF7D, strokeDasharray "2 12")
+       ├─ Endpoint bubbles (map-pin start + flag-pennant end) when mapMarkerDirectionsPreview active
+       └─ Only visible when currentCamera === 'bird_eye'
+```
+
+## Why bird-eye uses NavMeshRouteService (not its own pathfinder)
+
+The bird-eye route is calculated by the **same `NavMeshRouteService` / `RouteInstance` engine** used for walking, seat, and exit routes. This means:
+
+- **Cost areas automatically apply** (camera, sound, crowd)
+- **Wheelchair mode automatically applies** — every `RouteInstance` reads the active mesh through `get_navmesh_override` so the bird-eye route picks up the user's selected mesh (walking or wheelchair) on the next recalc; no rebake needed (`navmesh-dual-mode.mdc`)
+- **Path smoothing automatically applies** (`smooth_path_xz`)
+- **Via-point pruning and multi-segment logic** is shared, not duplicated
+- **Periodic recalculation** keeps the overlay up to date if costs change
+
+The only difference is **visualization**: walking routes draw BasisCurves in 3D; bird-eye routes project the path to screen coordinates and draw an SVG polyline in the web UI.
+
+## Two routing modes
+
+### Direct route (no waypoints)
+For destinations reachable via a single NavMesh path (e.g., from player position to Foyer spawn point). `RouteInstance._compute_path()` calls `RouteComposer.compose(...)` which produces a single-leg NavMesh polyline (or a NavMesh ↔ OSM bridge if the destination is outside any island).
+
+### Auto-corridor pruning parity (preview ↔ engine)
+For intra-island routes, the bird-eye preview path calls `composer.compose(..., enable_corridor_routing=True)` and the composer's `_same_navmesh` branch internally derives via-points via `_plan_intra_island_via` → `waypoint_router.plan_route_to_position`. Those auto-derived via-points are then run through the **same** `waypoint_router.prune_passed_via_points` helper the engine uses on caller-supplied via-points, so the dashed preview cannot diverge from the eventual first-person sphere route. Without this shared pass the preview would re-introduce ring waypoints the engine had pruned, showing as an "extra arm" most visible when the player is already inside the corridor and asks for directions to an outdoor map-marker spawn (e.g. Foyer → "Start"). See `waypoint-routing.mdc` → "waypoint_router.py internals" for the helper. Anti-pattern: adding a new bird-eye-only auto-corridor source that bypasses `prune_passed_via_points` will silently re-introduce the bug.
+
+### Waypoint-guided route
+For destinations requiring corridor routing (e.g., seats in upper sections). When the web request includes `useWaypoints: true`:
+
+1. `_compute_bird_eye_waypoints` calls `waypoint_router.plan_route()` (with `section`) or `plan_route_to_position()` to get corridor waypoints
+2. `RouteInstance._compute_path()` passes the via-points to `RouteComposer.compose(via_points=…)` which builds the multi-segment NavMesh path
+3. Leg polylines are concatenated (removing duplicate junction points) inside `_finalize`
+4. The projector applies a single RDP pass on the combined polyline
+
+This reuses the same corridor waypoint graph as first-person seat navigation. See `waypoint-routing.mdc` for the graph structure and `route-composer.mdc` for the composer pipeline.
+
+## Kit projector
+
+**Package**: `navmesh_route_extension/services/kit_services/bird_eye_route_projector/` — import surface unchanged (`from …bird_eye_route_projector import BirdEyeRouteProjector`). Internals are split for readability:
+
+| Module | Responsibility |
+|---|---|
+| `projector.py` | `BirdEyeRouteProjector` — channel state, update subscription, RDP via `navigation_guide.douglas_peucker_indices`, throttled `_on_update` |
+| `projection.py` | `project_waypoints_to_screen()` — active viewport, `world_to_ndc`, behind-camera cull, NDC → Kit pixels |
+| `overlay_dispatch.py` | `dispatch_bird_eye_route_overlay()` — `birdEyeRouteOverlay` payload via `dispatch_to_events2` |
+| `resolution.py` | `get_renderer_resolution()` — carb renderer width/height |
+| `constants.py` | `RDP_EPSILON_CM`, `UPDATE_INTERVAL_MS` |
+| `types.py` | `Vec3` |
+
+| Constant | Value | Purpose |
+|---|---|---|
+| `RDP_EPSILON_CM` | 200.0 | Douglas-Peucker tolerance in centimetres |
+| `UPDATE_INTERVAL_MS` | 100 | Minimum interval between projection dispatches |
+
+### Key methods
+
+- **`on_route_computed(points_3d)`** — receives 3D waypoints from `navmeshRouteWaypoints` event, applies RDP simplification, stores for projection.
+- **`_on_update()`** — per-frame callback (throttled). Checks `viewType == "birdEye"`, projects waypoints to screen coords, dispatches overlay event.
+- **Projection** — `project_waypoints_to_screen()` in `projection.py` (called from `BirdEyeRouteProjector._project_waypoints`): uses `viewport_api.world_to_ndc`, filters points behind the camera via camera inverse transform.
+- **`clear_route()`** — wipes stored waypoints, dispatches empty overlay update.
+
+### Projection pipeline
+
+1. Get active viewport via `omni.kit.viewport.utility.get_active_viewport()`
+2. For each 3D waypoint:
+   - Transform to camera space → skip if Z ≥ 0 (behind camera)
+   - `world_to_ndc.Transform()` → NDC `[-1, 1]`
+   - NDC → pixel: `sx = (ndc_x + 1) * 0.5 * width`, `sy = (1 - ndc_y) * 0.5 * height`
+3. Dispatch `birdEyeRouteOverlay` with `{ points: [{sx, sy, wx, wy, wz}, ...], viewport: {width, height} }`
+
+## Module decomposition (navmesh route extension)
+
+The navmesh route extension's `services/kit_services/` folder is organized as:
+
+| File | Lines | Responsibility |
+|---|---|---|
+| `route_engine/` | (package) | `RouteConfig` (`types.py`), `RouteInstance` (mixins: `compute.py`, `player_route.py`, `arrival.py`, `instance_base.py`) — pathfinding, measurement, arrival |
+| `navmesh_route_service/` | (package) | `service.py` — `NavMeshRouteService`; `constants.py` / `waypoint_dispatch.py` / `refs.py` — small helpers |
+| `navmesh_bake_utils.py` | ~160 | Standalone async baking functions: `wait_for_navmesh_ready`, `change_agent_settings_and_rebake`, `rebake_navmesh` |
+| `bird_eye_route_projector/` | (package) | Bird-eye overlay: `projector.BirdEyeRouteProjector`, `projection`, `overlay_dispatch`, `resolution`, `constants` — receives computed 3D path, RDP, per-frame projection (no pathfinding) |
+| `navmesh_bake_orchestrator.py` | ~560 | Bake orchestrator, area providers |
+| `route_measure/` | (package) | Route measurement (distance/time): `compute_single`, `compute_multi`, `exits`, `shortcut_fallback`, etc.; import from `route_measure` or `route_measure.route_measure_service` |
+| `navigation_guide.py` | ~253 | Turn-by-turn guide, RDP algorithm |
+| `waypoint_router.py` | ~574 | Corridor waypoint graph |
+| `seat_lookup.py` | ~243 | Seat position lookup |
+| `seat_highlight.py` | ~167 | Seat highlight visualization |
+
+## Extension wiring
+
+**File**: `navmesh_route_extension/extension.py`
+
+- `BirdEyeRouteProjector` instantiated in `on_startup`, `start()` called to begin update subscription
+- `"birdEyeRouteOverlay"` registered as outbound event
+- `birdEyeRouteRequest` → `_on_bird_eye_route_request` → `NavMeshRouteService.set_route_for_id("bird_eye", ...)`
+- `navmeshRouteWaypoints` (internal) → `_on_bird_eye_waypoints` → `BirdEyeRouteProjector.on_route_computed()`
+- `birdEyeRouteClear` → stops `"bird_eye"` route + clears projector
+- `shutdown()` called in `on_shutdown`
+
+### Start-point resolution (`_resolve_bird_eye_start`)
+
+Priority order:
+1. Explicit `startPos` coordinates from payload
+2. `startSpawnPoint` prim name
+3. Stored first-person position (`/younite/player/lastFpPos*` carb settings, guarded by `lastFpPosValid`)
+4. Fallback: `/World/PlayerCharacter` current position
+
+### End-point resolution
+
+Priority order:
+1. Explicit `endPos` coordinates
+2. `endSeatNumber` → resolved via `seat_lookup.get_seat_position()`
+3. `endSpawnPoint` prim name
+4. Fallback: `/World/PlayerCharacter`
+
+## Web frontend
+
+### State management
+
+- **`useControlHandlers.ts`**: `BirdEyeRoutePoint`, `BirdEyeRouteData` interfaces; `birdEyeRoutePoints` state
+- **`interactionHandlers.ts`**: handles `birdEyeRouteOverlay` event, parses points and viewport, updates state
+- **`StreamOnlyWindow.tsx`**: wires `setBirdEyeRoutePoints` into `useCustomEventHandler`
+
+### Overlay component
+
+**Files**: `streaming/overlays/birdEyeRoute/BirdEyeRouteOverlay.tsx` + `.css`
+
+Renders an SVG `<polyline>` when `currentCamera === 'bird_eye'` and at least 2 screen points exist. Maps Kit pixel coordinates to browser coordinates via `computeVideoContentRect()` (shared utility in `overlayUtils.ts`).
+
+| Property | Value |
+|---|---|
+| Stroke colour | `#DCFF7D` (lemon) |
+| Stroke width | 3.5px |
+| Dash pattern | `2 12` (short dots, wide gaps — reads as individual dots) |
+| Stroke linecap/join | `round` |
+| Opacity | 0.95 |
+| Z-index | 898 (below InteractionBoxesOverlay at 900, above video) |
+| Drop shadow | `0 1px 2px rgba(0,0,0,0.15)` |
+
+### Endpoint bubbles
+
+When `mapMarkerDirectionsPreview` is active (and not `movingToPoiId`), the overlay renders teardrop-shaped markers at route endpoints:
+
+| Marker | Icon | Background | Position |
+|---|---|---|---|
+| Start | `cu/figma-export-icons/MapPinSimpleArea.svg` (dark-purple pin) | White circle | First projected point |
+| Destination | `directions-icons/flag-pennant.svg` (dark-purple flag) | Lemon `#DCFF7D` circle | Last projected point |
+
+Both have a triangular pointer beneath the icon circle. The start marker additionally has a lime ground ring.
+
+When the user clicks the swap arrow in the directions panel, the icons mirror onto the opposite endpoints (geometry stays the same — only the icon `src` swaps). The `swapped` flag is read from `nav.mapMarkerDirectionsSwapped`. See `bird-eye-map-controls.mdc` for the state-lift and overlay wiring.
+
+The lemon "current location" pulse marker (`InteractionBoxesOverlay` `userLocation` projectable) is **hidden** while the directions panel is open — the start bubble takes its place. Outside of the directions session it remains visible as the player's current-location indicator.
+
+### Shared utility
+
+**File**: `streaming/overlays/overlayUtils.ts`
+
+`computeVideoContentRect(video)` — computes the actual content rectangle of the `<video>` element accounting for `object-fit: cover`. Used by both `InteractionBoxesOverlay` and `BirdEyeRouteOverlay` to map Kit viewport pixel coordinates to browser client coordinates.
+
+### Dev mode test buttons
+
+**File**: `features/dev/controls/submenus/NavigationSubmenu.tsx`
+
+Three buttons in the "Bird's Eye Routes" section (visible only when `currentCamera === 'bird_eye'`):
+
+| Button | Payload |
+|---|---|
+| Get directions to Foyer | `{ startPos: null, endSpawnPoint: 'PlayerSpawnPoint_Foyer' }` |
+| Get directions to seat P-35-5 | `{ startPos: null, endSeatNumber: 'P-35-5', useWaypoints: true, section: 'P' }` |
+| Clear route | Sends `birdEyeRouteClear`, clears local state |
+
+## Events summary
+
+| Event | Direction | Purpose |
+|---|---|---|
+| `birdEyeRouteRequest` | Web → Kit | Request route calculation |
+| `birdEyeRouteClear` | Web → Kit | Clear active route |
+| `navmeshRouteWaypoints` | Kit internal | Carries computed 3D path (routeId: "bird_eye") |
+| `birdEyeRouteOverlay` | Kit → Web | Projected route points + viewport size (repeating, throttled) |
+| `mapMarkerDirectionsStart` | Web → Kit | Commit FP-enter + route. Payload accepts `startSpawnPoint` / `startPos` / `startEndpointPath` (navmesh-POI swap) and `endSpawnPoint` / `endPos` / `endpointPath` / `endUseStoredFp` / `osmCoords` (outside-navmesh pin). |
+| `birdEyePinShowAtPrim` | Web → Kit | Show a flag pin at a USD prim's xform location (used by restroom / quiet-zone bird-eye sheets and Foyer/Arena map markers). Pairs with `birdEyePinDismiss` for cleanup. |
+
+## Reuse of existing services
+
+| Reused service | How it's used |
+|---|---|
+| `NavMeshRouteService.set_route_for_id` | Unified pathfinding engine (cost areas, smoothing, via-points, periodic recalc) |
+| `RouteInstance` (`route_engine/` package) | Per-route calculation, multi-segment via-point paths |
+| `douglas_peucker_indices` (RDP from navigation guide) | Polyline simplification in projector |
+| `waypoint_router.plan_route / plan_route_to_position` | Corridor waypoint graph for complex indoor routes |
+| `seat_lookup.get_seat_position` | Resolving seat number → world position |
+| Stored FP position (carb settings `lastFpPos*`) | Default start point (from camera-teleport feature) |
+| `dispatch_to_events2` (messaging core) | Kit → Web event dispatch |
+| `computeVideoContentRect` (shared overlay utility) | NDC-to-browser pixel mapping, shared with InteractionBoxesOverlay |
+
+## Tuning
+
+- **`RDP_EPSILON_CM`**: Controls route simplification. Lower = more points = more accurate path but heavier. 200cm is the current balance after iterative testing. Values tested: 600 (too simple), 200 (good), 20 (very accurate), 5 (near-raw).
+- **`UPDATE_INTERVAL_MS`**: Throttle for projection updates. 100ms keeps CPU usage low while maintaining smooth overlay tracking during camera movement.
+- **`strokeDasharray`**: CSS dash pattern on the SVG polyline. `"2 12"` = 2px dot, 12px gap (reads as individual dots with `stroke-linecap: round`).
+
+## Key files
+
+| File | Role |
+|---|---|
+| `route_engine/` | RouteConfig + RouteInstance — shared route calculation engine (see package `__init__.py`) |
+| `navmesh_route_service/` | `NavMeshRouteService` in `service.py` — multi-route manager, cost areas, event dispatch |
+| `navmesh_bake_utils.py` | Shared NavMesh baking utilities |
+| `bird_eye_route_projector/` | RDP simplification, per-frame projection, overlay dispatch (no pathfinding) |
+| `navmesh_route_extension/extension.py` | Event handlers, start/end resolution, waypoint computation, bird-eye wiring |
+| `BirdEyeRouteOverlay.tsx` + `.css` | SVG polyline rendering + endpoint bubbles |
+| `directions-icons/flag-pennant.svg` + `cu/figma-export-icons/MapPinSimpleArea.svg` | Bubble marker icons (flag for destination, dark-purple pin for start) |
+| `overlayUtils.ts` | Shared `computeVideoContentRect` utility |
+| `useControlHandlers.ts` | `BirdEyeRouteData` state |
+| `interactionHandlers.ts` | `birdEyeRouteOverlay` event handler |
+| `NavigationSubmenu.tsx` | Dev mode test buttons |
+
+## Directions panel (`MapMarkerDirectionsPanel`)
+
+The dashed bird-eye polyline is paired with a shared "Directions" sheet that lets the user choose the route's start and end (with a swap button) before committing to first-person navigation. **The same panel is reused for POI destinations (Foyer / Entrance / Arena) and seat destinations** — the panel branches on `preview.kind` (`'poi'` vs `'seat'`).
+
+### Lifecycle
+
+```
+User picks destination
+  ├─ POI:  click map-marker → `openMapMarkerDirectionsPreview`
+  └─ Seat: type seat in `SeatNavigateWidget` (bird-eye only) → `openSeatDirectionsPreview`
+        ↓ (sets `mapMarkerDirectionsPreview` in usePoiNavigation)
+Panel mounts, dashed bird-eye route drawn, bubbles at endpoints
+        ↓ user presses swap (optional) → swaps inputs, redraws polyline
+        ↓ user presses "Start navigation"
+  ├─ POI branch:  adoptPoiRouteTarget(routeKey, { primPath, endPos, displayLabel })
+  │              + `mapMarkerDirectionsStart` → Kit
+  └─ Seat branch: setActiveSeatRouteId(seatKey)
+                  + setSeatRouteSwapState({ fromSeat: swapped, displayLabel })
+                  + `seatDirectionsStart` → Kit
+        ↓ Kit fades out, switches to first-person, computes route, sends `seatDirectionsResolved`
+Panel dismissed, in-flight navigation pill shown
+```
+
+### Two paired state items per kind (must always move together)
+
+To prevent silent label/UX drift, each kind has a **single combined setter**. Never touch the underlying ref/state directly from outside the hook — go through the API so both move at once:
+
+| Kind | Combined setter | Underlying fields | What they drive |
+|---|---|---|---|
+| POI | `adoptPoiRouteTarget(routeKey, { ..., displayLabel })` | `poiRouteDisplayLabel` (state) + `lastPoiDisplayNameRef` (ref) | In-flight pill + arrival overlay text |
+| Seat | `setSeatRouteSwapState({ fromSeat, displayLabel })` / `clearSeatRouteSwapState()` | `seatRouteFromSeatRef` (ref) + `seatRouteDisplayLabel` (state) | Swap-arrival suppression + in-flight pill override |
+
+The seat ref is intentionally a `ref` (not state) because `seatHandlers.ts` (`seatTeleportResult`) and `navigationHandlers.ts` (arrival paths) need to read it synchronously at event-dispatch time without re-render delays. The POI display name is also a ref for the same reason — arrival happens synchronously in handlers.
+
+### Navmesh-POI variant (restroom / quiet zone)
+
+When a list-card item from `RestroomWidget` or `QuietZoneWidget` is opened on the bird-eye stream, the panel shows the same POI shape as Foyer / Arena but the destination is a **navmesh-resolved prim path**, not a `PlayerSpawnPoint_*`. Two extra fields thread through to make this work:
+
+| Field | Where | Meaning |
+|---|---|---|
+| `useNavmeshPoiTeleport: true` | `MapMarkerSheetData` (web) → `MapMarkerDirectionsPreview.poi` | The destination has no authored spawn point; resolve `start_pose` from the prim's xform instead. Also unlocks the swap arrow on the panel for these POIs. |
+| `endpointPath` | `mapMarkerDirectionsStart` payload (always set for navmesh POIs) | USD prim path of the POI (e.g. `/World/restroom_03`); Kit calls `UsdGeom.Xformable.ComputeLocalToWorldTransform` to derive `end_pos`. |
+| `startEndpointPath` | `mapMarkerDirectionsStart` payload (set on **swap**) | Same prim path used as the **start** when the user pressed swap; Kit derives `start_pos` from it the same way and builds `start_pose` for `_async_first_person_enter`. The "back to last FP" destination is already encoded by `endUseStoredFp`. |
+
+The forward direction (current FP → POI) does not need `start_pose` — the player is already in FP, so the FP-enter path resolves the start from stored state. The swapped direction (POI → last FP) **does** need `start_pose` because we have to teleport into the POI's location and orient toward `lastFpPos` before the polyline appears.
+
+Player-distance computation for the list itself (the per-item time/distance) uses **`/younite/player/lastFpPos*`** when bird-eye is the active camera — the bird-eye player position isn't on the navmesh, so falling back to the last known FP position keeps the prelist measurements meaningful. See `route-measurement.mdc` → "Bird-eye player ref" for the helper.
+
+A flag pin is shown immediately on sheet open via the `birdEyePinShowAtPrim` event (Web → Kit), so the user sees the destination on the map before pressing either Get-directions or Teleport. The pin lifecycle uses the same `set_pin_marker` / `birdEyePinDismiss` pipeline as the ad-hoc click pin (see `bird-eye-pin-anywhere.mdc`).
+
+**Reverse routes (POI → outdoor last-FP)** are now produced by the same symmetric `plan_route_to_position` as forward routes: the corridor router picks the best entrance to **exit** through (closest entrance to the FP destination by NavMesh distance), instead of looping out at whatever ring waypoint happens to be XZ-nearest to the FP. No payload change — this is automatic and transparent to the panel. See `waypoint-routing.mdc` → "Bidirectional endpoint selection".
+
+### Swap mode behaviour
+
+When the user swaps inputs the destination becomes the player's previously-stored FP position (carb settings `lastFpPos*`):
+
+- **POI swap (Foyer / Arena)**: the panel passes `displayLabel = t('search.directionsCurrentPosition')` to `adoptPoiRouteTarget` so the in-flight pill and arrival overlay both read "Current position" instead of the POI name. Start endpoint is the POI's `spawnPoint`, sent via `startSpawnPoint` on `mapMarkerDirectionsStart`.
+- **POI swap (navmesh POI: restroom / quiet zone)**: same display-label pattern, but the start endpoint is the POI's USD prim path sent via **`startEndpointPath`** (because there is no authored spawn point). Kit resolves the prim's xform to a world position and builds `start_pose` from it — see "Bird-eye → FP black-screen handoff" below for the body-yaw computation.
+- **Seat swap**: the panel passes `setSeatRouteSwapState({ fromSeat: true, displayLabel: t('search.directionsCurrentPosition') })`. The `fromSeat` ref tells `handleAutoMoveStatus` and `handleRouteArrival` to fire `schedulePoiArrival` (POI-style overlay) instead of `scheduleSeatArrivalCelebration` — because the player is arriving at their previous location, not at the seat. The seat is the *origin* in this case.
+
+### Strict-Mode pattern in arrival handlers
+
+Both `handleAutoMoveStatus` and `handleRouteArrival` follow this strict pattern when reading the swap ref:
+
+```ts
+const fromSeat = s.seatRouteFromSeatRef.current;   // capture ONCE
+if (reason === 'arrived') s.clearSeatRouteSwapState(); // clear OUTSIDE updater
+s.setMovingToSeatId((prev) => {
+    // ... use captured `fromSeat` (closure-stable) to branch celebration ...
+});
+```
+
+Reading + clearing the ref **outside** the functional updater is required because React Strict Mode double-invokes updaters in dev — if we mutated the ref inside, the second pass would see `false` and fire the wrong celebration. Capturing into `fromSeat` once makes both invocations agree.
+
+### Preflight check (seat only)
+
+Bird-eye seat actions (both "Get directions" and "Teleport me there") run a synchronous RPC against Kit before triggering any view-transition, because:
+
+- An invalid seat would otherwise leave the user stuck on a black "Switching to first person…" overlay forever (the executor returns silently → `viewTransitionReady` never fires).
+- The directions panel would open and then fail when Kit can't resolve the end position.
+
+The RPC is `seatTeleportFromBirdEyeCheck` → `seatTeleportFromBirdEyeCheckResult`, awaited via `requestSeatTeleportFromBirdEyeCheck()` in `seatBirdEyeTeleportRpc.ts`. Both buttons go through the same helper.
+
+### Wheelchair labels in the directions panel
+
+After the **`postprocess_wheelchair_wc_to_row6.py`** + regen pipeline, wheelchair seats use the same **section–row–seat** id shape as walking (e.g. `C-6-1`). `SeatNavigateWidget` passes that full id into `openSeatDirectionsPreview` via `t('seat.label', …)` — no special-case `WC`/`R` stripping in the widget. **`formatSeatLabel`** in `AppStream.tsx` still has a **legacy branch** for old bookmarks / stale keys shaped like `C-WC-R1` (row `WC`, seat `R`+digits): those display as "Section C, Seat 1" for continuity.
+
+### Route ready gating (bird-eye → first-person directions, FP "Get directions", and POI/quiet-zone routes)
+
+**The problem we're solving.** Before this gate existed, the moment the user pressed "Start navigation" (or "Get directions" inside FP) the panel snapped shut and the floating play FAB appeared even though Kit hadn't finished pathfinding yet. Two failure modes resulted:
+
+1. **Bird-eye → FP directions:** the black "Switching to first person…" overlay faded back in *before* the polyline was drawn, then the route popped in late — sometimes never if the path query failed.
+2. **FP "Get directions":** the FAB appeared instantly; clicking it before `lastSeatPositionRef` / `lastPoiEndPosRef` filled would silently no-op (auto-move had no `endPos` to send).
+
+**Mechanism.** `useNavmeshCore` exposes `routeReadyByRouteId: Record<string, boolean>` plus two setters: `markRouteCalculating(routeId)` (writes `false`) and `markRouteReady(routeId, ready)`. Every initiator of a user-facing route calls `markRouteCalculating` synchronously *before* sending the Kit request:
+
+| Initiator | Route id |
+|---|---|
+| `MapMarkerDirectionsPanel` "Start navigation" (POI / seat) | `poi_nav` / `seat_nav` |
+| `useSeatNavigation.handleSeatNavigate` (FP seat panel "Get directions") | `seat_nav` |
+| `usePoiNavigation.handlePoiClick` / `forceActivatePoiRoute` | `poi_nav` |
+| `useQuietZoneNavigation.handleQuietZoneClick` | `quiet_zone_nav` |
+
+Kit's `navmesh_route_extension._on_route_waypoints` relays a **`navmeshRouteReady { routeId }`** event to web whenever the underlying `navmeshRouteWaypoints` succeeds for one of `seat_nav | poi_nav | quiet_zone_nav | exit_nav`. `navigationHandlers.handleNavmeshRouteReady` calls `markRouteReady(routeId, true)`. Failure paths (`navmeshRouteError`, route arrival/teardown, `markRouteCalculating` on a fresh request) all flip the flag back to `false`.
+
+**Where the gate is enforced.** `AppUIContext` derives the `*StreamOverlayActive` flags with an extra `nav.routeReadyByRouteId[routeId] === true` clause:
+
+```ts
+const seatStreamOverlayActive =
+    !isViewer && stream.streamReady &&
+    !!nav.activeSeatRouteId &&
+    !nav.activeSeatRouteId.includes(':') &&            // exclude `unreachable:` etc
+    nav.routeReadyByRouteId['seat_nav'] === true;       // ← the gate
+
+const restroomStreamOverlayActive =
+    !isViewer && stream.streamReady &&
+    !!nav.activePoiRouteId &&
+    !(nav.mapMarkerDirectionsPreview != null && !nav.movingToPoiId) &&
+    nav.routeReadyByRouteId['poi_nav'] === true;        // ← the gate
+
+const quietStreamOverlayActive =
+    !isViewer && stream.streamReady &&
+    nav.quietZoneWidgetOpen &&
+    !!nav.activeQuietZoneRouteId &&
+    nav.routeReadyByRouteId['quiet_zone_nav'] === true; // ← the gate
+```
+
+**Net UX wins:**
+
+- The seat / restroom / quiet-zone panels **stay open** during the calculating window (their visibility is driven by widget-open state, not the overlay flag, so the panel naturally keeps showing while the FAB stays hidden).
+- The play FAB and stream nav overlay only appear once a real polyline exists, so clicking it always works.
+- `navmeshRouteError` keeps the gate closed — the panel inline-errors, no FAB ever flashes.
+
+**Bird-eye → FP black-screen handoff.** This is the dynamic counterpart on the Kit side; both `MapMarkerDirectionsHandler._run` (in `feature_commands_service/map_marker_directions.py`) and `SeatDirectionsHandler._run_directions` (in `feature_commands_service/seat_directions.py`) use it:
+
+1. They call `svc.async_first_person_enter(spawn_point, dispatch_ready=False)` — same LOD/navmesh prep as a normal FP teleport, **but `viewTransitionReady` is held back**. For POI swap / pin-anywhere / navmesh-POI (restroom / quiet zone) starts without a named spawn, the handler composes the route **first**, derives `body_yaw_deg` from the first polyline segment (`directions_utils.yaw_from_polyline`), then calls `TeleportService.teleport_to_coordinates(x, y, z, world_body_yaw_deg=yaw)` so the player lands at the route origin facing the dashed polyline. Navmesh POIs that have no `PlayerSpawnPoint_*` (restrooms / quiet zones) arrive as `startEndpointPath` on `mapMarkerDirectionsStart` and are resolved from the prim's xform before the teleport.
+2. After `seatDirectionsResolved` / `mapMarkerDirectionsStart` triggers `navmeshRouteCalculate` (with `useComposer:true` for map-marker / pin / cross-island flows), they `await svc.await_navmesh_route_settled(route_id, timeout_sec=20.0)` which resolves on the next `navmeshRouteWaypoints` event for that id (or times out / errors). The route engine's single `_compute_path()` runs `RouteComposer.compose(...)` regardless — there is no `set_route_with_preset` shortcut anymore.
+3. Only **then** do they call `svc.dispatch_view_transition_ready('firstPerson', success)` so the black overlay fades out into a scene that already has the polyline drawn.
+
+Failure handling: if pathfinding fails, the helper still dispatches `viewTransitionReady` (so the user is not stranded on the black screen) and the inline error surfaces. **The user stays in first-person — we do not roll back to bird-eye on route failure.** The character is positioned at the FP entry point with the panel-level error available; rolling back the camera would be more disorienting than leaving them where they landed.
+
+> **Anti-pattern (historic bug).** `NavigationOrchestratorService._ensure_auto_move` (in `younite.usd_viewer_player_core_extension/.../navigation_orchestrator_service.py`) flips the active route back to `"player"` on every ground click. It must clear **all** state fields the previous user route owns: `route_id`, `use_composer`, **and** `draw_path`. Forgetting `draw_path` causes the player point-click hops after a `poi_nav` / `seat_nav` / `quiet_zone_nav` route to inherit `drawPath=true` and render the sphere trail on every ground click — the regression first surfaced after the bird-eye → FP commit because that is the most common path that leaves the orchestrator with `draw_path=True`. Player point-click routes never want spheres; precalculated routes own their own `RouteInstance.draw_path` so their trails keep rendering for as long as that route is alive (intentional, "show paused route in background while exploring with point-click").
+
+> **Anti-pattern (historic bug).** Earlier iterations used `teleport_to_coordinates` for POI / pin swaps — that only writes translate, leaving the bird-eye body rotation on the player and the camera's bird-eye pitch intact. The visible symptom was "facing completely wrong" after navigating from a restroom back to last-FP. The fix was the unified `start_pose` → `teleport_to_pose` path above; do not regress to translate-only teleports for view-transition flows.
+
+> Anti-pattern: never gate the panel's mount/visibility on `routeReadyByRouteId` directly — the panel must stay visible during the calculating window. Gate the **stream overlay / FAB** layer instead, exactly like above.
+
+### FP search widgets — `RestroomWidget` / `QuietZoneWidget` vs tracking screen
+
+The CU **detail sheet** **“Get directions”** calls **`enterRestroomTrackingScreen` / `enterQuietZoneTrackingScreen`**, which sets **`restroomTrackingScreen` / `quietZoneTrackingScreen`** so the full-screen list unmounts (`return null` while tracking) and the **stream nav overlay** (play FAB, dismiss, measure) is meant to take over. That overlay is still gated on **`nav.routeReadyByRouteId['poi_nav'|'quiet_zone_nav'] === true`** (same `navmeshRouteReady` relay as above).
+
+**Historic blank-screen bug:** tapping **Get directions** *before* Kit confirms the route hid the list while **`routeReady`** stayed false — **no FAB, no panel**. Mitigations wired in the web app:
+
+- **Disable** the sheet **“Get directions”** button until the matching **`routeReadyByRouteId`** is true; expose **`title={t('search.poiWaitForRoute')}`** (`search.poiWaitForRoute` in all four locale files).
+- On **`navmeshRouteError`** for **`poi_nav`** / **`quiet_zone_nav`**, **`navigationHandlers.ts`** clears **`restroomTrackingScreen` / `quietZoneTrackingScreen`** via setters passed through **`StreamOnlyWindow`** → **`EventStateSetters`** so the list can render again.
+- Changing the active list selection or toggling the same item off resets tracking in **`usePoiNavigation`** / **`useQuietZoneNavigation`** so the user is not stuck off-widget after switching POIs.
+
+## Future refactors / known duplication
+
+These were noted during a review of the bird-eye seat directions feature; they are **pre-existing** code smells that grew slightly when the bird-eye seat directions flow was added. None are bugs — listed here so future work can consolidate them.
+
+### 1. Waypoint planning is duplicated 4 ways
+
+Same `waypoint_router` calls live in four spots with slightly different inputs:
+
+| Where | Player ref | Section? | Reverse? |
+|---|---|---|---|
+| `extension.py` `_compute_poi_waypoints` (~line 156) | `/World/PlayerCharacter` prim | no (uses `plan_route_to_position`) | no |
+| `extension.py` `_compute_bird_eye_waypoints` (~line 1103) | `/World/PlayerCharacter` prim | optional | no |
+| `extension.py` `_on_seat_navigate` (~line 528, **inline**) | `/World/PlayerCharacter` prim | yes | no |
+| `feature_commands_service/seat_directions.py` `SeatDirectionsHandler._run_directions` (**inline**) | `stored_fp_pos` (carb settings) | yes | yes (swap) |
+
+The ideal consolidation would be a `waypoint_router.plan_seat_route(player_pos_or_path, seat_pos, section, reverse=False)` helper that internally resolves the `/World/PlayerCharacter` prim if a string is passed. That removes ~30 lines of inline boilerplate from each call site and makes the swap reversal a single parameter. Touches `extension.py` (pre-existing) so left for a dedicated refactor.
+
+### 2. Seat arrival celebration logic duplicated across two handlers
+
+`handleAutoMoveStatus` (auto-move arrival) and `handleRouteArrival` (proximity arrival) in `navigationHandlers.ts` contain near-identical seat_nav blocks: same `sendMessage` cleanup, same `revertWheelchairMode`, same swap-vs-normal celebration branch, same `schedulePoiArrival` call. This duplication **predates** the bird-eye seat directions feature — the swap branch I added inherited it.
+
+A small `finalizeSeatArrival(s, { reason, fromSeat, manualNearDestination })` helper in `helpers.ts` would consolidate both blocks. Low risk because the two call sites already share the same structure.
+
+### 3. Bird-eye seat highlight comments duplicate context
+
+The block in `feature_commands_service/seat_directions.py:SeatDirectionsHandler._run_directions` and the matching note in `extension.py:_on_bird_eye_route_request` (where the highlight call was removed) both explain the same LOD-deactivation reasoning. If the seat-directions flow is ever consolidated into a single service, the explanation should live on `seat_highlight.py` (or its docstring).
+
+## Related
+
+- Waypoint routing (corridor graph): `.cursor/rules/topics/waypoint-routing.mdc`
+- NavMesh path refinement (straightening, smoothing): `.cursor/rules/topics/navmesh-path-refinement.mdc`
+- Turn-by-turn navigation (first-person guide): `.cursor/rules/topics/navigation-turn-by-turn.mdc`
+- Camera teleport (FP state capture, user location marker): `.cursor/rules/topics/camera-teleport.mdc`
+- Seat navigation (seat lookup, auto-move): `.cursor/rules/topics/seat-navigation.mdc`
+- Map markers (bird's eye overlays, same projection approach): `.cursor/rules/topics/map-markers.mdc`
+- Bird-eye map controls (drag-pan, cinematic tilt while panel open, marker icon swap): `.cursor/rules/topics/bird-eye-map-controls.mdc`
+- Bird-eye pin anywhere (focalLength zoom, click-anywhere pin, OSM bridge, multi-segment overlay — the projector's `set_osm_segment` and `MapMarkerDirectionsPreview` `pin` kind are both defined there): `.cursor/rules/topics/bird-eye-pin-anywhere.mdc`
+- Resolution streaming (viewport sync, NDC mapping): `.cursor/rules/topics/resolution-streaming.mdc`

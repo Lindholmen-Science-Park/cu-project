@@ -1,0 +1,25 @@
+[package]
+title = "Younite NavMesh Route Extension"
+description = "NavMesh shortest path / route visualization feature"
+version = "0.1.0"
+authors = ["Younite"]
+keywords = ["navmesh", "navigation", "route"]
+category = "Feature"
+
+[dependencies]
+"younite.messaging_core_extension" = {}
+"younite.usd_viewer_stage_core_extension" = {}
+"younite.osm_navigation_extension" = {}
+"younite.payload_orchestrator_core_extension" = {}
+"omni.anim.navigation.core" = {}
+"omni.usd" = {}
+
+[[python.module]]
+name = "younite.navmesh_route_extension"
+
+[build]
+include = [
+    "younite/**/*.py",
+    "*.toml",
+]
+

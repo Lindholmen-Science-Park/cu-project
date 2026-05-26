@@ -1,0 +1,85 @@
+---
+description: Camera placement extension — runtime camera creation, FPS free-look, lens control, visual markers
+globs:
+  - kit-app-template-main/source/extensions/younite.camera_placement_extension/**
+  - web-viewer-sample-main/src/features/dev/controls/UIControls.tsx
+  - web-viewer-sample-main/src/features/streaming/AppStream.tsx
+  - web-viewer-sample-main/src/features/streaming/hooks/useControlHandlers.ts
+  - web-viewer-sample-main/src/features/streaming/hooks/useEnvironmentHandlers.ts
+  - web-viewer-sample-main/src/features/streaming/hooks/useCustomEventHandler.ts
+  - web-viewer-sample-main/src/features/streaming/components/PlacementButtons.tsx
+---
+
+# Camera Placement Extension
+
+Place, rotate, and manage temporary cameras at any world location via the web UI.
+
+## Architecture
+
+**Kit extension**: `younite.camera_placement_extension` (order 1200)
+**Dependencies**: `younite.messaging_core_extension`, `omni.usd`
+**Persistence**: USD session layer only — cameras do not survive scene reload.
+
+## How it works
+
+1. User enables camera placement via hamburger menu → Cameras → "Enable Camera Placement"
+2. A floating blue "Add camera" button appears (via `PlacementButtons.tsx`)
+3. Clicking "Add camera" arms a single click; tapping the 3D scene sends a `younite.pick.request` with `intent: "cameraPlacement"`
+4. Kit creates a `UsdGeom.Camera` prim at the exact hit location under `/World/PlacedCameras/placed_cam_N` on the session layer
+5. The camera auto-orients toward the player's position (yaw only, starts level) and the viewport switches to it immediately
+6. A 20 cm blue `UsdGeom.Cube` visual marker is created at the same position; it is hidden while viewing through its own camera and shown otherwise
+
+## Rotation — FPS free-look via raw matrix
+
+Standard USD Euler ops (`rotateYXZ`, separate `rotateX`/`rotateY`) produce roll artifacts at non-zero yaw because of how OpenUSD composes rotation quaternions internally. The extension avoids all Euler ops and instead uses a single `xformOp:transform` containing a hand-built `GfMatrix4d`.
+
+The 3×3 rotation sub-matrix is the analytical product `R_X(pitch) × R_Y(yaw)` for USD's row-vector convention:
+
+```
+Row 0 (right):  ( cos(yaw),         0,    -sin(yaw)       )
+Row 1 (up):     ( sin(p)·sin(y),    cos(p), sin(p)·cos(y) )
+Row 2 (back):   ( cos(p)·sin(y),   -sin(p), cos(p)·cos(y) )
+Row 3 (pos):    ( tx,               ty,     tz              )
+```
+
+**Important**: `GfMatrix4d` in Python returns row copies on `m[i]`, so `m[0][0] = val` silently does nothing. Always use `m.SetRow(i, Gf.Vec4d(...))`.
+
+Yaw and pitch are tracked as plain Python floats per camera (`_camera_orientations` dict) — never read back from USD. Mouse deltas from the web update these values and `_write_rotation` rewrites the full matrix preserving position.
+
+## Events
+
+| Event | Direction | Payload |
+|---|---|---|
+| `cameraPlacementToggle` | web → Kit | `{ enabled: bool }` |
+| `younite.pick.result` (intent=`cameraPlacement`) | Kit → Kit | hit position used to create camera |
+| `placedCameraRotate` | web → Kit | `{ cameraId, deltaYaw, deltaPitch }` |
+| `placedCameraLens` | web → Kit | `{ cameraId, focalLength }` |
+| `placedCameraRemove` | web → Kit | `{ cameraId }` |
+| `placedCamerasSync` | Kit → web | `{ cameras: [{ id, label, primPath }] }` |
+| `fixedCameraSwitchRequest` | Kit internal | used to activate placed camera |
+| `fixedCameraExitRequest` | Kit internal | used when removing the active camera |
+| `fixedCameraStatus` | Kit → ext | triggers visual cube hide/show |
+
+## Web UI integration
+
+- **Camera list**: placed cameras appear in hamburger → Cameras → "Placed Cameras" with per-camera switch and delete (X) buttons
+- **Prev/Next bar**: placed cameras are merged into the fixed camera cycle
+- **Lens/zoom bar**: visible only when viewing a placed camera; contains `−`/`+` zoom, lens presets (Wide 12mm, Normal 24mm, Zoom 50mm, Tele 100mm), current focal length display, and a red "Remove" button
+- **Input isolation**: while viewing a placed camera, point-click navigation, OSM navigation, marker/incident placement, and player look deltas are all suppressed; only camera placement picks remain active
+
+## Visibility management
+
+- The visual marker cube for the active camera is hidden via `MakeInvisible` on the session layer
+- NavMesh debug prims (`/World/ShortestPathCurve`, `/World/NavmeshRoutes`, `/World/NavmeshCameraAreas`) are hidden when viewing a placed camera and restored on exit
+- Removing the currently-viewed camera triggers `fixedCameraExitRequest` to return to first person
+
+## Key constants
+
+| Constant | Value | Purpose |
+|---|---|---|
+| `_PLACED_CAMERAS_ROOT` | `/World/PlacedCameras` | Parent scope for all placed cameras |
+| `_HEIGHT_OFFSET` | 0.0 | Camera placed at exact hit point |
+| Cube size | 20 cm | Visual marker dimensions |
+| Focal length range | 4–200 mm | Clamped in `_set_focal_length` |
+| Pitch clamp | ±89° | Prevents gimbal lock |
+| Mouse sensitivity | 0.15 | `deltaYaw = -dx * 0.15`, `deltaPitch = -dy * 0.15` |

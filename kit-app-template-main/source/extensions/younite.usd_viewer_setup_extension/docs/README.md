@@ -1,0 +1,1 @@
+# Younite USD Viewer Setup Extension [younite.usd_viewer_setup_extension]

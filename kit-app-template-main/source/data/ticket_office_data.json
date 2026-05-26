@@ -1,0 +1,8 @@
+[
+    {
+        "_comment": "Temporary POI rows for POI coins (coin_<xform_id>_<coin_type>). Extend or replace when real content is ready.",
+        "xform_id": "ticket_office_01",
+        "in_use": true,
+        "display_name": "Ticket office"
+    }
+]

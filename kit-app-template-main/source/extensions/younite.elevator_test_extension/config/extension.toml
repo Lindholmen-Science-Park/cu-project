@@ -1,0 +1,50 @@
+[package]
+title = "Younite Elevator Test"
+description = "Composer-only elevator cab/door test UI (experimental local scene under source/data/Assets/Elevator/)"
+version = "0.1.0"
+authors = ["Younite"]
+category = "Authoring"
+
+[dependencies]
+"omni.usd" = {}
+"omni.kit.menu.utils" = {}
+
+[[python.module]]
+name = "younite.elevator_test_extension"
+
+[build]
+include = ["younite/**/*.py", "*.toml"]
+
+# Not listed in younite.usd_composer.kit dependencies — load only via:
+#   startcomposer_elevator_test.bat  (elevator_test_scene + --enable this extension)
+# Or Extension Manager / --enable younite.elevator_test_extension
+# Scene + elevator_edit.usdc live in source/data/Assets/Elevator/ (gitignored; local only).
+
+[settings.exts."younite.elevator_test_extension"]
+elevator_prim_path = "/World/elevator_edit/elevator_car"
+payload_root = "/World/elevator_edit"
+travel_axis = "z"
+floor_low = -1.26736
+floor_high = 1.74
+# Cab motion — Aalto HISSI 44733071 / KDL16 (stage Z units ≈ metres on this rig)
+rated_speed = 1.0
+inspection_speed = 0.3
+accel = 0.5
+decel = 0.5
+jerk_max = 1.0
+reduced_speed = 0.8
+approach_distance = 0.4
+use_reduced_speed_near_target = true
+stop_eps = 0.005
+start_delay_sec = 0.4
+stop_delay_sec = 0.4
+# Leveling crawl after main profile (KDL16 / Aalto: ~0.1–0.3 m/s, last few cm).
+leveling_speed = 0.2
+leveling_distance = 0.05
+# Doors — KES800 typical timings (open/close asymmetric)
+door_open_duration_sec = 1.8
+door_close_duration_sec = 2.2
+door_dwell_sec = 3.0
+# Inner doors live under elevator_car:
+# /World/elevator_edit/elevator_car/elevator_car_door_1
+# /World/elevator_edit/elevator_car/elevator_car_door_2

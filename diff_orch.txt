@@ -1,0 +1,110 @@
+commit 44f52cfeed7c419cfc67c4dc128a0659c2c63bc3
+Author: Aleksi Nokela <aleksi.nokela@younite.ai>
+Date:   Mon Mar 30 10:58:40 2026 +0200
+
+    Fix ghost route after rebake by clearing stale orchestrator endpoint, wheelchair auto-revert added when reaching endpoint, refactored how agent settings are managed
+
+diff --git a/kit-app-template-main/source/extensions/younite.navmesh_route_extension/younite/navmesh_route_extension/services/kit_services/navmesh_bake_orchestrator.py b/kit-app-template-main/source/extensions/younite.navmesh_route_extension/younite/navmesh_route_extension/services/kit_services/navmesh_bake_orchestrator.py
+index ad63010e..27126a48 100644
+--- a/kit-app-template-main/source/extensions/younite.navmesh_route_extension/younite/navmesh_route_extension/services/kit_services/navmesh_bake_orchestrator.py
++++ b/kit-app-template-main/source/extensions/younite.navmesh_route_extension/younite/navmesh_route_extension/services/kit_services/navmesh_bake_orchestrator.py
+@@ -18,6 +18,25 @@ from __future__ import annotations
+ import asyncio
+ from typing import Any, Callable, Awaitable, Dict, List, Optional, Protocol, runtime_checkable
+ 
++# Agent setting keys read from customLayerData.navmeshSettings
++_AGENT_KEYS = (
++    "agentMaxFloorSlope", "agentMaxRadius", "agentMaxStepHeight",
++    "agentMinHeight", "agentMinIslandRadius", "agentMinRadius",
++    "agentSamplingDistance",
++)
++
++# Complete wheelchair agent settings ÔÇö fully explicit, never inherits
++# from the scene defaults so the two modes can evolve independently.
++_WHEELCHAIR_SETTINGS: Dict[str, float] = {
++    "agentMaxFloorSlope": 45.0,
++    "agentMaxRadius": 50.0,
++    "agentMaxStepHeight": 5.0,
++    "agentMinHeight": 150.0,
++    "agentMinIslandRadius": 500.0,
++    "agentMinRadius": 20.0,
++    "agentSamplingDistance": 20.0,
++}
++
+ 
+ # ---------------------------------------------------------------------------
+ # Provider protocol
+@@ -71,6 +90,7 @@ class NavMeshBakeOrchestrator:
+         self._recalc_routes = recalc_routes
+         self._providers: Dict[str, NavMeshAreaProvider] = {}
+         self._bake_lock = asyncio.Lock()
++        self._scene_agent_defaults: Dict[str, float] = {}
+ 
+     # -- Provider registry --------------------------------------------------
+ 
+@@ -86,6 +106,55 @@ class NavMeshBakeOrchestrator:
+     def get_provider(self, name: str) -> Optional[NavMeshAreaProvider]:
+         return self._providers.get(name)
+ 
++    # -- Agent defaults (single source of truth) -----------------------------
++
++    def read_scene_agent_defaults(self) -> None:
++        """Read the walking-mode agent settings from the scene's customLayerData.
++
++        Called once at first bake.  The values in ``main_scene.usda``
++        ``customLayerData.navmeshSettings`` are the single source of truth
++        for the walking preset.
++        """
++        import omni.usd
++
++        ctx = omni.usd.get_context()
++        stage = ctx.get_stage() if ctx else None
++        if not stage:
++            return
++
++        root_layer = stage.GetRootLayer()
++        custom_data = root_layer.customLayerData or {}
++        nav_settings = custom_data.get("navmeshSettings", {})
++
++        defaults: Dict[str, float] = {}
++        for key in _AGENT_KEYS:
++            val = nav_settings.get(key)
++            if val is not None:
++                defaults[key] = float(val)
++
++        if defaults:
++            self._scene_agent_defaults = defaults
++            print(f"[BAKE_ORCH] Walking defaults from scene: {defaults}")
++        else:
++            print("[BAKE_ORCH] ÔÜá No agent settings found in customLayerData")
++
++    def get_agent_settings_for_mode(self, mode: str) -> Optional[Dict[str, float]]:
++        """Return the full agent settings dict for a given mode.
++
++        ``"walking"`` returns the scene defaults (from USD).
++        ``"wheelchair"`` returns ``_WHEELCHAIR_SETTINGS`` (fully explicit,
++        independent of scene defaults).
++        Returns ``None`` for unknown modes.
++        """
++        mode = mode.strip().lower()
++        if mode == "walking":
++            if not self._scene_agent_defaults:
++                self.read_scene_agent_defaults()
++            return dict(self._scene_agent_defaults)
++        if mode == "wheelchair":
++            return dict(_WHEELCHAIR_SETTINGS)
++        return None
++
+     # -- Area registration ---------------------------------------------------
+ 
+     def ensure_areas_registered(self) -> None:
+@@ -97,6 +166,9 @@ class NavMeshBakeOrchestrator:
+         be logged; it still writes them to ``customLayerData`` so that a
+         subsequent save captures them for the next session.
+         """
++        if not self._scene_agent_defaults:
++            self.read_scene_agent_defaults()
++
+         import omni.usd
+         from pxr import Gf
+ 

@@ -1,0 +1,325 @@
+---
+description: 360° video — browser-side equirectangular sphere via Three.js, iconGroup template, per-session onboarding, mount-ordering rule, optional WebVTT captions. Read when working on the Video360Overlay, adding new 360° videos, or any feature touching `video_360_*` Xforms.
+alwaysApply: false
+---
+
+# 360° Video
+
+Browser-side equirectangular 360° video player. Triggered from interactions (`video360.open`), fills the screen, plays one `.mp4`/`.webm` 360° clip at a time, and rotates the view with drag + device orientation. The Kit camera does not move while the overlay is open.
+
+Parallel to the spatial-sound overlay: same iconGroup template shape, same per-session onboarding, same caption pipeline, same drag/orientation conventions. Render path is Three.js (vs Web Audio FOA for spatial sound).
+
+---
+
+## Pipeline
+
+```
+fetch(video file)            ─┐
+  │                            ├─ <video> element (HTMLVideoElement)
+  └─ optional VTT fetch + parse ┘     │
+                                       └─ THREE.VideoTexture
+                                            │
+                                            └─ MeshBasicMaterial
+                                                 │
+                                                 └─ SphereGeometry, scale.x = -1
+                                                      (rendered from inside)
+```
+
+`useVideoSphere` owns the entire Three.js scene. `Video360Overlay` is pure UI + gesture/orientation wiring + phase management. Drag and `useDeviceOrientation` deltas call `sphere.addRotation(dYaw, dPitch)`; the rAF tick converts spherical coords into a `camera.lookAt(target)` and renders.
+
+---
+
+## Mount-ordering rule
+
+`THREE.VideoTexture` registers a `requestVideoFrameCallback` on its source `<video>` at construction time. If that video has no `src`, the callback chain never starts — setting `src` later does not repair it, and the sphere stays black.
+
+**Rule**: the sphere host `<div>` must only render after `load()` has resolved. The hook exposes `isReady` for this; `Video360Overlay` gates the host on it:
+
+```tsx
+{isReady ? (
+    <div ref={sphereHostRef} className="v360-sphere" ... />
+) : (
+    <div className="v360-loading"><span className="v360-loading-spinner" /></div>
+)}
+```
+
+On warm reopen the browser HTTP cache makes `load()` resolve in ~1 frame. On cold start the spinner covers the download.
+
+---
+
+## Phase machine
+
+```
+open → onboarding ──"Start"──▶ player ──close──▶ unmount
+        │                                 ▲
+        └─── (skipped if hasOnboarded) ───┘
+```
+
+| Phase | What renders | Notes |
+|---|---|---|
+| `onboarding` | Frosted card with `Phone360Icon`, title, description, "Start the experience" button | Shown once per `Video360Provider` lifetime. Description text changes when device orientation API is available. |
+| `player` | Sphere host (gated on `isReady`) + transient title overlay (~3 s) + bottom controls | Auto-plays the moment `phase === 'player' && isReady` is true. |
+
+Per-session onboarding is tracked on `Video360Context.hasOnboarded` (React state on the provider):
+
+- First open in a streaming session shows the onboarding card.
+- Subsequent opens within the same session land directly in `player`.
+- Survives overlay close → reopen (the provider stays mounted).
+- Resets on a full page reload (the provider re-mounts).
+- Not synced through `worldStateSync`. For cross-reload persistence use `sessionStorage`/`localStorage`.
+
+Same pattern is mirrored in `SpatialSoundContext.hasOnboarded`, independently.
+
+---
+
+## iconGroup template
+
+Single template entry in `interactions.json`:
+
+```json
+{
+  "id": "icon_video_360",
+  "interactionType": "iconGroup",
+  "scene": ["main_scene", "main_scene_light"],
+  "primNamePattern": "video_360_*",
+  "trigger": { "type": "proximity", "radiusMeters": 3, "activation": "always" },
+  "position": { "type": "xform", "positionOffset": [0, 50, 0] },
+  "iconConfig": {
+    "iconId": "vr",
+    "iconName": "VR",
+    "iconImage": "vr_avatar.svg",
+    "mediaType": "video360",
+    "iconAsset": "interaction_icons/vr.usd",
+    "videosDir": "nucleus/videos/",
+    "i18nKeyPattern": "interactions.{id}"
+  }
+}
+```
+
+Expansion: `ConfigLoader._expand_icon_group_entry` in `younite.interactions_extension/services/kit_services/config_loader/loader.py`. `mediaType: "video360"` maps to action `video360.open`. Shares the `_index_files_by_prefix` indexer with spatial sound, so the `NN_<name>.<ext>` file-naming convention and optional sidecar VTT support are identical.
+
+Per-Xform fan-out:
+
+- `primNamePattern: "video_360_*"` — fnmatch glob over leaf prim names under `/World`. Each match becomes one synthesised entry (`icon_video_360_1`, `icon_video_360_2`, …).
+- `iconAsset` — VR headset model attached to each match via session-layer override (idempotent on hot-reload). Bare Xforms in the sublayer stay free of payload boilerplate.
+- `videosDir` — directory (relative to `source/data/`) scanned for `NN_*` video files. The file whose `NN` matches the trailing digits of the prim name is bound to that spot.
+- `captionsDir` — optional; defaults to `videosDir`. Sidecar `.vtt` with the same `NN_` prefix → `captionsUrl` on the synthesised iconConfig.
+- `i18nKeyPattern` — `{id}` is replaced with `icon_<primName>`, so `video_360_1` → `interactions.icon_video_360_1.{greeting,title,subtitle,videoTitle}`.
+
+---
+
+## Authoring a new 360° video
+
+1. Drop the `.mp4` (or `.webm`) into `kit-app-template-main/source/data/nucleus/videos/`. Filename must start with `NN_` where `NN` is the unique numeric prefix (e.g. `2_horseshow_pitch.mp4`). Equirectangular projection (2:1 aspect ratio) required.
+2. Add an empty `Xform` named `video_360_NN` to `kit-app-template-main/source/data/scenes/sublayers/video_360_locations_layer.usda` at the world position. Trailing number must match the video prefix exactly (current convention uses no leading zeros: `video_360_1`, `video_360_2`).
+3. Add a per-location i18n block to all four locale files (`en.json`, `sv.json`, `fr.json`, `es.json`) under `interactions.icon_video_360_NN` with `greeting`, `title`, `subtitle`, `videoTitle`. `videoTitle` is displayed in the transient title overlay (`title` is fallback).
+4. Optional: drop a `NN_<name>.vtt` next to the video (same `NN` prefix) for closed captions.
+5. Done — no `interactions.json` edit. The single `icon_video_360` template auto-discovers the new Xform on next stage load.
+
+Video and optional `.vtt` are resolved via the Vite `@nucleus-videos` glob on the frontend — no extra config.
+
+---
+
+## Dev Media Admin panel (streaming dev mode)
+
+In **dev mode**, **Tools → Media content admin** opens a registry that merges:
+
+- `NN_*` clips from `nucleus/videos/` (Vite `@nucleus-videos` glob),
+- matching `/World` Xforms returned by Kit (`devMediaRegistryRequest` / `devMediaRegistryResponse`),
+- Kit-expanded interaction rows (`interactionPointsSync`),
+- i18n copy from all four `web-viewer-sample-main/src/i18n/locales/*.json` files (gap detection).
+
+Use it to spot **orphans** (video without Xform, Xform without video, or missing locale keys). **Save via Kit** merges strings into the matching `web-viewer-sample-main/src/i18n/locales/{locale}.json` on disk (Kit must resolve the repo layout next to `interactions.json`). Use **Export JSON** when you prefer to merge by hand.
+
+**Media theme**: `worldStateSync.mediaContentTheme` (default `horseshow`) filters `iconGroup` entries by optional `contentThemes` in `interactions.json`. The dev panel sends `mediaContentThemeSet` to Kit. Add a second template (e.g. hockey clips + `video_360_hk_*` prims) with `"contentThemes": ["hockey"]` when that pack is ready.
+
+---
+
+## i18n strings
+
+| Scope | Path | Notes |
+|---|---|---|
+| Fixed (overlay chrome) | `video360.label`, `video360.captions.{showCaptions,hideCaptions}`, `video360.onboarding.{title,description,descriptionDesktop,startButton}` | Same text for every 360° experience |
+| Fixed (bubble label) | `video360.watchButton` | Templated `"Watch 360° video: {{title}}"`. Rendered by `IconBubbleOverlay` when `cfg.mediaType === 'video360'`; `{{title}}` filled with `t(cfg.videoTitle) \|\| t(cfg.title)`. |
+| Per-location | `interactions.icon_video_360_NN.{greeting,title,subtitle,videoTitle}` | Synthesised by the iconGroup expander; `videoTitle` is the canonical display string |
+
+Keep all four locales in sync — every key referenced by the synthesised entries must resolve in `en/sv/fr/es.json`.
+
+**Rendering rule (transient title overlay)**: `Video360Overlay` displays `t(entry.videoTitle) || t(entry.title)` under the fixed `video360.label`. Both fields arrive as i18n keys, not literal text — the overlay translates them. Don't pre-resolve them upstream.
+
+---
+
+## Captions
+
+- Sidecar `NN_<name>.vtt` next to the video. The expander indexes audio+video extensions and `.vtt` separately so they don't collide.
+- `captionsUrl` flows through the `video360.open` payload → `Video360Entry.captionsUrl` → `useVideoSphere.load(url, captionsUrl?)`.
+- The hook fetches and parses in parallel with the video metadata wait. The rAF tick updates `activeCueText` via `findActiveCue` (shared with spatial sound — same `parseVtt.ts`).
+- CC button states: no VTT → disabled, VTT + on → active, VTT + off → outline.
+- **Caption size** — same Figma steps and `VideoBookSettingsContext.captionSizeIndex` as the videobook: `data-caption-size` on `.v360-captions` in `Video360Overlay.tsx` (typography: `Video360Overlay.css` / `.v360-caption-line`). See `video-playback.mdc` § Caption size.
+
+Translated captions: per-locale subfolder convention (e.g. `nucleus/videos/captions/en/1_horseshow_entre.vtt`), resolved at expansion time. The `captionsUrl` plumbing is already locale-agnostic.
+
+---
+
+## Rotation
+
+Drag (`handleDragMove`) and `useDeviceOrientation` deltas both feed `sphere.addRotation(dYaw, dPitch)`. The hook clamps pitch to `±89°` (no pole flips), accumulates yaw freely, and per rAF tick computes:
+
+```
+target = (sin(yaw) * cos(pitch),  sin(pitch),  -cos(yaw) * cos(pitch))
+camera.lookAt(target)
+```
+
+**Drag sign convention**: dragging right pans the world left ("grab and pull"). If a device-orientation axis feels inverted, negate the corresponding delta in the consumer (`Video360Overlay.handleDragMove` or the `useDeviceOrientation` wrapper) — the rotation math in `useVideoSphere` is the canonical convention.
+
+**Kit camera lock** (two mechanisms while the overlay is open):
+
+1. `Video360Overlay` sends `movementInputControl: { enabled: false }` on mount and restores on unmount.
+2. `useDeviceOrientation` is called with `{ suppressKitDispatch: true }` — device-tilt deltas drive only the sphere, never `touchLookDelta` to Kit.
+
+Drag goes straight to the sphere only (the overlay doesn't dispatch `touchLookDelta`).
+
+### Player teleport to the trigger Xform pose
+
+When the overlay enters its `player` phase (after onboarding "Start" or on direct mount when already onboarded), the Kit player is **teleported** to the trigger Xform's authored translate + body yaw. For 360° video the equirectangular sphere covers the viewport once it mounts so the teleport mostly matters at close: the user lands back in the world standing exactly where they were before opening the clip — same location, same head direction — with no visible interpolation.
+
+```
+Video360Overlay or Video360Context (skip-onboarding fast path)
+  → sendMessage('playerEnterXformView', { primPath })
+    → Kit IncomingMessageBridge → Events 2.0 'playerEnterXformView'
+      → CameraService.enter_xform_view(primPath)
+          (saves player pose, teleports to xform pose,
+           dispatches xformViewCameraReady ack)
+
+Video360Overlay unmount cleanup
+  → sendMessage('playerExitXformView', {})
+    → CameraService.exit_xform_view()
+        (restores saved translate + body yaw + camera local yaw/pitch)
+```
+
+The mechanism — including the rationale for teleport-instead-of-camera-switch and the use of `read_authored_world_transform` to skip the iconGroup spin-loop's session-layer overrides — is **shared verbatim with `SpatialSoundOverlay`**. See `spatial-audio.mdc` § "Player teleport to the trigger Xform pose" for the full pipeline, gating contract, and historical context. The two overlays use the same Kit events (`playerEnterXformView` / `playerExitXformView` / `xformViewCameraReady`) and the same `xformViewCameraChannel` for ack-gating overlay mount on the teleport landing.
+
+Convention: forward = local **−Z** (USD), same axis `marker_service._show_direction_line` uses for the dev arrow — what the author sees the arrow point at in the USD-edit visualizer is exactly where the player will face after the teleport. To re-aim a clip, rotate the `video_360_NN` Xform in `video_360_locations_layer.usda` rather than adding offsets in code.
+
+---
+
+## State flow
+
+```
+Kit                              Web
+────                             ────
+interaction triggered            ChatContext registers `video360.open` handler
+  → video360.open(payload)       → video360.open({ id, videoUrl, videoTitle, ... })
+                                       │
+                                 Video360Context
+                                  ├─ entry: Video360Entry            ← payload
+                                  ├─ isOpen: boolean                 ← derived (entry !== null)
+                                  ├─ hasOnboarded: boolean           ← per-session flag
+                                  ├─ open(entry) / close()
+                                  └─ markOnboarded()
+                                       │
+                                 Video360Overlay (renders when isOpen)
+                                  ├─ phase = hasOnboarded ? player : onboarding
+                                  ├─ load() → isReady
+                                  └─ on phase===player && isReady → mount sphere + play
+```
+
+`Video360Context` lives in `web-viewer-sample-main/src/features/streaming/contexts/Video360Context.tsx`, provided in `StreamOnlyWindow.tsx` between `ControlProvider` and `ChatProvider`. See `react-contexts.mdc` for the full provider hierarchy.
+
+Anything reacting to the overlay being open reads `useVideo360().isOpen` directly — not through `useControl()`.
+
+---
+
+## Hide-the-icon side effect
+
+When the overlay opens, `ChatContext` sends `avatarPrim.hide` for the bound icon prim and `npcMarkers.hide` for the marker overlay:
+
+```ts
+useEffect(() => {
+    if (!stream.streamReady || !video360.isOpen) return;
+    const primPath = video360.entry?.primPath;
+    if (!primPath) return;
+    sendMessage('avatarPrim.hide', { primPath });
+    sendMessage('npcMarkers.hide', {});
+    return () => {
+        sendMessage('avatarPrim.show', { primPath });
+        sendMessage('npcMarkers.show', {});
+    };
+}, [video360.isOpen, video360.entry?.primPath, stream.streamReady]);
+```
+
+Keeps the VR headset model from poking through the onboarding card and from being visible behind the sphere during playback.
+
+---
+
+## Layer hygiene
+
+A given `video_360_NN` Xform must be defined in **exactly one** layer — `video_360_locations_layer.usda`. Authoring the same prim in `usd_edits.usda` or any stronger sublayer will silently win composition and override the position. Symptom: VR headset spawns at one elevation while the projectable arrows render at another. Search every sublayer for the prim name first if this divergence appears. Same convention as spatial sound.
+
+---
+
+## Lifecycle
+
+- One renderer/scene per overlay open. The Three.js renderer, scene, mesh, geometry, material, texture, and `<video>` element are all torn down on overlay close (`useEffect` cleanup in `useVideoSphere`). On reopen everything is rebuilt from scratch.
+- Pixel ratio is set from `window.devicePixelRatio` on mount. No dynamic resolution scaling — tweak in `useVideoSphere.mount()` if a low-end device struggles.
+- `texture.colorSpace = THREE.SRGBColorSpace` is the only colour pipeline knob. Source videos authored in sRGB.
+- Sphere geometry is `SphereGeometry(500, 60, 40)` — radius arbitrary (camera at origin), tessellation is enough that pole distortion isn't visibly faceted.
+
+---
+
+## Extending
+
+### Add a new 360° video
+See "Authoring a new 360° video" above. No code changes.
+
+### Title overlay dwell time
+`TITLE_OVERLAY_HOLD_MS` constant in `Video360Overlay.tsx`.
+
+### Drag sensitivity
+`DRAG_SENSITIVITY` constant (degrees per CSS pixel) in `Video360Overlay.tsx`.
+
+### Persist `hasOnboarded` across page reloads
+Add `sessionStorage.getItem/setItem` in `Video360Context`'s `useState` initialiser and `markOnboarded`. Don't route through `worldStateSync`.
+
+### Render captions in a different position
+Use `.v360-captions` in `Video360Overlay.css` for position and `bottom` / `--with-controls` offsets. The short-viewport media query tweaks padding and spacing only; **font sizes** follow the same caption tokens as the videobook in all viewports (see `video-playback.mdc` § Caption size).
+
+### Non-equirect projection (cubemap, fisheye, etc.)
+Replace the `SphereGeometry` + `MeshBasicMaterial` block in `useVideoSphere.mount()`. `VideoTexture` itself is projection-agnostic. Cubemap source → `THREE.CubeTexture` + skybox material + custom UVs for the strip/tile layout.
+
+---
+
+## Key files
+
+| File | Purpose |
+|---|---|
+| `web-viewer-sample-main/src/features/streaming/overlays/video360/useVideoSphere.ts` | Three.js scene + `<video>` ownership; exposes `isReady`, `mount`, `load`, `play`, `pause`, `seek`, `addRotation`, caption fields. Header comment documents the mount-ordering rule. |
+| `web-viewer-sample-main/src/features/streaming/overlays/video360/Video360Overlay.tsx` | Phase machine, gesture/orientation wiring, transient title overlay, bottom controls, sphere host gated on `isReady`. |
+| `web-viewer-sample-main/src/features/streaming/overlays/video360/Video360Overlay.css` | `.v360-sphere`, `.v360-loading`, `.v360-title-overlay`, `.v360-captions`, onboarding card. |
+| `web-viewer-sample-main/src/features/streaming/contexts/Video360Context.tsx` | Provider + hook; owns `entry`, `isOpen`, `hasOnboarded`. |
+| `web-viewer-sample-main/src/features/streaming/contexts/index.ts` | Barrel export. |
+| `web-viewer-sample-main/src/features/streaming/contexts/ChatContext.tsx` | Registers `video360.open` interaction action; hides icon prim + map markers while overlay is open. |
+| `web-viewer-sample-main/src/features/streaming/overlays/iconBubble/IconBubbleOverlay.tsx` | Renders the "Watch 360° video: …" bubble for `mediaType === 'video360'`; suppresses itself when `video360.isOpen`. |
+| `web-viewer-sample-main/src/features/streaming/overlays/spatialSound/parseVtt.ts` | Shared with spatial sound — minimal WebVTT parser + binary-search active-cue lookup. |
+| `web-viewer-sample-main/src/features/streaming/SharedOverlayLayer.tsx` | Mounts `<Video360Overlay />` alongside the other shared overlays. |
+| `web-viewer-sample-main/src/features/streaming/StreamOnlyWindow.tsx` | Nests `Video360Provider` between `ControlProvider` and `ChatProvider`. |
+| `web-viewer-sample-main/vite.config.ts` | `@nucleus-videos` alias → `kit-app-template-main/source/data/nucleus/videos/`. |
+| `kit-app-template-main/source/data/scenes/sublayers/video_360_locations_layer.usda` | Canonical home for `video_360_NN` Xforms. |
+| `kit-app-template-main/source/data/scenes/main_scene.usda` | Registers the locations sublayer. |
+| `kit-app-template-main/source/data/interactions.json` | `icon_video_360` iconGroup template; optional `contentThemes` filters by `mediaContentTheme`. |
+| `kit-app-template-main/source/extensions/younite.interactions_extension/younite/interactions_extension/services/kit_services/config_loader/loader.py` | `_expand_icon_group_entry`: `mediaType: "video360"` → `video360.open`; `contentThemes` gate; injects `videoTitle` i18n key. |
+| `kit-app-template-main/source/extensions/younite.usd_viewer_stage_core_extension/.../services/kit_services/camera_service.py` | `enter_xform_view()` / `exit_xform_view()` — teleports the player to the marker pose for the overlay session and restores their original pose on close (shared with spatial sound). See `spatial-audio.mdc` for the full pipeline. |
+| `web-viewer-sample-main/src/features/streaming/overlays/xformViewCameraChannel.ts` | Kit→web ack channel for `xformViewCameraReady`; `Video360Context.open()` and `Video360Overlay.handleStartExperience` await it before mounting the overlay. |
+| `web-viewer-sample-main/src/features/dev/mediaAdmin/MediaAdminPanel.tsx` | Dev registry UI (360 + spatial sound tabs, theme, Kit save/export). |
+| `kit-app-template-main/source/data/nucleus/videos/` | Video storage (`NN_<name>.{mp4,webm,mov}` + optional `NN_<name>.vtt`). |
+| `web-viewer-sample-main/src/i18n/locales/{en,sv,fr,es}.json` | `video360.*` chrome keys + `interactions.icon_video_360_NN.*` per-location keys. |
+
+---
+
+## Related topics
+
+- **Spatial audio** (sibling overlay; same iconGroup template, same per-session onboarding, same caption pipeline) → `spatial-audio.mdc`
+- **Interactions framework** (iconGroup expansion, projectable overlays, action registry) → `interactions.mdc`
+- **React Contexts** (provider hierarchy, where `Video360Provider` sits) → `react-contexts.mdc`
+- **Localization** (i18n key conventions for interactions) → `localization.mdc`
+- **USD sublayers** (where `video_360_locations_layer.usda` slots in) → `sublayers.mdc`

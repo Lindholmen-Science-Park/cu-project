@@ -1,0 +1,56 @@
+---
+description: Sound NavMesh areas — fixed-size radial zones, raycasting, cost sliders, bake orchestrator integration
+---
+
+# Sound NavMesh Areas
+
+Fixed-size radial ground-following zones around `sound_location_*` prims. Sliders control NavMesh cost scoring only (higher cost = harder to walk through), not area size.
+
+**Extension**: `younite.sound_area_extension` (order 1200)
+**Area script**: `younite.sound_area_extension/.../scripts/sound_navmesh_areas.py`
+**Orchestrator provider**: `SoundAreaProvider` in `navmesh_bake_orchestrator.py`
+**Scene data**: `sound_location_01`–`sound_location_04` Xforms in `sublayers/sound_location_layer.usda`; area defs (27–30) in `main_scene.usda` → `customLayerData.navmeshSettings.areas`
+
+## How it works
+
+1. **Discover** `sound_location_*` Xform prims under `/World`.
+2. **Ground probe**: downward raycast from 3 m above the xform to find floor Y.
+3. **Radial wall scan** (`_radial_wall_scan`): 72 horizontal rays (5° steps) from 1.5 m above ground:
+   - Wall hit → boundary = hit distance minus 5 cm inset.
+   - Miss → boundary = `FIXED_RADIUS` (557.5 cm ≈ 5.6 m).
+4. **Floor-edge clipping**: if no walkable floor under boundary point (normal Y < 0.7 or no hit within 30 cm), binary-search inward (6 steps) to find the floor edge. Prevents areas from flowing over ledges, balconies, and arena seating.
+5. **Mesh**: flat triangle-fan polygon on the navigation sublayer with `NavMeshAreaAPI`, `nav:area = "<loc_name>_area"`, upward normals, 0.5 cm above ground. Unique emissive material per location.
+
+## Key constants (`sound_navmesh_areas.py`)
+
+| Constant | Value | Purpose |
+|----------|-------|---------|
+| `FIXED_RADIUS` | 557.5 cm | Preset area size for all locations |
+| `RAY_HEIGHT` | 150 cm | Ray origin height above ground |
+| `NUM_H_RAYS` | 72 | Angular resolution (5° per step) |
+| `WALL_INSET` | 5 cm | Pull boundary away from wall face |
+| `FLOOR_TOLERANCE` | 30 cm | Max gap for floor detection |
+| `MIN_FLOOR_NORMAL_Y` | 0.7 | Surface must face upward to count as floor |
+| `CLIFF_SEARCH_STEPS` | 6 | Binary-search iterations for floor edge |
+
+## Frontend integration
+
+Sound controls live in a dedicated **Sound** submenu in the hamburger menu.
+
+- **Show Sound Areas**: `showSoundAreasRequest { visible }` → `SoundAreaProvider.set_show_areas()`.
+- **Sound → Pathfinding**: `soundDataCalcToggle { active }` → `SoundAreaProvider.set_active()` + orchestrator rebake.
+- **Per-area cost**: `soundAreaCostUpdate { areaName, cost }` → `NavMeshRouteService.update_sound_area_costs()`. Query-time only; no rebake. Frontend debounce 150 ms.
+- **Cost widget**: `SoundCostWidget` in `StreamOnlyWindow.tsx` — sliders range 1–15, same pattern as `CameraPathfindingWidget`.
+- Area names: `<loc_prim_name>_area` (e.g. `sound_location_01_area`).
+
+## Extension architecture
+
+- `sound_area_extension/extension.py` — thin bootstrap; only handles `younite.player.ready` to sync location names to web via `soundLocationsSync`.
+- All area visibility, pathfinding toggles, and cost updates are handled by `navmesh_route_extension` via `SoundAreaProvider` and event handlers.
+- `soundDataCalcStatus` registered as outbound event in `messaging_core_extension`.
+
+## Related
+
+- NavMesh area mechanics: `.cursor/rules/topics/navmesh-areas.mdc`
+- Bake orchestrator + provider protocol: `.cursor/rules/topics/bake-orchestrator.mdc`
+- Camera areas (same pattern): `.cursor/rules/topics/camera_navmesh_areas.mdc`

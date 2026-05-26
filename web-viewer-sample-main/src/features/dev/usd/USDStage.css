@@ -1,0 +1,51 @@
+/* USD Stage styles placeholder (copied from original) */
+.usdStageContainer {
+    position: absolute;
+    right: 0;
+    width: 300px;
+    top: 155px;
+    bottom: 0;
+    background-color: #FEFEFE;
+    color: #656565;
+    overflow: auto;
+}
+
+.usdStageHeader {
+    margin-left: 30px;
+    margin-top: 15px;
+    font-size: 25px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-right: 20px;
+}
+
+.list-container {
+    list-style: none;
+    padding: 0 20px 20px 20px;
+}
+
+.list-item {
+    margin: 6px 0;
+}
+
+.item-content {
+    cursor: pointer;
+    padding: 6px 8px;
+    border-radius: 6px;
+}
+
+.item-content.selected {
+    background-color: rgba(118, 185, 0, 0.15);
+}
+
+.expand-toggle {
+    margin-right: 8px;
+}
+
+.nested-list {
+    list-style: none;
+    padding-left: 16px;
+}
+
+

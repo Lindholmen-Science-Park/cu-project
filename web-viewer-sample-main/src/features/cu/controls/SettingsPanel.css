@@ -1,0 +1,1998 @@
+/* Settings — Figma 2026-APRIL-DEMO: frame 390×1081, token --Beige, blur 12.5px */
+.cu-settings-frost {
+    position: fixed;
+    inset: 0;
+    z-index: 10052;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    min-height: 100dvh;
+    font-family: Lexend, system-ui, sans-serif;
+    background: var(--Beige, #eae7e5);
+    backdrop-filter: blur(12.5px);
+    -webkit-backdrop-filter: blur(12.5px);
+    animation: cu-fadeIn 0.22s ease;
+}
+
+/* Inherit Lexend for controls (UA often uses system UI on range/button) */
+.cu-settings-frost input,
+.cu-settings-frost button,
+.cu-settings-frost select,
+.cu-settings-frost textarea {
+    font-family: inherit;
+}
+
+/* 3D world tab — same shell; cards stay 390px max in stack */
+.cu-settings-frost--world3d-tab {
+    background: var(--Beige, #eae7e5);
+    backdrop-filter: blur(12.5px);
+    -webkit-backdrop-filter: blur(12.5px);
+}
+
+/* Title row + tab row (stacked; tabs match Figma tablist layout) */
+.cu-settings-header-bar {
+    flex-shrink: 0;
+    padding: 40px var(--page-edge-right) 12px var(--page-edge-left);
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+}
+
+.cu-settings-header-inner {
+    width: 100%;
+    max-width: min(390px, var(--page-max-width-gutter));
+    margin-left: auto;
+    margin-right: auto;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    box-sizing: border-box;
+}
+
+/* Tabs — General | Preferences | 3D world (Figma: flex, 24px gap, stretch) */
+.cu-settings-tabs-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+    max-width: min(390px, var(--page-max-width-gutter));
+    margin: 8px auto 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+.cu-settings-tabs {
+    display: flex;
+    align-items: stretch;
+    align-self: stretch;
+    flex-wrap: wrap;
+    gap: 24px;
+}
+
+/* Shrink-to-fit width = label width; stretch keeps row height even (avoids wavy baseline from font-weight) */
+.cu-settings-tab {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0;
+    padding: 12px 0 13px;
+    border: none;
+    box-sizing: border-box;
+    background: none;
+    font-family: Lexend, system-ui, sans-serif;
+    font-size: 16px;
+    font-weight: 500;
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+    color: #aea6ce;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: color 0.15s ease;
+}
+
+.cu-settings-tab:hover:not(.cu-settings-tab--active) {
+    color: #7c6fb0;
+}
+
+.cu-settings-tab--active {
+    color: var(--Dark-Purple, #351a84);
+    font-weight: 600;
+}
+
+/* Active tab: text-width underline only (no full-width separator above content) */
+.cu-settings-tab--active::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 2px;
+    border-radius: 0;
+    background: var(--Dark-Purple, #351a84);
+    pointer-events: none;
+    z-index: 1;
+}
+
+.cu-settings-tab:focus {
+    outline: none;
+}
+
+.cu-settings-tab:focus-visible {
+    border-radius: 6px;
+    outline: 2px solid var(--Dark-Purple, #351a84);
+    outline-offset: 2px;
+}
+
+/* Same height as 44px close button for optical alignment */
+.cu-settings-header-bar .cu-settings-page-title {
+    margin: 0;
+    flex: 1 1 auto;
+    min-width: 0;
+    text-align: start;
+    font-family: Lexend, system-ui, sans-serif;
+    font-size: 20px;
+    font-weight: 600;
+    line-height: 44px;
+    letter-spacing: -0.03em;
+    color: var(--Dark-Purple, #351a84);
+}
+
+/* Same button as main menu hamburger (no .open = three bars) */
+.cu-settings-header-bar .cu-settings-header-hamburger {
+    position: relative;
+    top: auto;
+    right: auto;
+    flex-shrink: 0;
+    color: var(--Dark-Purple, #351a84);
+}
+
+.cu-settings-frost-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    /* Scrollbar hidden; content can use full width to the padded right edge */
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    padding: 0 var(--page-edge-right) 40px var(--page-edge-left);
+    box-sizing: border-box;
+}
+
+.cu-settings-frost-body::-webkit-scrollbar {
+    display: none;
+}
+
+.cu-settings-stack {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 16px;
+    width: 100%;
+    max-width: min(390px, var(--page-max-width-gutter));
+    margin-left: auto;
+    margin-right: auto;
+    flex: 1 1 auto;
+    min-height: 0;
+    box-sizing: border-box;
+}
+
+.cu-settings-stack--world3d {
+    max-width: 390px;
+}
+
+.cu-settings-sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* —— Preferences tab: “I prefer” / “I want to avoid” (Figma glass + grids) —— */
+.cu-settings-section--prefs {
+    width: 100%;
+    align-self: stretch;
+}
+
+.cu-settings-prefs-root {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    width: 100%;
+    max-width: 390px;
+    margin-left: auto;
+    margin-right: auto;
+    box-sizing: border-box;
+}
+
+.cu-settings-prefs-glass {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    align-self: stretch;
+    gap: 16px;
+    width: 100%;
+    max-width: 390px;
+    padding: 24px 16px;
+    box-sizing: border-box;
+    border-radius: 24px;
+    border: 1px solid rgba(33, 23, 64, 0.3);
+    background: var(--Off-white, #f6f6f6);
+}
+
+.cu-settings-prefs-glass .cu-settings-prefs-section-title {
+    margin: 0;
+}
+
+.cu-settings-prefs-section-title {
+    margin: 0 0 12px;
+    font-family: Lexend, system-ui, sans-serif;
+    font-size: 18px;
+    font-weight: 600;
+    line-height: 22px;
+    letter-spacing: -0.02em;
+    color: var(--Dark-Purple, #351a84);
+    text-align: start;
+}
+
+.cu-settings-prefs-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+    width: 100%;
+}
+
+.cu-settings-prefs-grid--avoid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.cu-settings-prefs-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 104px;
+    padding: 10px 6px;
+    border-radius: 16px;
+    border: 1.5px solid transparent;
+    background: #ffffff;
+    cursor: pointer;
+    font-family: Lexend, system-ui, sans-serif;
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1.2;
+    letter-spacing: -0.01em;
+    text-align: center;
+    color: var(--Dark-Purple, #351a84);
+    -webkit-tap-highlight-color: transparent;
+    transition:
+        background 0.18s ease,
+        border-color 0.18s ease,
+        color 0.18s ease,
+        box-shadow 0.18s ease;
+}
+
+.cu-settings-prefs-card:focus {
+    outline: none;
+}
+
+.cu-settings-prefs-card:focus-visible {
+    outline: 2px solid var(--Dark-Purple, #351a84);
+    outline-offset: 2px;
+}
+
+/* Prefer — default tile + selected fill */
+.cu-settings-prefs-card--prefer {
+    box-sizing: border-box;
+    width: 98px;
+    height: 112px;
+    padding: 16px 8px;
+    border-radius: 8px;
+}
+
+.cu-settings-prefs-card--prefer:not(.cu-settings-prefs-card--selected) {
+    background: transparent;
+    border: 1px solid #22c55e;
+    box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.25);
+}
+
+/* Prefer — selected (pressed): livedata green fill + dark green border */
+.cu-settings-prefs-card--prefer.cu-settings-prefs-card--selected {
+    background: var(--Livedata-Green---DARK, #77fb9a);
+    border: 1px solid var(--Dark-green-Data, #17c48b);
+    color: var(--Dark-Purple, #351a84);
+    box-shadow: none;
+}
+
+.cu-settings-prefs-card--prefer.cu-settings-prefs-card--selected .cu-settings-prefs-card-icon-img {
+    filter: none;
+}
+
+/* Avoid — same tile size as prefer; unpressed transparent + pink frame */
+.cu-settings-prefs-card--avoid {
+    box-sizing: border-box;
+    width: 98px;
+    height: 112px;
+    padding: 16px 8px;
+    border-radius: 8px;
+}
+
+.cu-settings-prefs-card--avoid:not(.cu-settings-prefs-card--selected) {
+    background: transparent;
+    border: 1px solid #f472b6;
+    box-shadow: 0 0 0 1px rgba(244, 114, 182, 0.35);
+}
+
+/* Avoid — pressed: light red fill + livedata red border */
+.cu-settings-prefs-card--avoid.cu-settings-prefs-card--selected {
+    background: var(--Secondary-colours-Light-red, #ffafb9);
+    border: 1px solid var(--Livedata-RED---LIGHT, #fa0043);
+    color: var(--Dark-Purple, #351a84);
+    box-shadow: none;
+}
+
+.cu-settings-prefs-card--avoid.cu-settings-prefs-card--selected .cu-settings-prefs-card-icon-img {
+    filter: none;
+}
+
+.cu-settings-prefs-card-icon-img {
+    flex-shrink: 0;
+    width: 40px;
+    height: 40px;
+    object-fit: contain;
+    display: block;
+}
+
+.cu-settings-prefs-card--selected .cu-settings-prefs-card-icon-img {
+    filter: brightness(0) invert(1);
+}
+
+.cu-settings-prefs-card-label {
+    display: block;
+    max-width: 100%;
+    word-wrap: break-word;
+    hyphens: auto;
+}
+
+.cu-settings-card-title {
+    margin: 0 0 4px;
+    font-family: Lexend, system-ui, sans-serif;
+    font-size: 18px;
+    font-weight: 500;
+    line-height: 22px;
+    color: var(--Dark-Purple, #351a84);
+}
+
+/* Row — container: Medium Purple as light fill, Dark Purple text */
+.cu-settings-item {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: 16px;
+    row-gap: 8px;
+    padding: 16px 18px;
+    border-radius: 18px;
+    box-sizing: border-box;
+    /* Fallback without color-mix */
+    background: #ebe7f6;
+    background: color-mix(in srgb, var(--Medium-Purple, #5421cc) 14%, #ffffff);
+    border: 1px solid color-mix(in srgb, var(--Medium-Purple, #5421cc) 32%, #ffffff);
+    box-shadow: 0 1px 3px rgba(53, 26, 132, 0.07);
+}
+
+/* Tabpanel wrapper — creates the vertical gap between setting cards */
+.cu-settings-tab-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    width: 100%;
+}
+
+#cu-settings-panel-general,
+#cu-settings-panel-preferences {
+    padding-bottom: 40px;
+    box-sizing: border-box;
+}
+
+/* Settings section — container */
+.cu-settings-section {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+    flex: 0 0 auto;
+    box-sizing: border-box;
+}
+
+
+/* Title + switch inside same rounded host */
+.cu-settings-switch-host-title {
+    margin: 0 0 -8px;
+    width: 100%;
+    text-align: start;
+    flex-shrink: 0;
+    font-family: Lexend, system-ui, sans-serif;
+}
+
+/* Global card — Off-white, full column width */
+.cu-settings-switch-host {
+    display: flex;
+    width: 100%;
+    max-width: 100%;
+    padding: 24px 16px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 24px;
+    flex: 0 0 auto;
+    align-self: stretch;
+    box-sizing: border-box;
+    border-radius: 24px;
+    border: 1px solid rgba(33, 23, 64, 0.3);
+    background: var(--Off-white, #f6f6f6);
+}
+
+/* Global card: 16px between section title and theme switch */
+.cu-settings-switch-host--global {
+    gap: 16px;
+}
+
+/* Visual card: full 24px from title to “Size” row (default title margin -8px would shrink gap) */
+.cu-settings-switch-host--visual .cu-settings-switch-host-title {
+    margin: 0;
+}
+
+/* Audio card: 24px from “Audio settings” to Volume block; host gap 24px between Volume / Environment / Sound effects */
+.cu-settings-switch-host--audio {
+    gap: 24px;
+}
+
+.cu-settings-switch-host--audio .cu-settings-switch-host-title {
+    margin: 0;
+}
+
+#cu-settings-grp-audio {
+    align-self: stretch;
+    margin: 0;
+    color: var(--Dark-Purple, #351A84);
+    font-family: Lexend, system-ui, sans-serif;
+    font-size: 20px;
+    font-style: normal;
+    font-weight: 500;
+    line-height: 115%;
+}
+
+/* Global: 24px between theme switch and language trigger (Figma) */
+.cu-settings-global-theme-lang {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    align-self: stretch;
+    width: 100%;
+    gap: 24px;
+}
+
+/* Wide theme switch only — do not target compact OFF/ON row switches */
+.cu-settings-switch-host .cu-settings-switch--theme {
+    align-self: stretch;
+    width: 100%;
+    min-width: 0;
+    height: 52px;
+    padding: 6px;
+    background: #ebe7f6;
+    background: color-mix(in srgb, var(--Medium-Purple, #5421cc) 20%, #ffffff);
+    border-color: rgba(33, 23, 64, 0.22);
+}
+
+.cu-settings-switch-host .cu-settings-switch--theme .cu-settings-switch-highlight {
+    top: 6px;
+    bottom: 6px;
+    left: 6px;
+    width: calc(50% - 6px);
+}
+
+.cu-settings-switch-host .cu-settings-switch--theme.cu-settings-switch--on .cu-settings-switch-highlight {
+    left: calc(50%);
+}
+
+/* Unselected segment */
+.cu-settings-switch-host .cu-settings-switch--theme .cu-settings-switch-seg {
+    font-family: Lexend, system-ui, sans-serif;
+    font-size: 17px;
+    font-weight: 500;
+    line-height: 20px;
+    letter-spacing: 0;
+    color: var(--Dark-Purple, #351a84);
+}
+
+.cu-settings-switch-host .cu-settings-switch--theme .cu-settings-switch-seg-icon {
+    width: 20px;
+    height: 20px;
+}
+
+/* Selected side (highlight): Dark Purple, text Off White */
+.cu-settings-switch-host .cu-settings-switch--theme .cu-settings-switch-highlight,
+.cu-settings-switch-host .cu-settings-switch--theme.cu-settings-switch--on .cu-settings-switch-highlight {
+    background: var(--Dark-Purple, #351a84);
+    box-shadow: 0 1px 4px rgba(33, 23, 64, 0.25);
+}
+
+.cu-settings-switch-host .cu-settings-switch--theme:not(.cu-settings-switch--on) .cu-settings-switch-seg:nth-child(2) {
+    color: var(--Off-white, #f6f6f6);
+}
+
+.cu-settings-switch-host .cu-settings-switch--theme.cu-settings-switch--on .cu-settings-switch-seg:nth-child(3) {
+    color: var(--Off-white, #f6f6f6);
+}
+
+.cu-settings-switch-seg--rich {
+    flex-direction: row;
+    gap: 6px;
+    letter-spacing: 0.02em;
+}
+
+.cu-settings-switch-seg-icon {
+    flex-shrink: 0;
+    display: block;
+}
+
+.cu-settings-switch-seg-text {
+    white-space: nowrap;
+}
+
+.cu-settings-item-text {
+    min-width: 0;
+    justify-self: stretch;
+    text-align: start;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.cu-settings-item-trail {
+    justify-self: end;
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: flex-end;
+}
+
+.cu-settings-item-label {
+    font-family: Lexend, system-ui, sans-serif;
+    font-size: 16px;
+    font-weight: 500;
+    line-height: 1.25;
+    color: var(--Dark-Purple, #351a84);
+}
+
+.cu-settings-item-desc {
+    font-family: Lexend, system-ui, sans-serif;
+    font-size: 13px;
+    font-weight: 400;
+    line-height: 1.35;
+    /* Dark Purple (#351a84), secondary row */
+    color: #dbd8ea;
+}
+
+/* Compact pill with no inner OFF/ON copy (state is in .cu-settings-toggle-row-state) */
+.cu-settings-switch--no-seg-text .cu-settings-switch-seg--blank {
+    font-size: 0;
+    line-height: 0;
+    overflow: hidden;
+    color: transparent;
+}
+
+/* OFF / ON segmented toggle */
+.cu-settings-switch {
+    position: relative;
+    display: flex;
+    flex-shrink: 0;
+    align-items: stretch;
+    width: 80px;
+    height: 32px;
+    margin: 0;
+    padding: 3px;
+    border: 1px solid rgba(33, 23, 64, 0.22);
+    border-radius: 999px;
+    background: rgba(53, 26, 132, 0.08);
+    cursor: pointer;
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.cu-settings-switch:focus {
+    outline: none;
+}
+
+.cu-settings-switch:focus-visible {
+    outline: 2px solid var(--Dark-Purple, #351a84);
+    outline-offset: 3px;
+}
+
+.cu-settings-switch-highlight {
+    position: absolute;
+    top: 3px;
+    bottom: 3px;
+    left: 3px;
+    width: 37px;
+    border-radius: 999px;
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(33, 23, 64, 0.12);
+    transition:
+        left 0.22s cubic-bezier(0.25, 0.8, 0.25, 1),
+        background 0.2s ease,
+        box-shadow 0.2s ease;
+    pointer-events: none;
+    z-index: 0;
+}
+
+.cu-settings-switch--on .cu-settings-switch-highlight {
+    left: 40px;
+    background: var(--Lemon, #dcff7d);
+    box-shadow: 0 1px 4px rgba(33, 23, 64, 0.14);
+}
+
+.cu-settings-switch-seg {
+    position: relative;
+    z-index: 1;
+    flex: 1 1 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 0;
+    font-family: Lexend, system-ui, sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    color: #8278b0;
+    transition: color 0.2s ease;
+    user-select: none;
+}
+
+/* 2 = OFF, 3 = ON (1 = highlight span) */
+.cu-settings-switch:not(.cu-settings-switch--on) .cu-settings-switch-seg:nth-child(2) {
+    color: var(--Dark-Purple, #351a84);
+}
+
+.cu-settings-switch--on .cu-settings-switch-seg:nth-child(3) {
+    color: var(--Dark-Purple, #351a84);
+}
+
+/* About — collapsible disclosure widget in Settings */
+.cu-settings-about-host {
+    gap: 0;
+    padding: 0;
+    overflow: hidden;
+}
+
+.cu-settings-about-trigger {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    width: 100%;
+    margin: 0;
+    padding: 20px 20px;
+    box-sizing: border-box;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    font-family: Lexend, system-ui, sans-serif;
+    font-size: 18px;
+    font-weight: 500;
+    line-height: 22px;
+    color: var(--Dark-Purple, #351a84);
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.15s ease;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.cu-settings-about-trigger:hover {
+    background: rgba(53, 26, 132, 0.04);
+}
+
+.cu-settings-about-trigger:focus {
+    outline: none;
+}
+
+.cu-settings-about-trigger:focus-visible {
+    outline: 2px solid var(--Dark-Purple, #351a84);
+    outline-offset: -2px;
+    border-radius: 24px;
+}
+
+.cu-settings-about-trigger-label {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.cu-settings-about-caret {
+    flex-shrink: 0;
+    display: block;
+    color: #aea6ce;
+    transition: transform 0.22s ease;
+}
+
+.cu-settings-about-caret--open {
+    transform: rotate(180deg);
+}
+
+.cu-settings-about-body {
+    padding: 12px 20px 20px;
+    box-sizing: border-box;
+    animation: cu-settings-about-reveal 0.2s ease;
+}
+
+@keyframes cu-settings-about-reveal {
+    from {
+        opacity: 0;
+        transform: translateY(-4px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.cu-settings-about-list {
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.cu-settings-about-row {
+    display: flex;
+    flex-direction: row;
+    align-items: baseline;
+    gap: 8px;
+}
+
+.cu-settings-about-dt {
+    font-family: Lexend, system-ui, sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 1.3;
+    color: #aea6ce;
+}
+
+.cu-settings-about-dd {
+    margin: 0;
+    font-family: Lexend, system-ui, sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.3;
+    color: var(--Dark-Purple, #351a84);
+}
+
+/* Labeled OFF | ON row + compact switch — OFF: white row, ON: light purple (:has switch state) */
+.cu-settings-toggle-row {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    min-width: 0;
+    padding: 14px 16px;
+    box-sizing: border-box;
+    border-radius: 16px;
+    background: #ffffff;
+    border: 1px solid var(--Dark-Purple, #351a84);
+    transition:
+        background 0.18s ease,
+        border-color 0.18s ease;
+}
+
+.cu-settings-toggle-row:has(.cu-settings-track-switch--on) {
+    background: #ffffff;
+    border: 1px solid var(--Dark-Purple, #351a84);
+}
+
+.cu-settings-toggle-row-label {
+    margin-right: auto;
+    font-family: Lexend, system-ui, sans-serif;
+    font-size: 16px;
+    font-weight: 500;
+    line-height: 1.25;
+    color: var(--Dark-Purple, #351a84);
+    text-align: start;
+}
+
+.cu-settings-toggle-row-state {
+    font-family: Lexend, system-ui, sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    color: var(--Dark-Purple, #351a84);
+    flex-shrink: 0;
+}
+
+/* Figma track switch: OFF = light purple track + dark thumb; ON = dark track + white thumb */
+.cu-settings-track-switch {
+    position: relative;
+    width: 57px;
+    height: 31px;
+    flex-shrink: 0;
+    padding: 0;
+    border: none;
+    border-radius: 0;
+    cursor: pointer;
+    background: transparent url('../../../icons/settings/slider-switch.svg') center / contain no-repeat;
+    -webkit-tap-highlight-color: transparent;
+    transition: transform 0.2s ease;
+}
+
+.cu-settings-track-switch--on {
+    transform: scaleX(-1);
+}
+
+.cu-settings-track-switch-thumb {
+    display: none;
+}
+
+.cu-settings-track-switch:focus {
+    outline: none;
+}
+
+.cu-settings-track-switch:focus-visible {
+    outline: 2px solid var(--Dark-Purple, #351a84);
+    outline-offset: 3px;
+}
+
+/* Sliders — text size & environment volume */
+.cu-settings-slider-block {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 100%;
+}
+
+/* Font size & volume: 12px between label row and track row */
+.cu-settings-slider-block:has(> .cu-settings-slider-rail--text-size),
+.cu-settings-slider-block:has(> .cu-settings-slider-rail--volume) {
+    gap: 12px;
+}
+
+.cu-settings-slider-block--disabled {
+    opacity: 0.45;
+    pointer-events: none;
+}
+
+.cu-settings-slider-label-row {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+}
+
+.cu-settings-slider-label {
+    font-family: Lexend, system-ui, sans-serif;
+    font-size: 17px;
+    font-style: normal;
+    font-weight: 500;
+    line-height: 20px;
+    color: var(--Dark-Purple, #351a84);
+}
+
+.cu-settings-slider-rail {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    min-width: 0;
+}
+
+.cu-settings-slider-icon-a {
+    font-family: Lexend, system-ui, sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--Dark-Purple, #351a84);
+    flex-shrink: 0;
+    line-height: 1;
+}
+
+.cu-settings-slider-icon-a--lg {
+    font-size: 18px;
+}
+
+.cu-settings-volume-icon {
+    width: 24px;
+    height: 24px;
+    flex-shrink: 0;
+    aspect-ratio: 1 / 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--Dark-Purple, #351a84);
+}
+
+.cu-settings-volume-icon svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+/* Visual settings — text size: endpoint dots under track (Tick.svg) */
+.cu-settings-env-track-dot-wrap {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 8px;
+    color: var(--Dark-Purple, #351a84);
+}
+
+.cu-settings-slider-rail--text-size {
+    display: grid;
+    grid-template-columns: auto 238px auto;
+    grid-template-rows: auto auto;
+    align-items: center;
+    column-gap: 10px;
+    row-gap: 9px;
+}
+
+.cu-settings-slider-rail--text-size .cu-settings-slider-icon-a--track-start {
+    grid-column: 1;
+    grid-row: 1;
+    width: 32px;
+    flex-shrink: 0;
+    color: var(--Dark-Purple, #351a84);
+    text-align: center;
+    font-family: Lexend, system-ui, sans-serif;
+    font-size: 17px;
+    font-style: normal;
+    font-weight: 500;
+    line-height: 20px;
+}
+
+.cu-settings-slider-rail--text-size .cu-settings-range--text-size {
+    grid-column: 2;
+    grid-row: 1;
+    width: 238px;
+    min-width: 238px;
+    max-width: 238px;
+    height: 6px;
+    flex: none;
+    border-radius: 3px;
+    background: transparent;
+}
+
+.cu-settings-slider-rail--volume .cu-settings-range--volume {
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 6px;
+    border-radius: 3px;
+    background: transparent;
+}
+
+.cu-settings-slider-rail--text-size .cu-settings-range--text-size::-webkit-slider-runnable-track,
+.cu-settings-slider-rail--volume .cu-settings-range--volume::-webkit-slider-runnable-track {
+    height: 6px;
+    border-radius: 3px;
+    background: #d8cfff;
+}
+
+.cu-settings-slider-rail--text-size .cu-settings-range--text-size::-webkit-slider-thumb,
+.cu-settings-slider-rail--volume .cu-settings-range--volume::-webkit-slider-thumb {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 27px;
+    height: 27px;
+    border-radius: 50%;
+    background: var(--Medium-Purple, #5421cc);
+    box-shadow: none;
+    filter: drop-shadow(0 4px 4px rgba(0, 0, 0, 0.25));
+    cursor: pointer;
+    margin-top: -10.5px;
+}
+
+.cu-settings-slider-rail--text-size .cu-settings-range--text-size::-moz-range-thumb,
+.cu-settings-slider-rail--volume .cu-settings-range--volume::-moz-range-thumb {
+    width: 27px;
+    height: 27px;
+    border: none;
+    border-radius: 50%;
+    background: var(--Medium-Purple, #5421cc);
+    box-shadow: none;
+    filter: drop-shadow(0 4px 4px rgba(0, 0, 0, 0.25));
+    cursor: pointer;
+}
+
+.cu-settings-slider-rail--text-size .cu-settings-range--text-size::-moz-range-track,
+.cu-settings-slider-rail--volume .cu-settings-range--volume::-moz-range-track {
+    height: 6px;
+    border-radius: 3px;
+    background: #d8cfff;
+}
+
+.cu-settings-slider-rail--text-size .cu-settings-slider-icon-a--track-end {
+    grid-column: 3;
+    grid-row: 1;
+    width: 32px;
+    flex-shrink: 0;
+    box-sizing: border-box;
+    color: var(--Dark-Purple, #351a84);
+    text-align: center;
+    font-family: Lexend, system-ui, sans-serif;
+    font-size: 24px;
+    font-style: normal;
+    font-weight: 500;
+    line-height: 110%;
+}
+
+.cu-settings-slider-rail--text-size .cu-settings-env-track-dots {
+    grid-column: 2;
+    grid-row: 2;
+    align-self: start;
+    display: flex;
+    width: 100%;
+    min-width: 0;
+    height: 8px;
+    margin-top: -8px;
+    padding: 0 10px;
+    justify-content: space-between;
+    align-items: center;
+    box-sizing: border-box;
+}
+
+.cu-settings-range {
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 8px;
+    margin: 0;
+    border-radius: 999px;
+    appearance: none;
+    -webkit-appearance: none;
+    background: color-mix(in srgb, var(--Medium-Purple, #5421cc) 18%, #ffffff);
+    cursor: pointer;
+}
+
+.cu-settings-range:focus {
+    outline: none;
+}
+
+.cu-settings-range:focus-visible {
+    outline: 2px solid var(--Dark-Purple, #351a84);
+    outline-offset: 3px;
+}
+
+.cu-settings-range::-webkit-slider-thumb {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--Dark-Purple, #351a84);
+    box-shadow: 0 1px 4px rgba(33, 23, 64, 0.25);
+    cursor: pointer;
+    margin-top: -8px;
+}
+
+.cu-settings-range::-webkit-slider-runnable-track {
+    height: 8px;
+    border-radius: 999px;
+    background: transparent;
+}
+
+.cu-settings-range::-moz-range-thumb {
+    width: 24px;
+    height: 24px;
+    border: none;
+    border-radius: 50%;
+    background: var(--Dark-Purple, #351a84);
+    box-shadow: 0 1px 4px rgba(33, 23, 64, 0.25);
+    cursor: pointer;
+}
+
+.cu-settings-range::-moz-range-track {
+    height: 8px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--Medium-Purple, #5421cc) 18%, #ffffff);
+}
+
+/* —— 3D world tab (Figma: cards, icon rows, camera slider, crowd row) —— */
+.cu-settings-section--world3d {
+    width: 100%;
+    align-self: stretch;
+    padding-bottom: 40px;
+    box-sizing: border-box;
+}
+
+.cu-settings-world3d {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    width: 100%;
+}
+
+.cu-settings-world3d-card {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    align-self: stretch;
+    gap: 8px;
+    width: 100%;
+    padding: 24px 16px;
+    box-sizing: border-box;
+    border-radius: 24px;
+    border: 1px solid rgba(33, 23, 64, 0.3);
+    background: var(--Off-white, #f6f6f6);
+}
+
+.cu-settings-world3d-card > * {
+    width: 100%;
+    box-sizing: border-box;
+}
+
+/* Time of day: 24px under title; 12px between slider row and tick labels */
+.cu-settings-world3d-card--time-of-day {
+    gap: 24px;
+}
+
+.cu-settings-world3d-card--camera-height {
+    gap: 24px;
+}
+
+/* Camera height row (layout only; range uses .cu-settings-world3d-range like the rest of this panel) */
+.cu-settings-world3d-camera-slider-block {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    width: 100%;
+}
+
+.cu-settings-world3d-camera-slider-row {
+    display: flex;
+    justify-content: center;
+    padding: 0;
+    width: 100%;
+}
+
+.cu-settings-world3d-camera-slider-rail {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 16px;
+    width: 100%;
+    max-width: 326px;
+    margin-inline: auto;
+    border-radius: 0 0 1px 0;
+}
+
+/* Center end icons on the 35px track row only (middle column also contains tick labels). */
+.cu-settings-world3d-camera-slider-rail > .cu-settings-world3d-camera-end-icon {
+    margin-top: calc((35px - 28px) / 2);
+}
+
+/* Match CameraHeightIcon* default 40×24 — the prior ~24×23 box + contain shrank the art */
+.cu-settings-world3d-camera-end-icon {
+    width: 28px;
+    height: 28px;
+    flex-shrink: 0;
+    display: block;
+    object-fit: contain;
+    opacity: 1;
+    transform: rotate(0deg);
+    pointer-events: none;
+    user-select: none;
+}
+
+.cu-settings-world3d-camera-end-icon--left {
+    width: 28px;
+    height: 28px;
+}
+
+.cu-settings-world3d-camera-end-icon--right {
+    width: 28px;
+    height: 28px;
+}
+
+.cu-settings-world3d-camera-track-wrap {
+    position: relative;
+    flex: 1 1 auto;
+    min-width: 230px;
+    width: auto;
+    max-width: none;
+    margin: 0;
+    padding: 0;
+    height: 35px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Same idea as the time-of-day row: visible line is the SVG; kill Firefox’s filled segment */
+.cu-settings-world3d-camera-track-wrap .cu-settings-world3d-range::-moz-range-progress {
+    background-color: transparent;
+}
+
+.cu-settings-world3d-camera-track-wrap .cu-settings-world3d-track-bg {
+    width: 100%;
+    max-width: 100%;
+}
+
+/* Middle column: track + tick labels share width */
+.cu-settings-world3d-camera-track-column {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.cu-settings-world3d-camera-track-column > .cu-settings-world3d-camera-track-wrap {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+}
+
+/* Display: 24px title → toggles; toggle stack uses same 24px between rows */
+.cu-settings-world3d-card--display {
+    gap: 24px;
+}
+
+.cu-settings-world3d-card--exploring-mode {
+    gap: 24px;
+}
+
+.cu-settings-world3d-time-slider-stack {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    align-self: stretch;
+    gap: 12px;
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+}
+
+/* H2-20 / Lexend: 3D world settings card headings (e.g. Display, Camera height) */
+h3.cu-settings-world3d-card-title,
+.cu-settings-world3d-card-title {
+    align-self: stretch;
+    margin: 0;
+    padding: 0;
+    border: none;
+    font-family: Lexend, system-ui, sans-serif;
+    font-size: 20px;
+    font-style: normal;
+    font-weight: 500;
+    line-height: 115%;
+    color: var(--Dark-Purple, #351A84);
+    text-align: start;
+}
+
+.cu-settings-world3d-row {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 0;
+    width: 100%;
+    padding: 12px 14px;
+    box-sizing: border-box;
+    border-radius: 16px;
+    background: #d9d4f9;
+}
+
+.cu-settings-world3d-row + .cu-settings-world3d-row {
+    margin-top: 10px;
+}
+
+.cu-settings-world3d-row-label {
+    flex-shrink: 0;
+    font-family: Lexend, system-ui, sans-serif;
+    font-size: 15px;
+    font-weight: 500;
+    line-height: 1.2;
+    color: var(--Dark-Purple, #351a84);
+}
+
+.cu-settings-world3d-icon-group {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.cu-settings-world3d-icon-group--seasons {
+    gap: 6px;
+}
+
+.cu-settings-world3d-icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    background: color-mix(in srgb, var(--Medium-Purple, #5421cc) 14%, #ffffff);
+    box-shadow: inset 0 0 0 1px rgba(33, 23, 64, 0.06);
+    -webkit-tap-highlight-color: transparent;
+    transition:
+        background 0.18s ease,
+        box-shadow 0.18s ease,
+        transform 0.1s ease;
+}
+
+.cu-settings-world3d-icon-btn:focus {
+    outline: none;
+}
+
+.cu-settings-world3d-icon-btn:focus-visible {
+    outline: 2px solid var(--Dark-Purple, #351a84);
+    outline-offset: 2px;
+}
+
+.cu-settings-world3d-icon-btn--active {
+    background: var(--Dark-Purple, #351a84);
+    box-shadow: inset 0 0 0 1px rgba(33, 23, 64, 0.15);
+}
+
+.cu-settings-world3d-icon-btn-img {
+    display: block;
+    object-fit: contain;
+    pointer-events: none;
+}
+
+.cu-settings-world3d-icon-btn--active .cu-settings-world3d-icon-btn-img {
+    filter: brightness(0) invert(1);
+}
+
+.cu-settings-world3d-slider-block {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    min-width: 0;
+}
+
+.cu-settings-world3d-slider-block--time-of-day {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 16px;
+    width: 100%;
+    max-width: 326px;
+    margin-inline: auto;
+    border-radius: 0 0 1px 0;
+}
+
+/* Sun/moon: align to 35px track row (column below adds tick labels). */
+.cu-settings-world3d-slider-block--time-of-day > .cu-settings-world3d-time-icon {
+    margin-top: calc((35px - 28px) / 2);
+}
+
+.cu-settings-world3d-eye {
+    flex-shrink: 0;
+    display: block;
+    object-fit: contain;
+}
+
+.cu-settings-world3d-slider-rail {
+    position: relative;
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 35px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Track surface only (column also uses .cu-settings-world3d-slider-rail--time-of-day for flex sizing). */
+.cu-settings-world3d-slider-rail-inner-time {
+    position: relative;
+    height: 35px;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.cu-settings-world3d-time-track-column {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+}
+
+.cu-settings-world3d-time-track-column.cu-settings-world3d-slider-rail--time-of-day {
+    height: auto;
+    min-height: 0;
+}
+
+.cu-settings-world3d-slider-rail--time-of-day .cu-settings-world3d-track-bg,
+.cu-settings-world3d-slider-rail--time-of-day .cu-settings-world3d-range {
+    max-width: 230px;
+}
+
+.cu-settings-world3d-slider-rail--time-of-day {
+    flex: 0 0 230px;
+    width: 230px;
+    min-width: 230px;
+    max-width: 230px;
+    margin: 0;
+    padding: 0;
+}
+
+.cu-settings-world3d-slider-block--time-of-day .cu-settings-world3d-slider-rail--time-of-day {
+    flex: 1 1 auto;
+    width: auto;
+    min-width: 230px;
+    max-width: none;
+}
+
+.cu-settings-world3d-slider-block--time-of-day .cu-settings-world3d-track-bg,
+.cu-settings-world3d-slider-block--time-of-day .cu-settings-world3d-range {
+    width: 100%;
+    max-width: 100%;
+}
+
+.cu-settings-world3d-track-bg {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 100%;
+    max-width: 230px;
+    margin: 0;
+    height: auto;
+    pointer-events: none;
+    user-select: none;
+}
+
+.cu-settings-world3d-range {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: 230px;
+    margin: 0;
+    height: 35px;
+    padding: 0;
+    background: transparent;
+    cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+}
+
+.cu-settings-world3d-range:focus {
+    outline: none;
+}
+
+.cu-settings-world3d-range:focus-visible {
+    outline: 2px solid var(--Dark-Purple, #351a84);
+    outline-offset: 4px;
+    border-radius: 8px;
+}
+
+.cu-settings-world3d-range::-webkit-slider-runnable-track {
+    height: 6px;
+    border-radius: 3px;
+    background: transparent;
+}
+
+/* Time + camera: identical thumb. Do NOT use background:url() on ::-webkit-slider-thumb;
+   Chrome can paint a smaller disc than the box when the thumb is image-backed. */
+
+.cu-settings-world3d-range::-webkit-slider-thumb {
+    appearance: none;
+    -webkit-appearance: none;
+    box-sizing: border-box;
+    width: 24px;
+    height: 24px;
+    min-width: 24px;
+    min-height: 24px;
+    padding: 0;
+    margin-top: -9px;
+    border: none;
+    border-radius: 40px;
+    opacity: 1;
+    transform: none;
+    cursor: pointer;
+    background-color: var(--Dark-Purple, #351a84);
+    background-image: none;
+    filter: drop-shadow(0 4px 4px rgba(0, 0, 0, 0.25));
+}
+
+.cu-settings-world3d-range::-moz-range-track {
+    height: 6px;
+    border-radius: 3px;
+    background: transparent;
+}
+
+.cu-settings-world3d-range::-moz-range-thumb {
+    box-sizing: border-box;
+    width: 24px;
+    height: 24px;
+    min-width: 24px;
+    min-height: 24px;
+    padding: 0;
+    border: none;
+    border-radius: 40px;
+    opacity: 1;
+    transform: none;
+    cursor: pointer;
+    background-color: var(--Dark-Purple, #351a84);
+    background-image: none;
+    filter: drop-shadow(0 4px 4px rgba(0, 0, 0, 0.25));
+}
+
+#cu-w3d-camera-height-slider {
+    width: 100%;
+    max-width: 100%;
+}
+
+.cu-settings-world3d-time-icon {
+    width: 28px;
+    height: 28px;
+    flex-shrink: 0;
+    display: block;
+    object-fit: contain;
+    color: var(--Dark-Purple, #351a84);
+}
+
+.cu-settings-world3d-time-icon--moon {
+    flex-shrink: 0;
+}
+
+.cu-settings-world3d-toggle-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    width: 100%;
+}
+
+.cu-settings-world3d-explore {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    align-self: stretch;
+    gap: 8px;
+    width: 100%;
+    padding: 8px;
+    box-sizing: border-box;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--Medium-Purple, #5421cc) 18%, #ffffff);
+    border: 1px solid rgba(33, 23, 64, 0.1);
+}
+
+.cu-settings-world3d-explore-btn {
+    flex: 1 1 50%;
+    display: inline-flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 48px;
+    padding: 10px 14px;
+    border: none;
+    border-radius: 999px;
+    cursor: pointer;
+    font-family: Lexend, system-ui, sans-serif;
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 1.2;
+    color: var(--Dark-Purple, #351a84);
+    background: transparent;
+    -webkit-tap-highlight-color: transparent;
+    transition:
+        background 0.18s ease,
+        color 0.18s ease;
+}
+
+.cu-settings-world3d-explore-btn:focus {
+    outline: none;
+}
+
+.cu-settings-world3d-explore-btn:focus-visible {
+    outline: 2px solid var(--Dark-Purple, #351a84);
+    outline-offset: 2px;
+}
+
+.cu-settings-world3d-explore-btn--active {
+    background: var(--Dark-Purple, #351a84);
+    color: var(--Off-white, #f6f6f6);
+}
+
+.cu-settings-world3d-explore-btn--active .cu-settings-world3d-explore-btn-icon {
+    filter: brightness(0) invert(1);
+}
+
+.cu-settings-world3d-explore-btn-icon {
+    flex-shrink: 0;
+    display: block;
+    object-fit: contain;
+}
+
+.cu-settings-world3d-explore-btn-label {
+    text-align: center;
+}
+
+/* Preferences / 3D world placeholder */
+.cu-settings-placeholder-card {
+    gap: 16px;
+}
+
+.cu-settings-placeholder-text {
+    margin: 0;
+    font-family: Lexend, system-ui, sans-serif;
+    font-size: 15px;
+    font-weight: 400;
+    line-height: 1.45;
+    color: #66607a;
+}
+
+.cu-settings-world3d-cta {
+    align-self: flex-start;
+    margin-top: 4px;
+    padding: 12px 20px;
+    border-radius: 80px;
+    border: 1px solid var(--Dark-Purple, #351a84);
+    background: color-mix(in srgb, var(--Medium-Purple, #5421cc) 12%, #ffffff);
+    font-family: Lexend, system-ui, sans-serif;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--Dark-Purple, #351a84);
+    cursor: pointer;
+    transition: background 0.15s ease, transform 0.1s ease;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.cu-settings-world3d-cta:hover {
+    background: color-mix(in srgb, var(--Medium-Purple, #5421cc) 22%, #ffffff);
+}
+
+.cu-settings-world3d-cta:focus {
+    outline: none;
+}
+
+.cu-settings-world3d-cta:focus-visible {
+    outline: 2px solid var(--Dark-Purple, #351a84);
+    outline-offset: 3px;
+}
+
+/* Settings Dark mode variant */
+.cu-settings-frost--dark {
+    background: rgba(24, 17, 48, 0.62);
+    backdrop-filter: blur(12.5px);
+    -webkit-backdrop-filter: blur(12.5px);
+}
+
+.cu-settings-frost--dark .cu-settings-page-title,
+.cu-settings-frost--dark .cu-settings-card-title {
+    color: var(--Off-white, #f6f6f6);
+}
+
+.cu-settings-frost--dark .cu-settings-prefs-glass {
+    border-color: rgba(236, 228, 255, 0.2);
+    background: linear-gradient(180deg, rgba(33, 23, 64, 0) 0%, rgba(33, 23, 64, 0.2) 100%);
+}
+
+.cu-settings-frost--dark .cu-settings-prefs-section-title {
+    color: var(--Off-white, #f6f6f6);
+}
+
+.cu-settings-frost--dark .cu-settings-prefs-card:not(.cu-settings-prefs-card--selected) {
+    background: rgba(255, 255, 255, 0.96);
+    color: var(--Dark-Purple, #351a84);
+}
+
+.cu-settings-frost--dark .cu-settings-prefs-card--prefer:not(.cu-settings-prefs-card--selected) {
+    background: transparent;
+}
+
+.cu-settings-frost--dark .cu-settings-prefs-card--avoid:not(.cu-settings-prefs-card--selected) {
+    background: transparent;
+}
+
+.cu-settings-frost--dark .cu-settings-prefs-card--avoid.cu-settings-prefs-card--selected {
+    background: var(--Secondary-colours-Light-red, #ffafb9);
+    border-color: var(--Livedata-RED---LIGHT, #fa0043);
+    color: var(--Dark-Purple, #351a84);
+}
+
+.cu-settings-frost--dark .cu-settings-prefs-card--prefer.cu-settings-prefs-card--selected {
+    background: var(--Livedata-Green---DARK, #77fb9a);
+    border-color: var(--Dark-green-Data, #17c48b);
+    color: var(--Dark-Purple, #351a84);
+}
+
+.cu-settings-frost--dark .cu-settings-prefs-card:not(.cu-settings-prefs-card--selected) .cu-settings-prefs-card-icon-img {
+    filter: none;
+}
+
+.cu-settings-frost--dark .cu-settings-switch-host {
+    border-color: rgba(236, 228, 255, 0.28);
+    background: linear-gradient(180deg, rgba(65, 36, 148, 0.9) 0%, rgba(45, 24, 107, 0.92) 100%);
+    box-shadow: 0 10px 30px rgba(8, 5, 18, 0.35);
+}
+
+.cu-settings-frost--dark .cu-settings-switch-host .cu-settings-switch--theme {
+    border-color: rgba(236, 228, 255, 0.28);
+    background: color-mix(in srgb, var(--Dark-Purple, #351a84) 72%, #ffffff);
+}
+
+.cu-settings-frost--dark .cu-settings-switch-host .cu-settings-switch--theme .cu-settings-switch-seg {
+    color: #b8afe0;
+}
+
+.cu-settings-frost--dark .cu-settings-switch-host .cu-settings-switch--theme .cu-settings-switch-highlight,
+.cu-settings-frost--dark .cu-settings-switch-host .cu-settings-switch--theme.cu-settings-switch--on .cu-settings-switch-highlight {
+    background: var(--Off-white, #f6f6f6);
+    box-shadow: 0 1px 5px rgba(9, 6, 20, 0.24);
+}
+
+.cu-settings-frost--dark .cu-settings-switch-host .cu-settings-switch--theme:not(.cu-settings-switch--on) .cu-settings-switch-seg:nth-child(2),
+.cu-settings-frost--dark .cu-settings-switch-host .cu-settings-switch--theme.cu-settings-switch--on .cu-settings-switch-seg:nth-child(3) {
+    color: var(--Dark-Purple, #351a84);
+}
+
+/* About — dark mode */
+.cu-settings-frost--dark .cu-settings-about-host {
+    border-color: rgba(236, 228, 255, 0.28);
+    background: linear-gradient(180deg, rgba(65, 36, 148, 0.9) 0%, rgba(45, 24, 107, 0.92) 100%);
+    box-shadow: 0 10px 30px rgba(8, 5, 18, 0.35);
+}
+
+.cu-settings-frost--dark .cu-settings-about-trigger {
+    color: var(--Off-white, #f6f6f6);
+}
+
+.cu-settings-frost--dark .cu-settings-about-trigger:hover {
+    background: rgba(246, 246, 246, 0.06);
+}
+
+.cu-settings-frost--dark .cu-settings-about-caret {
+    color: var(--Off-white, #f6f6f6);
+}
+
+.cu-settings-frost--dark .cu-settings-about-dt {
+    color: #9f93c2;
+}
+
+.cu-settings-frost--dark .cu-settings-about-dd {
+    color: var(--Off-white, #f6f6f6);
+}
+
+.cu-settings-frost--dark .cu-settings-tab {
+    color: #9f93c2;
+}
+
+.cu-settings-frost--dark .cu-settings-tab:hover {
+    color: #c4bddc;
+}
+
+.cu-settings-frost--dark .cu-settings-tab--active {
+    color: var(--Off-white, #f6f6f6);
+}
+
+.cu-settings-frost--dark .cu-settings-tab--active::after {
+    background: var(--Off-white, #f6f6f6);
+}
+
+/* Toggle rows are light surfaces (white / light purple); labels stay readable */
+.cu-settings-frost--dark .cu-settings-toggle-row {
+    background: #ffffff;
+    border-color: var(--Dark-Purple, #351a84);
+}
+
+.cu-settings-frost--dark .cu-settings-toggle-row:has(.cu-settings-track-switch--on) {
+    background: #ffffff;
+    border-color: var(--Dark-Purple, #351a84);
+}
+
+.cu-settings-frost--dark .cu-settings-slider-label {
+    color: var(--Off-white, #f6f6f6);
+}
+
+.cu-settings-frost--dark .cu-settings-toggle-row-label {
+    color: var(--Dark-Purple, #351a84);
+}
+
+.cu-settings-frost--dark .cu-settings-toggle-row-state {
+    color: var(--Dark-Purple, #351a84);
+}
+
+/* Lightened Dark Purple on dark gradient card (same family as switch host surfaces) */
+.cu-settings-frost--dark .cu-settings-slider-icon-a,
+.cu-settings-frost--dark .cu-settings-volume-icon {
+    color: color-mix(in srgb, var(--Dark-Purple, #351a84) 72%, #ffffff);
+}
+
+.cu-settings-frost--dark .cu-settings-env-track-dot-wrap {
+    color: color-mix(in srgb, var(--Dark-Purple, #351a84) 72%, #ffffff);
+}
+
+.cu-settings-frost--dark .cu-settings-range {
+    background: color-mix(in srgb, var(--Dark-Purple, #351a84) 55%, #ffffff);
+}
+
+.cu-settings-frost--dark .cu-settings-range::-moz-range-track {
+    background: color-mix(in srgb, var(--Dark-Purple, #351a84) 55%, #ffffff);
+}
+
+.cu-settings-frost--dark .cu-settings-slider-rail--text-size .cu-settings-range--text-size,
+.cu-settings-frost--dark .cu-settings-slider-rail--volume .cu-settings-range--volume {
+    background: transparent;
+}
+
+.cu-settings-frost--dark .cu-settings-slider-rail--text-size .cu-settings-range--text-size::-webkit-slider-runnable-track,
+.cu-settings-frost--dark .cu-settings-slider-rail--volume .cu-settings-range--volume::-webkit-slider-runnable-track {
+    background: #d8cfff;
+}
+
+.cu-settings-frost--dark .cu-settings-slider-rail--text-size .cu-settings-range--text-size::-moz-range-track,
+.cu-settings-frost--dark .cu-settings-slider-rail--volume .cu-settings-range--volume::-moz-range-track {
+    background: #d8cfff;
+}
+
+.cu-settings-frost--dark .cu-settings-range::-webkit-slider-thumb {
+    background: var(--Off-white, #f6f6f6);
+    box-shadow: 0 1px 5px rgba(8, 5, 18, 0.35);
+}
+
+.cu-settings-frost--dark .cu-settings-range::-moz-range-thumb {
+    background: var(--Off-white, #f6f6f6);
+    box-shadow: 0 1px 5px rgba(8, 5, 18, 0.35);
+}
+
+.cu-settings-frost--dark .cu-settings-slider-rail--text-size .cu-settings-range--text-size::-webkit-slider-thumb,
+.cu-settings-frost--dark .cu-settings-slider-rail--text-size .cu-settings-range--text-size::-moz-range-thumb,
+.cu-settings-frost--dark .cu-settings-slider-rail--volume .cu-settings-range--volume::-webkit-slider-thumb,
+.cu-settings-frost--dark .cu-settings-slider-rail--volume .cu-settings-range--volume::-moz-range-thumb {
+    background: var(--Medium-Purple, #5421cc);
+    box-shadow: none;
+    filter: drop-shadow(0 4px 4px rgba(0, 0, 0, 0.25));
+}
+
+.cu-settings-frost--dark .cu-settings-placeholder-text {
+    color: #c4bddc;
+}
+
+.cu-settings-frost--dark .cu-settings-world3d-cta {
+    border-color: rgba(236, 228, 255, 0.45);
+    background: rgba(53, 26, 132, 0.45);
+    color: var(--Off-white, #f6f6f6);
+}
+
+.cu-settings-frost--dark .cu-settings-world3d-cta:hover {
+    background: rgba(65, 36, 148, 0.65);
+}
+
+/*
+ * 3D world time + camera sliders: lavender track, Off-white thumb & icons.
+ * `.cu-settings-frost--dark` covers General/Preferences; the 3D tab omits that class
+ * (`useDarkFrost` is false on world3d) so we also key off `data-theme="dark"` + `--world3d-tab`.
+ */
+.cu-settings-frost--dark .cu-settings-world3d-slider-rail-inner-time,
+:root[data-theme='dark'] .cu-settings-frost--world3d-tab .cu-settings-world3d-slider-rail-inner-time,
+body[data-theme='dark'] .cu-settings-frost--world3d-tab .cu-settings-world3d-slider-rail-inner-time {
+    position: relative;
+}
+
+.cu-settings-frost--dark .cu-settings-world3d-slider-rail-inner-time::before,
+:root[data-theme='dark'] .cu-settings-frost--world3d-tab .cu-settings-world3d-slider-rail-inner-time::before,
+body[data-theme='dark'] .cu-settings-frost--world3d-tab .cu-settings-world3d-slider-rail-inner-time::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: min(230px, 100%);
+    height: 6px;
+    border-radius: 3px;
+    background: var(--Light-Purple, #b7a8ff);
+    z-index: 0;
+    pointer-events: none;
+    box-sizing: border-box;
+}
+
+.cu-settings-frost--dark .cu-settings-world3d-slider-rail-inner-time .cu-settings-world3d-track-bg,
+:root[data-theme='dark'] .cu-settings-frost--world3d-tab .cu-settings-world3d-slider-rail-inner-time .cu-settings-world3d-track-bg,
+body[data-theme='dark'] .cu-settings-frost--world3d-tab .cu-settings-world3d-slider-rail-inner-time .cu-settings-world3d-track-bg {
+    opacity: 0 !important;
+}
+
+.cu-settings-frost--dark .cu-settings-world3d-camera-track-wrap,
+:root[data-theme='dark'] .cu-settings-frost--world3d-tab .cu-settings-world3d-camera-track-wrap,
+body[data-theme='dark'] .cu-settings-frost--world3d-tab .cu-settings-world3d-camera-track-wrap {
+    position: relative;
+}
+
+.cu-settings-frost--dark .cu-settings-world3d-camera-track-wrap::before,
+:root[data-theme='dark'] .cu-settings-frost--world3d-tab .cu-settings-world3d-camera-track-wrap::before,
+body[data-theme='dark'] .cu-settings-frost--world3d-tab .cu-settings-world3d-camera-track-wrap::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 100%;
+    height: 6px;
+    border-radius: 3px;
+    background: var(--Light-Purple, #b7a8ff);
+    z-index: 0;
+    pointer-events: none;
+    box-sizing: border-box;
+    margin: 0 auto;
+    max-width: 100%;
+}
+
+.cu-settings-frost--dark .cu-settings-world3d-camera-track-wrap .cu-settings-world3d-track-bg,
+:root[data-theme='dark'] .cu-settings-frost--world3d-tab .cu-settings-world3d-camera-track-wrap .cu-settings-world3d-track-bg,
+body[data-theme='dark'] .cu-settings-frost--world3d-tab .cu-settings-world3d-camera-track-wrap .cu-settings-world3d-track-bg {
+    opacity: 0 !important;
+}
+
+.cu-settings-frost--dark .cu-settings-world3d-time-icon,
+.cu-settings-frost--dark .cu-settings-world3d-time-icon--moon,
+.cu-settings-frost--dark .cu-settings-world3d-camera-end-icon,
+:root[data-theme='dark'] .cu-settings-frost--world3d-tab .cu-settings-world3d-time-icon,
+:root[data-theme='dark'] .cu-settings-frost--world3d-tab .cu-settings-world3d-time-icon--moon,
+:root[data-theme='dark'] .cu-settings-frost--world3d-tab .cu-settings-world3d-camera-end-icon,
+body[data-theme='dark'] .cu-settings-frost--world3d-tab .cu-settings-world3d-time-icon,
+body[data-theme='dark'] .cu-settings-frost--world3d-tab .cu-settings-world3d-time-icon--moon,
+body[data-theme='dark'] .cu-settings-frost--world3d-tab .cu-settings-world3d-camera-end-icon {
+    filter: brightness(0) invert(1) !important;
+}
+
+.cu-settings-frost--dark .cu-settings-world3d-range::-webkit-slider-thumb,
+:root[data-theme='dark'] .cu-settings-frost--world3d-tab .cu-settings-world3d-range::-webkit-slider-thumb,
+body[data-theme='dark'] .cu-settings-frost--world3d-tab .cu-settings-world3d-range::-webkit-slider-thumb {
+    background-color: var(--Off-white, #f6f6f6) !important;
+    filter: drop-shadow(0 4px 4px rgba(0, 0, 0, 0.25)) !important;
+}
+
+.cu-settings-frost--dark .cu-settings-world3d-range::-moz-range-thumb,
+:root[data-theme='dark'] .cu-settings-frost--world3d-tab .cu-settings-world3d-range::-moz-range-thumb,
+body[data-theme='dark'] .cu-settings-frost--world3d-tab .cu-settings-world3d-range::-moz-range-thumb {
+    background-color: var(--Off-white, #f6f6f6) !important;
+    filter: drop-shadow(0 4px 4px rgba(0, 0, 0, 0.25)) !important;
+}
+
+/* Tick labels: white like icons/thumb; text-shadow keeps them readable on light cards while Settings uses data-theme=dark */
+.cu-settings-frost--dark .cu-settings-world3d .cu-discrete-slider-ticks,
+:root[data-theme='dark'] .cu-settings-frost--world3d-tab .cu-settings-world3d .cu-discrete-slider-ticks,
+body[data-theme='dark'] .cu-settings-frost--world3d-tab .cu-settings-world3d .cu-discrete-slider-ticks {
+    flex-shrink: 0;
+}
+
+.cu-settings-frost--dark .cu-settings-world3d .cu-discrete-slider-ticks,
+.cu-settings-frost--dark .cu-settings-world3d .cu-discrete-slider-ticks__tick,
+:root[data-theme='dark'] .cu-settings-frost--world3d-tab .cu-settings-world3d .cu-discrete-slider-ticks,
+:root[data-theme='dark'] .cu-settings-frost--world3d-tab .cu-settings-world3d .cu-discrete-slider-ticks__tick,
+body[data-theme='dark'] .cu-settings-frost--world3d-tab .cu-settings-world3d .cu-discrete-slider-ticks,
+body[data-theme='dark'] .cu-settings-frost--world3d-tab .cu-settings-world3d .cu-discrete-slider-ticks__tick {
+    color: #ffffff !important;
+}
+

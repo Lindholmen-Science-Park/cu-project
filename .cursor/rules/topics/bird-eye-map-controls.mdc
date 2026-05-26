@@ -1,0 +1,345 @@
+---
+description: Bird-eye map controls — drag-pan ("grab the world"), two-finger twist / middle-mouse map rotation (BirdEyeYawService), cinematic camera tilt while panels are open (BirdEyeFramer), endpoint icon swap on the route overlay, and the inert-backdrop rule that keeps drag-pan alive under bottom sheets. Read when working on bird-eye view interactions, the directions / POI sheets, or any feature that overlays a panel on top of the bird-eye stream.
+globs:
+  - "**/bird_eye_framer*"
+  - "**/bird_eye_yaw_service*"
+  - "**/bird_eye_usd_translate_mover*"
+  - "**/usd_viewer_player_core_extension/extension.py"
+  - "**/MapMarkerDirectionsPanel*"
+  - "**/MapMarkerPoiSheet*"
+  - "**/BirdEyeRouteOverlay*"
+alwaysApply: false
+---
+
+# Bird-eye map controls
+
+In bird-eye view the stream behaves like a top-down map: drag-pan to move the player, no look-rotation. When a bottom sheet (Directions / POI) is open over the map, Kit also tilts the camera further down so the player marker pulls visually upward, clearing the sheet.
+
+This file documents three tightly-coupled behaviors that all share the same constraint: **keep the area above the bottom sheet drag-pannable at all times, even while the sheet is animating in/out.**
+
+| Behavior | Lives in | Trigger |
+|---|---|---|
+| Camera-relative drag-pan ("grab the world") | `bird_eye_usd_translate_mover.py` + `player_input_controller.py` | Pointer drag on the stream when `viewType === "birdEye"` |
+| Map rotation (two-finger twist / middle-mouse / Shift+LMB) | `bird_eye_yaw_service.py` + `AppStream.tsx` | `birdEyeYawDelta` events from web |
+| Cinematic tilt while panel is open | `bird_eye_framer.py` + `player_core_extension/extension.py` | `birdEyeFrameTarget` / `birdEyeFrameRestore` events from web |
+| Map-marker icon swap mirroring the panel swap arrow | `BirdEyeRouteOverlay.tsx` reads `nav.mapMarkerDirectionsSwapped` | User clicks the swap button in the directions panel |
+
+---
+
+## 1. Drag-pan ("grab the world")
+
+### Pipeline
+
+```
+Frontend pointer drag on #remote-video
+  → sendCustomMessage('touchLookDelta', { dx, dy }) while dragging
+  → sendCustomMessage('touchLookEnd', {}) on pointer-up after pan drag
+    → Kit TouchLookHandler — drag + post-release pan coast (bird-eye branch)
+      → PlayerInputController.update() — branches on view type:
+          * firstPerson: tick(dt) → camera RotateXYZ  (look + short coast)
+          * birdEye:    tick_bird_eye_pan(dt) → movement_state forward/right (brief coast)
+            → BirdEyeUsdTranslateMover.drive() — writes player prim translate
+```
+
+### Why a custom XZ basis (not the camera's local rotation)
+
+`TeleportService` zeroes the camera's local rotation when entering bird-eye and parents the spawn rotation onto the player body instead. Reading `camera.RotateXYZOp[1]` therefore returns `0` in bird-eye, which would lock pan directions to world `+Z` / `-X` regardless of where the user is actually looking after a runtime camera-angle change.
+
+`BirdEyeUsdTranslateMover.drive()` instead derives the basis from `cam_xf.ComputeLocalToWorldTransform()`:
+
+```python
+fwd_w = cam_m.TransformDir(Gf.Vec3d(0.0, 0.0, -1.0))   # USD camera local -Z = forward
+rgt_w = cam_m.TransformDir(Gf.Vec3d(1.0, 0.0, 0.0))    # USD camera local +X = right
+fwd_xz = Gf.Vec3d(fwd_w[0], 0.0, fwd_w[2])             # project onto ground plane
+rgt_xz = Gf.Vec3d(rgt_w[0], 0.0, rgt_w[2])
+```
+
+`ComputeLocalToWorldTransform` picks up rotation at any level of the transform hierarchy, so the basis stays correct after spawn and after any runtime tilt (including the cinematic tilt below). A fallback path uses the controller's tracked yaw if the matrix can't be read.
+
+### Inverted ("grab the world") sign convention
+
+In `PlayerInputController.update()` the bird-eye branch negates the touch deltas before writing them into `movement_state`:
+
+```python
+movement_state["forward"] = -float(t_pitch)   # drag UP   → player moves DOWN  (world slides up under finger)
+movement_state["right"]   = -float(t_yaw)     # drag LEFT → player moves RIGHT (world slides left under finger)
+```
+
+This is the standard mobile-map convention: the world feels anchored to the finger/cursor, not the player. The first-person branch keeps the original (non-inverted) signs.
+
+### Throughput tuning
+
+`bird_eye_speed_multiplier = 8.0` inside `BirdEyeUsdTranslateMover.drive()` is the only knob distinguishing bird-eye pan speed from first-person walking speed. Changing it scales pan speed without affecting WASD / joystick pace.
+
+### Post-release pan coast
+
+On pointer-up after a pan drag, the web sends **`touchLookEnd`** (same event as first-person drag-look). `TouchLookHandler` arms **`_be_coast_armed`** and `PlayerInputController` keeps calling **`tick_bird_eye_pan(dt)`** until velocity decays — much shorter than FP look coast:
+
+| Constant (`touch_look_handler.py`) | Default | Compare to FP |
+|---|---|---|
+| `BIRD_EYE_COAST_DECAY_PER_SEC` | `95.0` | Very short glide; FP look uses `12.0` (longer) |
+| `BIRD_EYE_COAST_STOP_VEL` | `0.18` | FP uses `0.25` deg/s |
+
+Decay math: `ease_helpers.apply_exponential_coast`. Rotation drag / two-finger twist do **not** send `touchLookEnd` for coast — they use **`birdEyeYawEnd`** (§2b).
+
+---
+
+## 2. Cinematic tilt — `BirdEyeFramer`
+
+When the directions panel or POI sheet opens over the bird-eye view, the player marker (and often the route destination) end up hidden under the bottom sheet. `BirdEyeFramer` animates an extra downward pitch on the camera's local `RotateXYZOp` so the player position pulls visually upward, ending up above the sheet's top edge.
+
+### Service file
+
+**`younite.usd_viewer_player_core_extension/.../movement_modes/bird_eye_framer.py`**
+
+| Constant | Value | Purpose |
+|---|---|---|
+| `TILT_DELTA_DEG` | `-15.0` | Downward pitch added on top of the spawn pitch. Negative because the player body's combined XYZ rotation at the bird-eye spawn (~`159°, -45°, 180°`) flips the effective sign of a positive rotation on the camera's local X axis. |
+| `ANIM_DURATION_S` | `0.45` | Tilt animation length. Smoothstep eased in `update()`. |
+
+**Magnitude:** larger negative values pull the marker further toward screen center but past ~20° the framing flips into a top-down map and loses the cinematic feel. ~15° puts the player just above the sheet's top edge while preserving perspective.
+
+### Lifecycle
+
+```
+Web: panel/sheet mounts (visible && currentCamera === 'bird_eye')
+  → sendMessage('birdEyeFrameTarget', {})
+    → Kit: BirdEyeFramer.frame()
+        - reads current camera pitch via UsdGeom.Xformable.GetRotateXYZOp().Get()[0]
+        - stores it as _original_pitch_deg (only on first frame call)
+        - kicks off animation _anim_from_deg → _anim_to_deg
+PlayerUpdateLoop._on_update each frame:
+  → BirdEyeFramer.update(dt) — smoothstep ease writes _write_pitch_deg(cur)
+Web: panel/sheet unmounts
+  → sendMessage('birdEyeFrameRestore', {})
+    → Kit: BirdEyeFramer.restore()
+        - kicks off the reverse animation back to _original_pitch_deg
+        - on completion, clears _original_pitch_deg + _framed
+```
+
+On view-type switch (e.g. teleport), `SettingsWatchers` calls `framer.snap_restore()` to forget any in-flight pitch — `TeleportService` has already zeroed the camera's local rotation, so there is nothing left to undo.
+
+### Wiring in `extension.py` (player_core)
+
+1. Instantiated in `on_startup`: `self._bird_eye_framer = BirdEyeFramer(self)`
+2. Two Events 2.0 observers registered: `birdEyeFrameTarget` → `frame()`, `birdEyeFrameRestore` → `restore()`
+3. `PlayerUpdateLoop._on_update` calls `framer.update(dt)` per frame **after** the input controller, so the camera-rotation write is not stomped by the same-frame look pipeline
+4. `SettingsWatchers` on view-type change calls `framer.snap_restore()`
+5. `on_shutdown` clears the subscription list and the framer reference
+
+### What the framer never does
+
+- **It never blocks input.** Drag-pan stays free during the tilt animation and after it settles — the user can still browse the route to inspect the whole path while the panel is open. (An earlier iteration had `_set_input_blocked` calls; they were removed because they prevented the user from panning the map under an open panel.)
+- **It only touches the camera's local pitch (X component of `RotateXYZOp`).** Yaw/roll, the player body's transform, and the viewport camera path are all untouched.
+
+---
+
+## 2b. Map rotation — `BirdEyeYawService`
+
+Spec: yaw-only map rotation, pivoting around the player marker's screen position (the player body's world XZ — see §2b "Why we rotate the player body" below for why this is *effectively* the `camera_self` pivot the spec asked for). Reset on every bird-eye entry. Web-driven by **two-finger twist** on touch and **middle-mouse drag** (or **Shift + left-mouse drag** as a trackpad fallback) on desktop. Pinch zoom and twist run **simultaneously** during a single two-finger gesture (standard mobile-map UX).
+
+### Why we rotate the **player body** around world +Y (not the camera's local Z)
+
+The first iteration of this service wrote the camera's local `RotateXYZ.z` on the assumption that "in bird-eye the camera looks straight down, so its local Z axis is roughly world up." That's almost true — but the player body's spawn rotation `(159°, -45°, 180°)` tilts the camera's local Z far enough off vertical that the rotation reads as a **horizon roll** (buildings tip diagonally), not a map rotation.
+
+`BirdEyeYawService` instead composes the new yaw onto the **player body's** existing `xformOp:rotateXYZ`, applying it at the world (parent) level:
+
+```python
+baseline_rot = Rz(bz) * Ry(by) * Rx(bx)            # body's current rotation
+yaw_world    = Ry(yaw_deg)                          # rotate around world +Y
+target       = yaw_world * baseline_rot             # PREPEND in matrix order
+new_euler    = target.Decompose(Vec3d X, Y, Z)      # back to USD RotateXYZ
+```
+
+Because the camera is parented under the body, this rotates the bird-eye view around the body's pivot (= the camera's world XZ position) — the player marker stays put on screen and everything else swings around it. `BirdEyeUsdTranslateMover.drive()` derives its pan basis from `cam_xf.ComputeLocalToWorldTransform()`, so drag-pan automatically follows the new heading without any extra wiring.
+
+### Baseline capture — drift-free repeated deltas
+
+The body's Euler at the **first** `apply_delta` call is captured into `_baseline_euler`. Every subsequent call recomputes the body rotation as `Ry(total_yaw) * baseline`. Read-modify-decompose-write per call would slowly drift through Gf's decomposition rounding; recomposing from the baseline is exact for any total yaw.
+
+### Gimbal guard
+
+Decomposition is ambiguous when the body's pitch is near ±90°. The bird-eye spawn pitch is ~-45° so the guard never trips in practice — but if a future spawn point is added inside the band, the service drops the apply (with a one-line log) rather than emit a decomposition that snaps the camera around. Guard width: `_GIMBAL_GUARD_DEG = 2.0`.
+
+### Defensive read-modify-write on the framer
+
+`BirdEyeFramer` only writes the X (pitch) component, but its `_write_pitch_deg` was updated to read-modify-write so it preserves Y/Z. This is purely defensive — `BirdEyeYawService` no longer touches the camera, but if a future bird-eye service ever writes Y or Z on the camera's `RotateXYZ`, the framer won't clobber it.
+
+### Lifecycle
+
+```
+Web pointer pipeline (`useRemoteVideoPointerGestures.ts`, bird-eye only):
+  Two fingers down                → twistLastAngleRad = atan2(p2 - p1)
+  Two-finger move                 → angle delta → birdEyeYawDelta; pinch → birdEyeZoomLevel
+  Two-finger lift (pinch end)     → birdEyeYawEnd if twist moved this gesture
+  Middle mouse / Shift+LMB drag   → dx * 0.4°/px → birdEyeYawDelta
+  Rotate-drag pointer up          → birdEyeYawEnd
+
+Kit (`extension.py`):
+  birdEyeYawDelta → BirdEyeYawService.queue_delta(deg)
+  birdEyeYawEnd   → BirdEyeYawService.arm_coast()
+
+PlayerUpdateLoop each frame:
+  BirdEyeYawService.tick(dt) — apply queued delta, then optional post-release coast
+
+`BirdEyeYawService.apply_delta` / baseline / gimbal guard unchanged; coast tuning:
+
+| Constant | Default |
+|---|---|
+| `COAST_DECAY_PER_SEC` | `95.0` (very short glide) |
+| `COAST_STOP_VEL_DEG_S` | `1.2` |
+
+SettingsWatchers on view-type change:
+  - yaw.snap_restore() → restore baseline Euler, drop accumulator + coast
+```
+
+### Sensitivity & sign conventions
+
+| Channel | Constant / formula | Sign behaviour |
+|---|---|---|
+| Mouse drag | `ROTATE_DEG_PER_PX = 0.4` | `dx > 0` (drag right) → positive yaw delta → camera rotates left → map appears to rotate right under the cursor ("grab the world" convention, matches drag-pan sign inversion in §1) |
+| Two-finger twist | 1:1 — `dRad → deg` | Fingers rotate clockwise on screen → negative yaw delta → map appears to rotate clockwise (mobile-map convention) |
+
+The `angleBetweenRad` helper negates screen Y (which grows downward) so it returns a CCW-positive mathematical angle, and `wrapAngle` collapses the ±π discontinuity into the shortest signed delta — without it, crossing the discontinuity once per gesture would emit a ~360° spike that snaps the camera around.
+
+A sub-degree threshold (`Math.abs(deltaDeg) < 0.05`) is applied web-side before sending so a "still" finger doesn't flood the data channel with micro-noise.
+
+### Pinch + twist coexistence
+
+On a single two-finger gesture, `handlePointerMove` updates the same `pinchPointers` map, recomputes both the distance (zoom) and the angle (yaw) per frame, and dispatches both events. The two Kit services are independent (`BirdEyeZoomService` writes the camera's `focalLength` on the session layer; `BirdEyeYawService` writes the player body's `RotateXYZ` Euler) so simultaneous pinch + twist Just Works.
+
+### Reset on bird-eye exit
+
+Per spec the user sees an axis-aligned map every time bird-eye is re-entered. `SettingsWatchers._on_view_type_changed` calls `yaw.snap_restore()` on every view-type change (alongside the existing `zoom.snap_restore()`). It restores the body's baseline Euler (captured on the first apply of this session) and drops the accumulator. If the user never rotated in this bird-eye session the baseline was never captured and the call is a no-op.
+
+### Rotation drag never produces a tap
+
+The rotation drag (middle mouse / Shift+LMB) sets `isRotateDrag = true` on pointerdown and `isDragging = true` immediately (skipping the `DRAG_THRESHOLD_PX` tap window). On pointerup, the `wasRotateDrag` branch returns *before* the navigation pick-request branch — otherwise releasing the middle button would silently fire a `birdEyePin` pick at the cursor location.
+
+---
+
+## 3. Inert backdrop rule (don't break drag-pan with bottom sheets)
+
+The directions panel (`MapMarkerDirectionsPanel`) and POI sheet (`MapMarkerPoiSheet`) are bottom sheets that visually cover the lower portion of the bird-eye view. If their root (or a transparent backdrop element) had `pointer-events: auto`, the area between the top of the sheet and the top of the viewport would silently swallow touch / mouse drag events — the user could no longer drag-pan the map above the panel.
+
+### Required pattern
+
+- The panel's root wrapper has `pointer-events: none`
+- Only the visible bottom sheet itself has `pointer-events: auto`
+- **No tap-outside-to-close backdrop element.** Dismiss is via the visible X / back buttons inside the sheet header.
+
+CSS:
+
+```css
+.map-marker-directions {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;          /* root: inert */
+}
+.map-marker-directions__sheet {
+  /* ...positioning + visual styles... */
+  pointer-events: auto;          /* only the sheet captures input */
+}
+```
+
+`MapMarkerPoiSheet` follows the same contract but with one extra wrinkle: it reuses the `.cu-restroom-widget` class from `RestroomWidget.css`, which has `position: fixed; inset: 0;` (correct for the full-screen restroom panel — wrong for our bird-eye context). We can't change that shared class without breaking the restroom widget, so the POI sheet overrides at the inline-style level:
+
+```tsx
+<div className="cu-restroom-widget cu-restroom-widget--sheet-open"
+     style={{ background: 'transparent', zIndex: 1200, pointerEvents: 'none' }}>
+  <div className="cu-restroom-widget__sheet"
+       style={{ pointerEvents: 'auto' }}>
+    {/* ...sheet content... */}
+  </div>
+</div>
+```
+
+There is also no backdrop button. (`RestroomWidget` itself still uses an interactive backdrop because it appears in first-person view where there is no underlying drag-pan to preserve.)
+
+> Anti-pattern: re-introducing a tap-outside-to-close `<button class="*-backdrop">` over the bird-eye stream silently breaks drag-pan above the sheet.
+>
+> Anti-pattern: forgetting the inline `pointerEvents` override on `MapMarkerPoiSheet` — the shared `.cu-restroom-widget` rule will silently capture the whole viewport even though the sheet looks fine, and the symptom is "tilt animates correctly but the map won't drag".
+
+---
+
+## 4. Map-marker icon swap mirror
+
+The directions panel has a swap button that flips the start / end inputs. The two endpoint markers on the bird-eye route overlay (start = white circle with dark-purple `MapPinSimpleArea.svg`; destination = lemon circle with dark-purple `flag-pennant.svg`) must follow that swap so the user sees a consistent "which end is the destination" indicator on the map.
+
+### State lift
+
+The `swapped` flag was lifted from a panel-local `useState` into the navigation hook so the overlay can read it:
+
+| Field | Where | Notes |
+|---|---|---|
+| `mapMarkerDirectionsSwapped` (state) | `usePoiNavigation.ts` | Default `false`. Reset to `false` inside `clearMapMarkerDirectionsPreview` and via a panel-side `useEffect` keyed on `previewRouteKey` so a previously swapped POI session does not carry into the next destination. |
+| `setMapMarkerDirectionsSwapped` | exposed on the navigation context | Used by the panel's swap button toggle. |
+
+### Overlay consumption
+
+`BirdEyeRouteOverlay.tsx`:
+
+```tsx
+const swapped = nav.mapMarkerDirectionsSwapped;
+// start bubble (geometric first point)
+<img src={swapped ? flagPennantUrl : mapPinUrl} ... />
+// destination bubble (geometric last point)
+<img src={swapped ? mapPinUrl : flagPennantUrl} ... />
+```
+
+The route polyline geometry is always Kit's `first → last` path; only the icons swap. Bubble background colours stay tied to the geometric position (white start ring, lemon destination ring) — they don't follow the swap, so a swapped destination is "lemon ring with map pin" and a swapped start is "white ring with flag". This matches the panel's tab styling where the icons swap but the field colours don't.
+
+---
+
+## 5. Pan to center a world target (no route, no camera rotation change)
+
+**Kit:** `younite.usd_viewer_player_core_extension` — event **`birdEyePanFocusWorld`** with payload **`worldPos`**: `[x, y, z]` in scene units (same as other world-space messages). Handler `_bird_eye_pan_focus_world` runs only when `viewType === birdEye`: intersects the active viewport camera’s **center ray** with the horizontal plane `y = worldPos[1]`, then adds the XZ delta to the **player prim’s translate op** (same mechanism as drag-pan in `BirdEyeUsdTranslateMover`). Camera **RotateXYZ** is not modified.
+
+**Web (dev IoT menu):** `TransitLiveDevSection.tsx` — live transit rows (bird-eye only) send **`birdEyeRouteClear`** then **`birdEyePanFocusWorld`** so a prior `birdEyeRouteRequest` preview line does not linger. See `transit-live-overlay.mdc`.
+
+**Kit (IoT station list):** `younite.open_data_live_extension` — on **`iotAirQualityFocusStation`** in bird-eye, dispatches the same two events (after lat/lon → scene XYZ) so air-quality “focus” uses **player_core** `_bird_eye_pan_focus_world` — no second pan implementation.
+
+---
+
+## Events summary
+
+| Event | Direction | Purpose |
+|---|---|---|
+| `birdEyeFrameTarget` | Web → Kit | Begin cinematic tilt-down animation |
+| `birdEyeFrameRestore` | Web → Kit | Animate back to the spawn pitch |
+| `touchLookDelta` | Web → Kit | Pointer drag — FP look (`tick`) or bird-eye pan (`tick_bird_eye_pan`) |
+| `touchLookEnd` | Web → Kit | Pointer-up after pan/look drag — arms FP look coast + bird-eye pan coast (`touch-look.mdc`) |
+| `birdEyeYawDelta` | Web → Kit | `{ deltaDeg }` — incremental map rotation while twisting / rotate-dragging |
+| `birdEyeYawEnd` | Web → Kit | Pointer-up after twist or rotate-drag — arms map rotation release coast |
+| `birdEyeZoomLevel` | Web → Kit | `{ level }` — pinch / wheel zoom (focalLength) |
+| `birdEyePanFocusWorld` | Web → Kit | `{ worldPos: [x,y,z] }` — pan rig so target lies on view-center ray (bird-eye only; see §5) |
+
+No outbound events from the framer — the tilt is fire-and-forget from the panel's `useEffect`.
+
+---
+
+## Key files
+
+| File | Role |
+|---|---|
+| `bird_eye_framer.py` | Cinematic tilt animation service (frame / restore / snap_restore / update). Read-modify-write on RotateXYZ to preserve yaw component |
+| `bird_eye_yaw_service.py` | Map rotation — `queue_delta` / `tick(dt)` + post-release coast (`arm_coast` on `birdEyeYawEnd`); `apply_delta` composes world-Y yaw onto body `RotateXYZ` |
+| `inputs/point_click/ease_helpers.py` | Shared smoothstep + exponential coast for pan, yaw, walk, face-turn |
+| `bird_eye_usd_translate_mover.py` | Bird-eye drag-pan mover; computes camera-relative XZ basis from `ComputeLocalToWorldTransform` (automatically follows yaw — no extra wiring needed) |
+| `player_input_controller.py` | Branches touch-look deltas into pan vs. look based on view type; applies "grab the world" sign inversion in the bird-eye branch |
+| `runtime/update_loop.py` | Per-frame hub: `payload["dt"]` → input controller + `framer.update(dt)` + auto-mover (see `events-api.mdc` § Delta time) |
+| `wiring/settings_watchers.py` | Calls `framer.snap_restore()` + `zoom.snap_restore()` + `yaw.snap_restore()` on view-type change |
+| `useRemoteVideoPointerGestures.ts` | Stream pointer: `touchLookDelta` / `touchLookEnd`, pinch, twist, pick |
+| `streaming/AppStream.tsx` | Wires pointer hook; middle-mouse / Shift+LMB → `birdEyeYawDelta` |
+| `MapMarkerDirectionsPanel.tsx` + `.css` | Fires `birdEyeFrameTarget` / `birdEyeFrameRestore`; root is `pointer-events: none` |
+| `MapMarkerPoiSheet.tsx` | Same tilt contract as the directions panel; no backdrop button |
+| `BirdEyeRouteOverlay.tsx` | Reads `nav.mapMarkerDirectionsSwapped` to mirror the panel swap on the map markers |
+| `usePoiNavigation.ts` | Owns `mapMarkerDirectionsSwapped` state + setter; resets in `clearMapMarkerDirectionsPreview` |
+
+## Related
+
+- Touch look general pipeline: `.cursor/rules/topics/touch-look.mdc`
+- Bird-eye route overlay (polyline + bubble rendering): `.cursor/rules/topics/bird-eye-route.mdc`
+- Bird-eye pin anywhere (zoom via focalLength, click-anywhere pin, OSM bridge): `.cursor/rules/topics/bird-eye-pin-anywhere.mdc`
+- Map markers (projectable overlays in bird-eye): `.cursor/rules/topics/map-markers.mdc`
+- Camera teleport (view switching, FP entry): `.cursor/rules/topics/camera-teleport.mdc`

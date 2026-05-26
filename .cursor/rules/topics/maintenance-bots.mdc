@@ -1,0 +1,115 @@
+---
+description: Maintenance bots — incident orchestrator, bot spawning, NavMesh travel time dispatch, deferred rebake
+---
+
+# Maintenance Bots (Incident Orchestrator)
+
+Spawns maintenance bot prims at predefined spawn points and orchestrates them to resolve incidents. Bots are dispatched by priority (highest severity first) and proximity (NavMesh travel time estimation). When a busy bot would reach a new incident faster after finishing its current task than any idle bot, the assignment is deferred for sequential handling.
+
+**Extension**: `younite.maintenance_bot_extension` (order 1220, after incident extension at 1210)
+**Depends on**: `younite.messaging_core_extension`, `younite.navmesh_route_extension`, `younite.incident_extension`
+**Frontend**: "Spawn Maintenance Bots" / "Remove Bots" toggle in Simulation submenu (`UIControls.tsx`)
+
+## Spawn points
+
+Defined as `/World/maintenance_bot_spawn_XX` Xform prims in `sublayers/maintenance_bot_layer.usda`. Currently three spawn points (`_01`, `_02`, `_03`). The extension auto-discovers them by iterating the prefix.
+
+## Bot model
+
+Placeholder USD asset at `source/data/Assets/Maintenance bots/maintenance_bot.usda` — blue capsule body + sphere head. Referenced at spawn; swap the file for a better model without code changes.
+
+## Data structures
+
+```python
+BotRecord:
+    bot_id, prim_path, spawn_pos
+    state: "idle" | "en_route" | "resolving" | "returning"
+    assigned_incident, mover (BotMover), resolve_timer, eta_seconds
+
+IncidentRecord:
+    incident_id, incident_path, position, severity (1-5), status, assigned_bot
+    status: "reported" | "resolving" | "done"
+```
+
+## Dispatch logic (NavMesh travel time)
+
+Bot selection uses **synchronous NavMesh path queries** (`calculate_path_points` + `path_length_cm` from `younite.navmesh_route_extension`) to compute actual travel time (`path_cm / BOT_SPEED`), falling back to Euclidean XZ distance when the NavMesh is unavailable.
+
+Key methods:
+- `_estimate_travel_time(start, end)` — NavMesh path time in seconds, `None` on failure.
+- `_estimate_travel_time_or_fallback(start, end)` — NavMesh with Euclidean fallback.
+- `_find_fastest_bot(candidates, target)` — returns `(bot, time_seconds)`.
+- `_estimate_best_busy_bot_time(target_pos)` — for each en_route/resolving bot, estimates: remaining work + travel to new incident. Returns best total or `None`.
+- `_pick_best_next_incident(candidates, from_pos)` — highest severity, tiebreak by shortest travel time.
+
+### Smart sequential assignment
+
+When the orchestrator runs, for each unassigned incident (sorted by severity desc):
+1. Find the fastest idle bot (NavMesh time).
+2. Estimate the best busy bot time (remaining resolve/travel + travel to new incident).
+3. If a busy bot would be faster → **defer** assignment (the bot picks it up after finishing).
+4. Otherwise → assign the idle bot.
+
+This handles the scenario of two incidents near one bot's spawn: the nearby bot handles both sequentially rather than pulling a distant bot.
+
+## Constants
+
+| Name | Value | Note |
+|------|-------|------|
+| `BOT_SPEED` | 200 cm/s (2 m/s) | Stage units per second |
+| `RESOLVE_TIME_MIN` | 5 s | Random resolve timer lower bound |
+| `RESOLVE_TIME_MAX` | 15 s | Random resolve timer upper bound |
+| `RESOLVE_TIME_AVG` | 10 s | Used for busy-bot estimation |
+| `ROUTE_ID_PREFIX` | `"mbot_"` | NavMesh route IDs for bot routes |
+
+## Event flow
+
+### Spawning bots
+1. Web: user clicks "Spawn Maintenance Bots" → `maintenanceBotSpawn {}`
+2. Extension: creates bot prims at spawn points, references model USD
+3. Extension: dispatches `maintenanceBotStatus { active: true, count: N }`
+
+### Incident lifecycle
+1. Incident extension dispatches `incidentAdded { incidentPath, position, severity, status: "reported" }`
+2. Orchestrator queues incident, runs `_run_orchestrator()`
+3. Best bot dispatched → `navmeshRouteCalculate` (drawPath: false, no periodic recalc)
+4. Waypoints received → `BotMover` follows path; ETA refined from `distanceMetersBase`
+5. Bot arrives → random resolve timer (5-15 s), status update `"arrived"`
+6. Timer expires → `incidentRemove { incidentPath, skipRebake: true }`, status `"resolved"`
+7. Bot picks next pending incident or returns to spawn
+8. When no bots are resolving → single deferred `navmeshRebakeRequest`
+
+### Despawning
+- Web: user clicks "Remove Bots" → `maintenanceBotDespawn {}`
+- Extension: removes all bot prims, clears state
+
+## Deferred NavMesh rebake
+
+When a bot resolves an incident, `incidentRemove` is dispatched with `skipRebake: true`. The `_rebake_pending` flag is set. A single `navmeshRebakeRequest` is triggered only when **no bots are in the "resolving" state** (`_flush_rebake_if_safe`). This prevents concurrent rebakes from causing route failures.
+
+## Stale waypoint protection
+
+If a NavMesh rebake triggers recalculated routes while a bot is already following waypoints, `_handle_waypoints` ignores the new waypoints (`if bot.mover.is_active: return`). This prevents bots from teleporting back to stale route start positions.
+
+## Status updates (Kit → Web)
+
+Event `maintenanceBotIncidentUpdate` payload:
+```json
+{ "action": "reported|dispatched|arrived|resolved",
+  "botId": "bot_01", "incidentId": "Incident_...",
+  "severity": 3, "status": "resolving",
+  "position": { "x": ..., "y": ..., "z": ... },
+  "eta": 12.5 }
+```
+`eta` (seconds) included when bot has an active assignment.
+
+## BotMover
+
+Simplified waypoint-following class in `bot_mover.py`. Drives a prim along a polyline each frame at `BOT_SPEED` (200 cm/s). Features look-ahead steering and smooth yaw turning.
+
+## Related
+
+- Incidents (obstacle placement): `.cursor/rules/topics/incidents.mdc`
+- NavMesh area mechanics: `.cursor/rules/topics/navmesh-areas.mdc`
+- Bake orchestrator + provider protocol: `.cursor/rules/topics/bake-orchestrator.mdc`
+- Route measurement service: `.cursor/rules/topics/route-measurement.mdc`

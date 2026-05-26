@@ -1,0 +1,320 @@
+{"input": "now", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "go", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "do it", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "do it!", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "please go", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "go now", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "now please", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "start now", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "proceed", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "proceed please", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "continue", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "let's move", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "let's roll", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "let's head out", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "head there", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "send me there", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "bring me there", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "get me there", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "move me", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "move me now", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "move now", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "move out", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "forward", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "onwards", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "engage", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "make it happen", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "make it so", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "i'm good to go", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "i'm ready now", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "i'm set", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "i'm in", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "count me in", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "yes", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "yes, go", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "yes, please", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "sure", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "sure, let's go", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "okay", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "okay, go", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "ok", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "ok, do it", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "do it now", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "go for it", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "go for it please", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "take me now", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "there please", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "to there", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "teleport", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "teleport now", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "teleport me now", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "let's teleport", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "guide me there", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "lead the way", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "take me there", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "ok, let's go", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "let's go", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "I'm ready", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "go ahead", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "take me there then", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "move there", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "yeah now", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "yep now", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "yes please", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "sure, take me", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "later", "response": {"poi_id": null, "text": "Okay — just say the word if you'd like to go."}, "lang": "en"}
+{"input": "not now", "response": {"poi_id": null, "text": "Okay — just say the word if you'd like to go."}, "lang": "en"}
+{"input": "ta mig dit", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "sv"}
+{"input": "jag är redo", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "sv"}
+{"input": "okej, kör", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "sv"}
+{"input": "gå dit", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "sv"}
+{"input": "inte nu", "response": {"poi_id": null, "text": "Okej — säg bara till om du vill gå dit."}, "lang": "sv"}
+{"input": "myöhemmin", "response": {"poi_id": null, "text": "Selvä — kerro vain kun haluat mennä."}, "lang": "fi"}
+{"input": "mennään sinne", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "fi"}
+{"input": "olen valmis", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "fi"}
+{"input": "go there", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "take me to that place now", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "yes, teleport me", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "no thanks", "response": {"poi_id": null, "text": "Okay — just say the word if you'd like to go."}, "lang": "en"}
+{"input": "alright, let's go there", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "ok go", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "let's do it", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "maybe later", "response": {"poi_id": null, "text": "Okay — just say the word if you'd like to go."}, "lang": "en"}
+{"input": "can we go now?", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "teleport me there", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "vie minut sinne", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "fi"}
+{"input": "ei nyt", "context": {"response": {"poi_id": null, "text": "Selvä — kerro vain kun haluat mennä."}, "lang": "fi"}
+{"input": "Show me Gothia Towers", "response": {"poi_id": "poi_gothia_towers", "should_move": true}, "lang": "en"}
+{"input": "Take me to Gothia Towers", "response": {"poi_id": "poi_gothia_towers", "should_move": true}, "lang": "en"}
+{"input": "I want to see Gothia Towers", "response": {"poi_id": "poi_gothia_towers", "should_move": true}, "lang": "en"}
+{"input": "Go to Gothia Towers", "response": {"poi_id": "poi_gothia_towers", "should_move": true}, "lang": "en"}
+{"input": "Navigate to Gothia Towers", "response": {"poi_id": "poi_gothia_towers", "should_move": true}, "lang": "en"}
+{"input": "Show me the hotel with towers", "response": {"poi_id": "poi_gothia_towers", "should_move": true}, "lang": "en"}
+{"input": "Take me to the modern hotel", "response": {"poi_id": "poi_gothia_towers", "should_move": true}, "lang": "en"}
+{"input": "I want to see something modern", "response": {"poi_id": "poi_gothia_towers", "should_move": true}, "lang": "en"}
+{"input": "Show me a landmark", "response": {"poi_id": "poi_gothia_towers", "should_move": true}, "lang": "en"}
+{"input": "Take me to a modern building", "response": {"poi_id": "poi_gothia_towers", "should_move": true}, "lang": "en"}
+{"input": "I want to see the twin towers", "response": {"poi_id": "poi_gothia_towers", "should_move": true}, "lang": "en"}
+{"input": "I want to see towers", "response": {"poi_id": "poi_gothia_towers", "should_move": true}, "lang": "en"}
+{"input": "take me to towers", "response": {"poi_id": "poi_gothia_towers", "should_move": true}, "lang": "en"}
+{"input": "do we have any towers?", "response": {"poi_id": "poi_gothia_towers", "should_move": true}, "lang": "en"}
+{"input": "show me gothia towers?", "response": {"poi_id": "poi_gothia_towers", "should_move": true}, "lang": "en"}
+{"input": "Show me Gothia", "response": {"poi_id": "poi_gothia_towers", "should_move": true}, "lang": "en"}
+{"input": "Take me to Gothia hotel", "response": {"poi_id": "poi_gothia_towers", "should_move": true}, "lang": "en"}
+{"input": "Can you show me Gothia Towers?", "response": {"poi_id": "poi_gothia_towers", "should_move": true}, "lang": "en"}
+{"input": "I'd like to visit Gothia Towers", "response": {"poi_id": "poi_gothia_towers", "should_move": true}, "lang": "en"}
+{"input": "Let's go to Gothia Towers", "response": {"poi_id": "poi_gothia_towers", "should_move": true}, "lang": "en"}
+{"input": "I need to see Gothia Towers", "response": {"poi_id": "poi_gothia_towers", "should_move": true}, "lang": "en"}
+{"input": "Where is Gothia Towers?", "response": {"poi_id": "poi_gothia_towers", "should_move": true}, "lang": "en"}
+{"input": "Can we go to Gothia Towers?", "response": {"poi_id": "poi_gothia_towers", "should_move": true}, "lang": "en"}
+{"input": "I'm looking for Gothia Towers", "response": {"poi_id": "poi_gothia_towers", "should_move": true}, "lang": "en"}
+{"input": "Gothia Towers please", "response": {"poi_id": "poi_gothia_towers", "should_move": true}, "lang": "en"}
+{"input": "Take me there", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "Tell me about Gothia Towers", "response": {"poi_id": "poi_gothia_towers", "should_move": false}, "lang": "en"}
+{"input": "What is Gothia Towers?", "response": {"poi_id": "poi_gothia_towers", "should_move": false}, "lang": "en"}
+{"input": "Describe Gothia Towers", "response": {"poi_id": "poi_gothia_towers", "should_move": false}, "lang": "en"}
+{"input": "Tell me more about Gothia Towers", "response": {"poi_id": "poi_gothia_towers", "should_move": false}, "lang": "en"}
+{"input": "What can you tell me about Gothia Towers?", "response": {"poi_id": "poi_gothia_towers", "should_move": false}, "lang": "en"}
+{"input": "Info about Gothia Towers", "response": {"poi_id": "poi_gothia_towers", "should_move": false}, "lang": "en"}
+{"input": "What's special about Gothia Towers?", "response": {"poi_id": "poi_gothia_towers", "should_move": false}, "lang": "en"}
+{"input": "What is the Gothia Towers hotel?", "response": {"poi_id": "poi_gothia_towers", "should_move": false}, "lang": "en"}
+{"input": "Tell me about that hotel", "response": {"poi_id": "poi_gothia_towers", "should_move": false}, "lang": "en"}
+{"input": "What can you tell me about the modern hotel?", "response": {"poi_id": "poi_gothia_towers", "should_move": false}, "lang": "en"}
+{"input": "Show me Skandinavium", "response": {"poi_id": "poi_skandinavium", "should_move": true}, "lang": "en"}
+{"input": "Take me to Skandinavium", "response": {"poi_id": "poi_skandinavium", "should_move": true}, "lang": "en"}
+{"input": "I want to see Skandinavium", "response": {"poi_id": "poi_skandinavium", "should_move": true}, "lang": "en"}
+{"input": "Go to Skandinavium", "response": {"poi_id": "poi_skandinavium", "should_move": true}, "lang": "en"}
+{"input": "Navigate to Skandinavium", "response": {"poi_id": "poi_skandinavium", "should_move": true}, "lang": "en"}
+{"input": "Show me the arena", "response": {"poi_id": "poi_skandinavium", "should_move": true}, "lang": "en"}
+{"input": "Take me to the arena", "response": {"poi_id": "poi_skandinavium", "should_move": true}, "lang": "en"}
+{"input": "I want to see the stadium", "response": {"poi_id": "poi_skandinavium", "should_move": true}, "lang": "en"}
+{"input": "Show me where concerts are held", "response": {"poi_id": "poi_skandinavium", "should_move": true}, "lang": "en"}
+{"input": "Take me to the sports venue", "response": {"poi_id": "poi_skandinavium", "should_move": true}, "lang": "en"}
+{"input": "I want to see an entertainment venue", "response": {"poi_id": "poi_skandinavium", "should_move": true}, "lang": "en"}
+{"input": "Show me the event hall", "response": {"poi_id": "poi_skandinavium", "should_move": true}, "lang": "en"}
+{"input": "Can you take me to Skandinavium?", "response": {"poi_id": "poi_skandinavium", "should_move": true}, "lang": "en"}
+{"input": "I'd like to visit the arena", "response": {"poi_id": "poi_skandinavium", "should_move": true}, "lang": "en"}
+{"input": "Let's go to Skandinavium", "response": {"poi_id": "poi_skandinavium", "should_move": true}, "lang": "en"}
+{"input": "Where is the arena?", "response": {"poi_id": "poi_skandinavium", "should_move": true}, "lang": "en"}
+{"input": "Show me the concert hall", "response": {"poi_id": "poi_skandinavium", "should_move": true}, "lang": "en"}
+{"input": "Take me to where they have sports events", "response": {"poi_id": "poi_skandinavium", "should_move": true}, "lang": "en"}
+{"input": "I'm looking for the stadium", "response": {"poi_id": "poi_skandinavium", "should_move": true}, "lang": "en"}
+{"input": "Skandinavium please", "response": {"poi_id": "poi_skandinavium", "should_move": true}, "lang": "en"}
+{"input": "Tell me about Skandinavium", "response": {"poi_id": "poi_skandinavium", "should_move": false}, "lang": "en"}
+{"input": "What is Skandinavium?", "response": {"poi_id": "poi_skandinavium", "should_move": false}, "lang": "en"}
+{"input": "Describe Skandinavium", "response": {"poi_id": "poi_skandinavium", "should_move": false}, "lang": "en"}
+{"input": "Tell me more about Skandinavium", "response": {"poi_id": "poi_skandinavium", "should_move": false}, "lang": "en"}
+{"input": "What can you tell me about the arena?", "response": {"poi_id": "poi_skandinavium", "should_move": false}, "lang": "en"}
+{"input": "Info about Skandinavium", "response": {"poi_id": "poi_skandinavium", "should_move": false}, "lang": "en"}
+{"input": "What's special about Skandinavium?", "response": {"poi_id": "poi_skandinavium", "should_move": false}, "lang": "en"}
+{"input": "What is the arena used for?", "response": {"poi_id": "poi_skandinavium", "should_move": false}, "lang": "en"}
+{"input": "Tell me about that stadium", "response": {"poi_id": "poi_skandinavium", "should_move": false}, "lang": "en"}
+{"input": "What events happen at Skandinavium?", "response": {"poi_id": "poi_skandinavium", "should_move": false}, "lang": "en"}
+{"input": "Show me the art museum", "response": {"poi_id": "poi_art_museum", "should_move": true}, "lang": "en"}
+{"input": "Take me to the art museum", "response": {"poi_id": "poi_art_museum", "should_move": true}, "lang": "en"}
+{"input": "I want to see the art museum", "response": {"poi_id": "poi_art_museum", "should_move": true}, "lang": "en"}
+{"input": "Go to the art museum", "response": {"poi_id": "poi_art_museum", "should_move": true}, "lang": "en"}
+{"input": "Navigate to Gothenburg Museum of Art", "response": {"poi_id": "poi_art_museum", "should_move": true}, "lang": "en"}
+{"input": "Show me Gothenburg Museum of Art", "response": {"poi_id": "poi_art_museum", "should_move": true}, "lang": "en"}
+{"input": "Take me to a museum", "response": {"poi_id": "poi_art_museum", "should_move": true}, "lang": "en"}
+{"input": "I want to see art", "response": {"poi_id": "poi_art_museum", "should_move": true}, "lang": "en"}
+{"input": "Show me where I can see paintings", "response": {"poi_id": "poi_art_museum", "should_move": true}, "lang": "en"}
+{"input": "Take me to the gallery", "response": {"poi_id": "poi_art_museum", "should_move": true}, "lang": "en"}
+{"input": "I want to see cultural exhibitions", "response": {"poi_id": "poi_art_museum", "should_move": true}, "lang": "en"}
+{"input": "Can you show me the art museum?", "response": {"poi_id": "poi_art_museum", "should_move": true}, "lang": "en"}
+{"input": "I'd like to visit the museum", "response": {"poi_id": "poi_art_museum", "should_move": true}, "lang": "en"}
+{"input": "Let's go to the art museum", "response": {"poi_id": "poi_art_museum", "should_move": true}, "lang": "en"}
+{"input": "Where is the art museum?", "response": {"poi_id": "poi_art_museum", "should_move": true}, "lang": "en"}
+{"input": "Show me the museum with art collections", "response": {"poi_id": "poi_art_museum", "should_move": true}, "lang": "en"}
+{"input": "Take me to see the art exhibitions", "response": {"poi_id": "poi_art_museum", "should_move": true}, "lang": "en"}
+{"input": "I'm looking for the art gallery", "response": {"poi_id": "poi_art_museum", "should_move": true}, "lang": "en"}
+{"input": "Art museum please", "response": {"poi_id": "poi_art_museum", "should_move": true}, "lang": "en"}
+{"input": "Tell me about the art museum", "response": {"poi_id": "poi_art_museum", "should_move": false}, "lang": "en"}
+{"input": "What is the art museum?", "response": {"poi_id": "poi_art_museum", "should_move": false}, "lang": "en"}
+{"input": "Describe the art museum", "response": {"poi_id": "poi_art_museum", "should_move": false}, "lang": "en"}
+{"input": "Tell me more about Gothenburg Museum of Art", "response": {"poi_id": "poi_art_museum", "should_move": false}, "lang": "en"}
+{"input": "What can you tell me about the art museum?", "response": {"poi_id": "poi_art_museum", "should_move": false}, "lang": "en"}
+{"input": "Info about the art museum", "response": {"poi_id": "poi_art_museum", "should_move": false}, "lang": "en"}
+{"input": "What's in the art museum?", "response": {"poi_id": "poi_art_museum", "should_move": false}, "lang": "en"}
+{"input": "What kind of art is in the museum?", "response": {"poi_id": "poi_art_museum", "should_move": false}, "lang": "en"}
+{"input": "Tell me about the gallery", "response": {"poi_id": "poi_art_museum", "should_move": false}, "lang": "en"}
+{"input": "What exhibitions are at the art museum?", "response": {"poi_id": "poi_art_museum", "should_move": false}, "lang": "en"}
+{"input": "Show me Liseberg", "response": {"poi_id": "poi_liseberg", "should_move": true}, "lang": "en"}
+{"input": "Take me to the amusement park", "response": {"poi_id": "poi_liseberg", "should_move": true}, "lang": "en"}
+{"input": "I want to see the amusement park", "response": {"poi_id": "poi_liseberg", "should_move": true}, "lang": "en"}
+{"input": "Show me Universeum", "response": {"poi_id": "poi_universeum", "should_move": true}, "lang": "en"}
+{"input": "Take me to the science center", "response": {"poi_id": "poi_universeum", "should_move": true}, "lang": "en"}
+{"input": "Show me the aquarium", "response": {"poi_id": "poi_universeum", "should_move": true}, "lang": "en"}
+{"input": "I want to see the science museum", "response": {"poi_id": "poi_universeum", "should_move": true}, "lang": "en"}
+{"input": "Show me Haga", "response": {"poi_id": "poi_haga", "should_move": true}, "lang": "en"}
+{"input": "Take me to the old neighborhood", "response": {"poi_id": "poi_haga", "should_move": true}, "lang": "en"}
+{"input": "I want to see the historic district", "response": {"poi_id": "poi_haga", "should_move": true}, "lang": "en"}
+{"input": "Show me Feskekôrka", "response": {"poi_id": "poi_feskekorka", "should_move": true}, "lang": "en"}
+{"input": "Take me to the fish market", "response": {"poi_id": "poi_feskekorka", "should_move": true}, "lang": "en"}
+{"input": "Show me the Fish Church", "response": {"poi_id": "poi_feskekorka", "should_move": true}, "lang": "en"}
+{"input": "Show me Avenyn", "response": {"poi_id": "poi_avenyn", "should_move": true}, "lang": "en"}
+{"input": "Take me to the shopping street", "response": {"poi_id": "poi_avenyn", "should_move": true}, "lang": "en"}
+{"input": "I want to see the main street", "response": {"poi_id": "poi_avenyn", "should_move": true}, "lang": "en"}
+{"input": "Show me the park", "response": {"poi_id": "poi_garden_society", "should_move": true}, "lang": "en"}
+{"input": "Take me to a peaceful place", "response": {"poi_id": "poi_garden_society", "should_move": true}, "lang": "en"}
+{"input": "I want to see nature", "response": {"poi_id": "poi_garden_society", "should_move": true}, "lang": "en"}
+{"input": "Show me Götaplatsen", "response": {"poi_id": "poi_gotaplatsen", "should_move": true}, "lang": "en"}
+{"input": "Take me to the square with Poseidon", "response": {"poi_id": "poi_gotaplatsen", "should_move": true}, "lang": "en"}
+{"input": "Visa mig Gothia Towers", "response": {"poi_id": "poi_gothia_towers", "should_move": true}, "lang": "sv"}
+{"input": "Visa mig Skandinavium", "response": {"poi_id": "poi_skandinavium", "should_move": true}, "lang": "sv"}
+{"input": "Visa mig konstmuseet", "response": {"poi_id": "poi_art_museum", "should_move": true}, "lang": "sv"}
+{"input": "Berätta om Gothia Towers", "response": {"poi_id": "poi_gothia_towers", "should_move": false}, "lang": "sv"}
+{"input": "Berätta om Skandinavium", "response": {"poi_id": "poi_skandinavium", "should_move": false}, "lang": "sv"}
+{"input": "Näytä minulle Gothia Towers", "response": {"poi_id": "poi_gothia_towers", "should_move": true}, "lang": "fi"}
+{"input": "Näytä minulle areena", "response": {"poi_id": "poi_skandinavium", "should_move": true}, "lang": "fi"}
+{"input": "Kertoa minulle Gothia Towers", "response": {"poi_id": "poi_gothia_towers", "should_move": false}, "lang": "fi"}
+{"input": "What's the weather?", "response": {"poi_id": null, "text": "I'm a tour guide for Gothenburg. I can help you explore locations like Gothia Towers, Skandinavium, or the Art Museum. What would you like to see?"}, "lang": "en"}
+{"input": "How are you?", "response": {"poi_id": null, "text": "I'm doing well, thank you! I'm here to help you explore Gothenburg. Would you like to visit Gothia Towers, Skandinavium, or the Art Museum?"}, "lang": "en"}
+{"input": "Tell me a joke", "response": {"poi_id": null, "text": "I'm focused on being your tour guide! I can help you discover places like Gothia Towers, Skandinavium, or the Art Museum. What would you like to explore?"}, "lang": "en"}
+{"input": "What time is it?", "response": {"poi_id": null, "text": "I'm a tour guide for Gothenburg locations. I can help you explore places like Gothia Towers, Skandinavium, or the Art Museum. What interests you?"}, "lang": "en"}
+{"input": "Hello", "response": {"poi_id": null, "text": "Hello! I'm your tour guide for Gothenburg. I can show you places like Gothia Towers, Skandinavium, or the Art Museum. Where would you like to go?"}, "lang": "en"}
+{"input": "Hi there", "response": {"poi_id": null, "text": "Hi! I'm here to help you explore Gothenburg. Would you like to visit Gothia Towers, Skandinavium, or the Art Museum?"}, "lang": "en"}
+{"input": "What can you do?", "response": {"poi_id": null, "text": "I can help you explore Gothenburg! I can take you to places like Gothia Towers, Skandinavium, or the Art Museum, or tell you about them. What would you like to see?"}, "lang": "en"}
+{"input": "Help me", "response": {"poi_id": null, "text": "I'm here to help! I can guide you to locations in Gothenburg such as Gothia Towers, Skandinavium, or the Art Museum. What would you like to explore?"}, "lang": "en"}
+{"input": "Tell me about this place", "response": {"poi_id": "find_current_location", "should_move": false}, "lang": "en"}
+{"input": "What is this?", "response": {"poi_id": "find_current_location", "should_move": false}, "lang": "en"}
+{"input": "What is here?", "response": {"poi_id": "find_current_location", "should_move": false}, "lang": "en"}
+{"input": "Where am I?", "response": {"poi_id": "find_current_location", "should_move": false}, "lang": "en"}
+{"input": "What's this place?", "response": {"poi_id": "find_current_location", "should_move": false}, "lang": "en"}
+{"input": "Where are we?", "response": {"poi_id": "find_current_location", "should_move": false}, "lang": "en"}
+{"input": "What location is this?", "response": {"poi_id": "find_current_location", "should_move": false}, "lang": "en"}
+{"input": "Tell me about where I am", "response": {"poi_id": "find_current_location", "should_move": false}, "lang": "en"}
+{"input": "What's around here?", "response": {"poi_id": "find_current_location", "should_move": false}, "lang": "en"}
+{"input": "What place is this?", "response": {"poi_id": "find_current_location", "should_move": false}, "lang": "en"}
+{"input": "word", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "the word", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "say the word", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "just say the word", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "ready", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "ready now", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "ready to go", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "let's do this", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "let's do this now", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "alright", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "alright, go", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "fine", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "fine, let's go", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "yeah", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "yep", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "yep, let's go", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "absolutely", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "definitely", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "of course", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "sounds good", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "sounds good, let's go", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "that works", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "that works for me", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "i'm game", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "let's move forward", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "move forward", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "bring it on", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "let's get going", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "get going", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "let's get started", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "get started", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "start", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "begin", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "let's begin", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "here we go", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "off we go", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "away we go", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "let's hit the road", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "hit the road", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "let's travel", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "travel", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "let's journey", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "journey", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "let's explore", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "explore", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "let's visit", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "visit", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "let's check it out", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "check it out", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "let's see it", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "see it", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "let's see", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "see", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "let's view it", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "view it", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "let's view", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "view", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "let's look", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "look", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "let's look at it", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "look at it", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "let's check", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "check", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "let's check out", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "check out", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "let's go check", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "go check", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "let's go see", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "go see", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "let's go look", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "go look", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "let's go view", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "go view", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "let's go visit", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "go visit", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "let's go explore", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "go explore", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "let's go travel", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "go travel", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "let's go journey", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "go journey", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "now go", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "please now", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "begin now", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "continue please", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "move", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "roll", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "head out", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "send me", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "bring me", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "get me", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}
+{"input": "go now please", "response": {"poi_id": "last_poi_id", "should_move": true}, "lang": "en"}

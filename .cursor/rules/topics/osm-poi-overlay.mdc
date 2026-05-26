@@ -1,0 +1,57 @@
+---
+description: Baked OSM POI dev overlay — Overpass export script, JSON, Kit markers, web category toggle + list (complements live transit vehicles)
+globs:
+  - "**/export_osm_pois.py"
+  - "**/osm_pois_gbg.json"
+  - "**/osm_poi_markers_service.py"
+  - "**/iotOsmPois/**"
+  - "**/iotOsmPois.ts"
+  - "**/iotShared/**"
+---
+
+# OSM POI overlay (baked, dev IoT)
+
+**Dev-only** (same extension as WAQI/GBFS: `younite.open_data_live_extension`). Static **OpenStreetMap** point features around the same radius as `generate_roads.py` are exported to **`kit-app-template-main/source/data/osm/osm_pois_gbg.json`** and bundled into the web app. The dev **IoT** drawer opens **`IotOsmPoisPanel`**: a **category** toggle (restaurants, cafés & bars, parks, culture, transit stops) filters the list and the **`iotOsmPoisStations`** payload so only one category’s markers exist in Kit at a time.
+
+## Data bake
+
+| Item | Location |
+|------|----------|
+| Export script | `source/data/osm/export_osm_pois.py` |
+| Output JSON | `source/data/osm/osm_pois_gbg.json` (committed) |
+| Reference point / radius | Same `LAT_REF`, `LON_REF`, `RADIUS_M` as `generate_roads.py` |
+
+**Run** (from `source/data/osm`): `python export_osm_pois.py` — requires network (Overpass). Re-run when you want fresher OSM, then **`npm run build`** (or dev server) on the web so the bundled JSON updates.
+
+**Categories** (caps are in-script): `restaurants`, `cafes_bars`, `parks`, `culture`, `transit_stops` (bus stops, platforms, tram stops). Some categories may be empty in a given extract.
+
+**Licence**: OSM data is **ODbL** — the panel footer shows **© OpenStreetMap contributors**.
+
+## Relation to live transit
+
+**Live** vehicle positions come from Västtrafik (`transit-live-overlay.mdc`). **Baked** `transit_stops` are OSM **infrastructure** (stop locations); they complement moving buses/trams but are not GTFS-real-time.
+
+## Kit
+
+- Service: `OsmPoiMarkersService` in `osm_poi_markers_service.py`
+- USD root: `/World/IoT_OsmPois/Stations` — sublayer `iot_osm_pois_layer.usda`; runtime may create the parent chain if the sublayer is missing from the composed stage.
+- **Placement:** WGS84 → USD via `GeoCoordinateService`, then **`snap_geo_scene_position_to_ground`** (same idea as transit) so short poles are not buried under Cesium tiles; orchestrator visibility uses **`Priority.CRITICAL`**.
+- **Highlight:** `sync_stations` ends with **`_apply_highlight()`** so list selection stays correct if WebRTC delivers `HighlightStation` before `Stations`.
+- **Geo lag:** `extension.py` caches the last OSM payload and replays sync on **`scene.loaded`** and a short async poll when the first sync sees geo not ready yet.
+- Events: `iotOsmPoisStations`, `iotOsmPoisToggle`, `iotOsmPoisFocusStation`, `iotOsmPoisHighlightStation` (wired via `_register_station_service` in `extension.py`, OSM uses optional cache + `after_stations_sync` hook).
+- **Materials:** default crowns use a vivid red/orange family for visibility on stream; list selection uses orange halo + teal beacon (not category-tinted crowns).
+
+## Web
+
+- Types: `web-viewer-sample-main/src/types/iotOsmPois.ts`
+- JSON import: `src/services/iot/osmPoisBaked.ts`
+- Panel: `src/features/streaming/overlays/iotOsmPois/IotOsmPoisPanel.tsx` (wrapped in **`IotPanelLayout`** with the other IoT list panels)
+- **Shell / mobile:** `src/features/streaming/overlays/iotShared/` — `IotPanelLayout.tsx`, `useIotPanelDrag.ts`, `index.ts`; shared chrome + bottom-sheet behaviour (≤639px) and drag-to-dismiss live in **`IotAirStationsPanel.css`**.
+- **Effects:** send **`iotOsmPoisStations` before** `iotOsmPoisHighlightStation`; category tab clears selection, sends focus to the first POI in the new category.
+- **WebRTC payload**: `iotOsmPoisStations` sends only **`id`, `lat`, `lon`, `category`** (no `name`, `opening_hours`, or `detail` — those stay in the web UI only). Kit uses `id` as the prim label when `name` is missing. Only the **nearest N** per category get markers (cap in `IotOsmPoisPanel.tsx`). The full baked list stays in the bundled JSON; the cap is only for the Kit message size. Rebuild the web app after changing this — fat JSON will trip Carb’s parser.
+
+## Related
+
+- `open-data-live-waqi-gbfs.mdc` — shared IoT drawer and messaging patterns
+- `osm-navigation.mdc` — road graph (separate offline pipeline)
+- `transit-live-overlay.mdc` — live vehicles

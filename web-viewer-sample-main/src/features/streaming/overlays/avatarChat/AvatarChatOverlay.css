@@ -1,0 +1,785 @@
+/* ── AvatarChatOverlay ── */
+
+/* ── Full-body character behind chat (NPC click only) ── */
+
+.avatar-chat-character-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 1995;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  pointer-events: none;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.6) 3%, #000 7%);
+  mask-image: linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.6) 3%, #000 7%);
+}
+
+.avatar-chat-character-bg__img {
+  width: 100%;
+  height: 91%;
+  object-fit: contain;
+  object-position: bottom center;
+  user-select: none;
+  filter: drop-shadow(0 8px 32px rgba(0, 0, 0, 0.3));
+}
+
+@keyframes avatar-chat-character-fade-in {
+  from { opacity: 0; transform: translateY(24px) scale(0.96); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.avatar-chat-character-bg {
+  animation: avatar-chat-character-fade-in 0.5s ease-out forwards;
+}
+
+.avatar-chat-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1990;
+  pointer-events: auto;
+  background: rgba(255, 255, 255, 0.24);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+/* Solid cover when layered above CUControls (search → chat) */
+.avatar-chat-backdrop--solid {
+  z-index: 10055;
+  background: rgb(232, 229, 225);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.avatar-chat-container {
+  position: fixed;
+  inset: 0;
+  z-index: 2001;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-end;
+  pointer-events: none;
+}
+
+/* ── Back button (search → chat navigation) ── */
+
+/* When layered above CUControls (search → chat), raise the container */
+.avatar-chat-container--above-controls {
+  z-index: 10060;
+}
+
+.avatar-chat-back-btn {
+  position: fixed;
+  top: 40px;
+  left: var(--page-edge-left);
+  z-index: 10062;
+  width: 48px;
+  height: 48px;
+  border-radius: 80px;
+  border: none;
+  background: #DCFF7D;
+  color: #1e1b4b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 1px 5px 0 rgba(0, 0, 0, 0.25);
+  transition: background 0.15s ease, transform 0.1s ease;
+  padding: 10px;
+}
+
+.avatar-chat-back-btn:hover {
+  background: #d0f060;
+}
+
+.avatar-chat-back-btn:active {
+  transform: scale(0.93);
+}
+
+/* Koko chat-lehti: klikit eivät sulje taustaa; dock täysleveä */
+.avatar-chat-sheet {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  width: 100%;
+  max-width: 100%;
+  flex: 1 1 0;
+  min-height: 0;
+  justify-content: flex-end;
+  pointer-events: auto;
+  box-sizing: border-box;
+  /* Yksi fontti koko chatille (viestit + syöttökenttä) */
+  font-family: Lexend, system-ui, sans-serif;
+}
+
+.avatar-chat-panel {
+  align-self: center;
+  position: relative;
+  width: 100%;
+  max-width: min(390px, var(--page-max-width-gutter));
+  margin-left: auto;
+  margin-right: auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: flex-start;
+  flex: 1 1 0;
+  min-height: 0;
+  padding-top: 72px;
+  box-sizing: border-box;
+}
+
+.avatar-chat-panel--with-character {
+  padding-top: max(180px, 25vh);
+}
+
+@media (max-height: 600px) {
+  .avatar-chat-panel--with-character {
+    padding-top: max(80px, 12vh);
+  }
+}
+
+.avatar-chat-close-btn {
+  position: fixed;
+  top: 40px;
+  right: var(--page-edge-right);
+  z-index: 2010;
+}
+
+.avatar-chat-hamburger-btn {
+  position: fixed;
+  top: 40px;
+  right: var(--page-edge-right);
+  width: 48px;
+  height: 48px;
+  border: none;
+  border-radius: 80px;
+  background: var(--Off-white, #f6f6f6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 10062;
+  box-shadow: 0 1px 6px 0 rgba(0, 0, 0, 0.3);
+  padding: 10px;
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+
+.avatar-chat-hamburger-btn:hover {
+  background: #eeeeee;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.14);
+  transform: scale(1.03);
+}
+
+.avatar-chat-hamburger-btn:active {
+  transform: scale(0.98);
+}
+
+.avatar-chat-hamburger-icon {
+  width: 23px;
+  height: 23px;
+  object-fit: contain;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* ── Chat messages area ── */
+
+.avatar-chat-messages {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: 12px 0 12px 0;
+  min-height: 0;
+  flex: 1 1 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  /* Soften top cut-off: messages fade out instead of hard clipping */
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 24px, #000 100%);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 24px, #000 100%);
+}
+
+.avatar-chat-messages::-webkit-scrollbar {
+  width: 0;
+  transition: width 0.2s ease;
+}
+
+.avatar-chat-messages.is-scrolling {
+  scrollbar-width: thin;
+}
+
+.avatar-chat-messages.is-scrolling::-webkit-scrollbar {
+  width: 5px;
+}
+
+.avatar-chat-messages.is-scrolling::-webkit-scrollbar-thumb {
+  background: rgba(53, 26, 132, 0.3);
+  border-radius: 3px;
+}
+
+.avatar-chat-messages.is-scrolling::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Pushes messages to the bottom when few; may shrink when the thread overflows */
+.avatar-chat-messages-spacer {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* ── Message rows ── */
+
+.avatar-chat-msg {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  min-width: 0;
+}
+
+.avatar-chat-msg.assistant {
+  flex-direction: row;
+  gap: 6px;
+}
+
+.avatar-chat-msg.user {
+  flex-direction: row;
+  justify-content: flex-end;
+}
+
+.avatar-chat-msg.assistant .avatar-chat-msg-body {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin-right: 40px;
+}
+
+.avatar-chat-msg.user .avatar-chat-msg-body {
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* ── Avatar portrait — 32 px (inline SVG: Lemon + clipped image; Figma “image avatar”) */
+
+.avatar-chat-portrait {
+  display: block;
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  max-width: 32px;
+  min-height: 32px;
+  max-height: 32px;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  line-height: 0;
+}
+
+.avatar-chat-portrait-svg {
+  display: block;
+  width: 32px;
+  height: 32px;
+  vertical-align: top;
+}
+
+.avatar-chat-portrait-spacer {
+  width: 32px;
+  min-width: 32px;
+  flex-shrink: 0;
+}
+
+/* ── Bubble ── */
+
+.avatar-chat-bubble {
+  position: relative;
+  padding: 12px 16px;
+  border-radius: 16px;
+  max-width: 280px;
+  font-size: 14px;
+  line-height: 1.4;
+  box-sizing: border-box;
+}
+
+/* Assistant-viestin <p> — Dark Purple; p.-etuliite voittaa Bootstrapin p-tyylit */
+/* Älä käytä flex-grow + flex-basis:0 kuplassa: sisältö voi saada 0 korkeuden → teksti “katoaa” */
+p.avatar-chat-bubble-text {
+  margin: 0;
+  flex: 0 1 auto;
+  min-width: 0;
+  min-height: min-content;
+  padding: 2px 0 0;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  color: #351a84;
+  color: var(--Dark-Purple, #351a84);
+  position: relative;
+  z-index: 0;
+  overflow: visible;
+  font-family: Lexend, system-ui, sans-serif;
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 500;
+  line-height: 130%;
+  white-space: pre-line;
+}
+
+/* Teksti ei mene kaiuttimen alle (oikea yläkulma) */
+.avatar-chat-msg.assistant .avatar-chat-bubble p.avatar-chat-bubble-text {
+  flex: 0 1 auto;
+  margin: 0;
+  padding-right: 40px;
+  padding-top: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.avatar-chat-bubble-head {
+  position: relative;
+  display: block;
+  width: 100%;
+  min-height: 28px;
+}
+
+.avatar-chat-msg.assistant .avatar-chat-bubble {
+  display: flex;
+  padding: 10px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  flex: 1 0 0;
+  border-radius: 12px;
+  border: 1px solid rgba(33, 23, 64, 0.3);
+  background: var(--Off-white, #f6f6f6);
+  color: var(--Dark-Purple, #351a84);
+  width: 100%;
+  max-width: min(340px, var(--page-max-width-gutter));
+  box-shadow: 0 2px 4px 0 rgba(0, 0, 0, 0.2);
+}
+
+.avatar-chat-msg.user .avatar-chat-bubble {
+  display: block;
+  width: fit-content;
+  /* 44px = portrait 32 + gap 6 + 6px right margin for shadow */
+  max-width: calc(min(390px, var(--page-max-width-gutter)) - 44px);
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--Lighter-Purple, #D8CFFF);
+  color: #1e1b4b;
+  margin-left: auto;
+  margin-right: 6px;
+  font-family: Lexend, system-ui, sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 130%;
+  white-space: pre-line;
+  overflow-wrap: break-word;
+  box-shadow: 0 2px 4px 0 rgba(0, 0, 0, 0.2);
+}
+
+/* ── Speaker icon ── */
+
+.avatar-chat-speaker {
+  display: flex;
+  width: 28px;
+  height: 28px;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  aspect-ratio: 1 / 1;
+  flex-shrink: 0;
+  margin: 0;
+  padding: 0;
+  border-radius: 80px;
+  border: 1px solid var(--Dark-Purple, #351a84);
+  background: transparent;
+  color: var(--Dark-Purple, #351a84);
+  cursor: pointer;
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease, transform 0.15s ease;
+}
+
+.avatar-chat-speaker-icon {
+  width: 14px;
+  height: 14px;
+  display: block;
+  flex-shrink: 0;
+  pointer-events: none;
+}
+
+/* Assistant bubble: speaker button on right side inside bubble */
+.avatar-chat-msg.assistant .avatar-chat-bubble .avatar-chat-speaker {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 1;
+}
+
+@media (hover: hover) {
+  .avatar-chat-speaker:hover {
+    background: var(--Dark-Purple, #351a84);
+    border-color: var(--Dark-Purple, #351a84);
+    color: var(--Off-white, #f6f6f6);
+  }
+}
+
+.avatar-chat-speaker:focus-visible {
+  outline: 2px solid var(--Dark-Purple, #351a84);
+  outline-offset: 2px;
+}
+
+.avatar-chat-speaker:active {
+  transform: scale(0.96);
+}
+
+.avatar-chat-speaker.avatar-chat-speaker--playing,
+.avatar-chat-speaker.avatar-chat-speaker--playing:hover {
+  background: var(--Dark-Purple, #351a84);
+  border-color: var(--Dark-Purple, #351a84);
+  color: var(--Off-white, #f6f6f6);
+}
+
+/* ── Quick action buttons ── */
+
+.avatar-chat-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+/* Inside speech bubble: actions stack under greeting (parent gap handles spacing) */
+.avatar-chat-actions.avatar-chat-actions--in-bubble {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.avatar-chat-action-btn {
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1.5px solid #312e81;
+  background: #ffffff;
+  color: #312e81;
+  font-family: Lexend, system-ui, sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    border-radius 0.15s ease;
+  white-space: nowrap;
+  width: auto;
+  max-width: 100%;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+.avatar-chat-action-btn:focus {
+  outline: none;
+}
+
+.avatar-chat-action-btn:focus-visible {
+  outline: 2px solid #312e81;
+  outline-offset: 2px;
+}
+
+.avatar-chat-action-btn--long {
+  width: 100%;
+  white-space: normal;
+  text-align: left;
+  line-height: 1.3;
+}
+
+@media (hover: hover) {
+  .avatar-chat-action-btn:hover,
+  .avatar-chat-action-btn.active {
+    background: #312e81;
+    border-color: #312e81;
+    color: #fff;
+  }
+}
+
+/* Lemon press — vain dark mode (DarkMode.css, .avatar-chat-msg.assistant) */
+
+/* ── Askbox (chat input dock) ── */
+
+.avatar-chat-input-dock {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  align-self: stretch;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  padding: 16px 16px 40px 16px;
+  border-radius: 16px 16px 0 0;
+  background: rgba(234, 231, 229, 0.9);
+  box-shadow:
+    0 -2px 8px rgba(33, 23, 64, 0.1),
+    0 -1px 3px rgba(0, 0, 0, 0.07);
+  flex-shrink: 0;
+  overflow: hidden;
+  transform: translateY(6px);
+}
+
+.avatar-chat-input-bar {
+  display: flex;
+  flex-direction: row;
+  flex: 1 1 auto;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  box-sizing: border-box;
+}
+
+/* Ask question — tekstikentän pill (mic + input) */
+.avatar-chat-input-wrapper {
+  display: flex;
+  flex-direction: row;
+  flex: 1 0 0;
+  min-width: 0;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 12px;
+  border-radius: 12px;
+  background: var(--Off-white, #f6f6f6);
+  box-shadow: 0 4px 2px 0 rgba(0, 0, 0, 0.2) inset;
+  box-sizing: border-box;
+}
+
+.avatar-chat-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-family: Lexend, sans-serif;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.3;
+  color: var(--Dark-Purple, #351a84);
+  padding: 0;
+}
+
+.avatar-chat-mic-outside {
+  flex-shrink: 0;
+  align-self: center;
+}
+
+/* Dark-mode dock send (replaces dual-purpose mic when text + dark theme) */
+.avatar-chat-dock-send-fab {
+  flex-shrink: 0;
+  box-sizing: border-box;
+  display: flex;
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  margin: 0;
+  padding: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 80px;
+  border: 1px solid rgba(53, 26, 132, 0.45);
+  background: var(--Lemon, #dcff7d);
+  box-shadow: 0 2px 3px 0 rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+  align-self: center;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease,
+    background 0.18s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.avatar-chat-dock-send-fab:hover {
+  filter: brightness(1.03);
+}
+
+.avatar-chat-dock-send-fab:active {
+  transform: scale(0.96);
+}
+
+.avatar-chat-dock-send-fab:focus {
+  outline: none;
+}
+
+.avatar-chat-dock-send-fab:focus-visible {
+  outline: 2px solid var(--Dark-Purple, #351a84);
+  outline-offset: 2px;
+}
+
+.avatar-chat-dock-send-fab__icon {
+  display: block;
+  width: 20px;
+  height: 20px;
+  pointer-events: none;
+  user-select: none;
+}
+
+.avatar-chat-input::placeholder {
+  color: rgba(53, 26, 132, 0.6);
+}
+
+/* Send — kentän vieressä (ei wrapperin sisällä), näkyy kun kentässä on teksti */
+@keyframes avatar-chat-send-in {
+  from {
+    opacity: 0;
+    transform: scale(0.88);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.avatar-chat-send-btn {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: var(--Dark-Purple, #351a84);
+  color: #dcff7d;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  line-height: 0;
+  box-sizing: border-box;
+  animation: avatar-chat-send-in 0.2s ease;
+  box-shadow: 0 1px 4px rgba(33, 23, 64, 0.28);
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    transform 0.15s ease,
+    background 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.avatar-chat-send-btn:hover {
+  background: color-mix(in srgb, var(--Dark-Purple, #351a84) 90%, #ffffff);
+  box-shadow: 0 2px 8px rgba(33, 23, 64, 0.22);
+  transform: scale(1.05);
+}
+
+.avatar-chat-send-btn:active {
+  transform: scale(0.96);
+}
+
+.avatar-chat-send-btn:focus-visible {
+  outline: 2px solid var(--Dark-Purple, #351a84);
+  outline-offset: 2px;
+}
+
+.avatar-chat-send-icon {
+  width: 17px;
+  height: 17px;
+  display: block;
+  pointer-events: none;
+  user-select: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .avatar-chat-send-btn {
+    animation: none;
+  }
+}
+
+/* ── Error bubble ── */
+
+.avatar-chat-bubble.avatar-chat-bubble--error {
+  border-color: rgba(180, 60, 60, 0.35);
+  background: #fef2f2;
+}
+
+.avatar-chat-bubble--error .avatar-chat-bubble-text {
+  color: #991b1b;
+}
+
+/* ── Typing indicator ── */
+
+.avatar-chat-msg.assistant .avatar-chat-bubble.avatar-chat-bubble--typing {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 12px 18px;
+  min-height: 0;
+  width: auto;
+  max-width: none;
+  flex: 0 0 auto;
+}
+
+.avatar-chat-typing-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--Dark-Purple, #351a84);
+  opacity: 0.25;
+  animation: avatar-chat-typing-blink 1.2s ease-in-out infinite;
+}
+
+.avatar-chat-typing-dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.avatar-chat-typing-dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes avatar-chat-typing-blink {
+  0%, 80%, 100% {
+    opacity: 0.25;
+    transform: translateY(0);
+  }
+  40% {
+    opacity: 1;
+    transform: translateY(-2px);
+  }
+}
+
+/* ── Mobile software keyboard (visualViewport shrink) ── */
+
+.avatar-chat--keyboard-open .avatar-chat-panel {
+  padding-top: 8px;
+}
+
+.avatar-chat--keyboard-open .avatar-chat-panel--with-character {
+  padding-top: 8px;
+}
+
+.avatar-chat--keyboard-open .avatar-chat-messages {
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 8px, #000 100%);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 8px, #000 100%);
+}
+
+.avatar-chat--keyboard-open .avatar-chat-input-dock {
+  padding-bottom: max(12px, env(safe-area-inset-bottom, 0px));
+}

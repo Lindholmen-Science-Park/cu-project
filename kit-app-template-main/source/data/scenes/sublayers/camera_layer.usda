@@ -1,0 +1,58 @@
+#usda 1.0
+(
+    customLayerData = {
+        string description = "Camera layer for main_scene — VIP/main entrance cameras."
+    }
+)
+
+over "World"
+{
+    def Camera "camera_vip_entrance" (
+        prepend apiSchemas = ["OmniRtxCameraAutoExposureAPI_1", "OmniRtxCameraExposureAPI_1"]
+    )
+    {
+        float2 clippingRange = (1, 10000000)
+        float exposure:responsivity = 1.1026709
+        float exposure:time = 0.02
+        float focalLength = 8
+        float focusDistance = 400
+        custom uniform vector3d omni:kit:centerOfInterest = (0, 0, -390.9535069783964)
+        double3 xformOp:rotateYXZ = (-19.206054624208576, -338.07358924871545, 7.543211989130327)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (-2881.2002202121203, 2481.743207461559, -4694.540305969391)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateYXZ", "xformOp:scale"]
+    }
+
+    def Camera "camera_main_entrance_exit" (
+        prepend apiSchemas = ["OmniRtxCameraAutoExposureAPI_1", "OmniRtxCameraExposureAPI_1"]
+    )
+    {
+        float2 clippingRange = (1, 10000000)
+        float exposure:responsivity = 1.1026709
+        float exposure:time = 0.02
+        float focalLength = 12
+        float focusDistance = 400
+        float fStop = 0
+        custom uniform vector3d omni:kit:centerOfInterest = (0, 0, -400)
+        double3 xformOp:rotateYXZ = (-19.336284440074166, 6.70418349601718, 2.228897345841574)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (-1706.0940771244677, 2485.573966686171, -5046.9030251934455)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateYXZ", "xformOp:scale"]
+    }
+
+    def Camera "camera_main_entrance_entry" (
+        prepend apiSchemas = ["OmniRtxCameraAutoExposureAPI_1", "OmniRtxCameraExposureAPI_1"]
+    )
+    {
+        float2 clippingRange = (1, 10000000)
+        float exposure:responsivity = 1.1026709
+        float exposure:time = 0.02
+        float focalLength = 14
+        float focusDistance = 400
+        custom uniform vector3d omni:kit:centerOfInterest = (0, 0, -400)
+        double3 xformOp:rotateYXZ = (-12.51417662787182, 8.3068245797119, 1.8120463322098033)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (-218.9878207348338, 2484.9022305772223, -5246.428058981538)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateYXZ", "xformOp:scale"]
+    }
+}

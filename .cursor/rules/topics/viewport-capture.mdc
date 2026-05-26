@@ -1,0 +1,143 @@
+---
+description: Viewport capture — two-mode screenshot (web snapshot vs Kit-rendered), HTTP server image transfer, camera bar popup, Tools menu integration
+---
+
+# Viewport Capture (Snapshot + Rendered)
+
+Two capture modes for downloading a screenshot of the current viewport. **Snapshot** grabs the WebRTC video frame instantly on the web side (compressed, stream resolution). **Rendered** requests a full-quality capture from Kit's GPU renderer at native viewport resolution and serves it via an HTTP endpoint for the browser to download.
+
+**Kit extension**: `younite.viewport_capture_extension`
+**Depends on**: `omni.kit.viewport.utility`, `younite.messaging_core_extension`, `PIL` (Pillow, bundled with Kit Python)
+**Frontend**: Tools menu "Viewport Capture" section + camera lens bar popup button (`UIControls.tsx`)
+
+## Quality & Size Difference
+
+| | Snapshot | Rendered |
+|---|---|---|
+| **Source** | `<video id="remote-video">` HTML element | Kit viewport via `capture_viewport_to_buffer()` |
+| **Quality** | WebRTC lossy compression (H.264/VP8/VP9) | Full GPU render, no stream compression artifacts |
+| **Resolution** | Stream resolution (typically 1080p) | Native viewport render resolution |
+| **Format** | PNG (lossless, larger files ~1-2 MB) | JPEG quality 95 (visually lossless, smaller files ~300 KB) |
+| **Speed** | Instant | 1–2 seconds (render + encode + HTTP download) |
+| **Kit involved** | No | Yes |
+
+The rendered image has **better source quality** despite smaller file size. The size difference is purely format: PNG is lossless (every pixel preserved, larger), JPEG 95 is lossy but visually indistinguishable from lossless for rendered scenes.
+
+Future: format selection (JPEG/PNG) can be added to the UI if needed — the Kit extension already supports both via the `format` payload field.
+
+## Architecture
+
+### Snapshot (web-only)
+
+`doSnapshotCapture(filePrefix)` in `UIControls.tsx`:
+1. Gets `document.getElementById('remote-video')` as `HTMLVideoElement`
+2. Creates off-screen canvas at `videoWidth × videoHeight`
+3. `ctx.drawImage(video, 0, 0)` — captures current decoded frame
+4. `canvas.toDataURL('image/png')` → triggers `<a>.click()` download
+
+File naming: `{prefix}_{timestamp}.png`
+
+### Rendered (Kit HTTP server → browser download)
+
+The NVST WebRTC data channel has a hard **64 KB message limit**, so image data cannot be sent through it. Instead, the Kit extension serves the captured image via a lightweight HTTP endpoint and sends only the download URL through the data channel.
+
+#### Kit side (`extension.py`)
+
+1. On startup, starts a threaded `HTTPServer` on port 49300 (configurable via `_CAPTURE_PORT`)
+2. Receives `viewportCaptureRequest` message (payload: `{ format: "jpeg" | "png" }`)
+3. Dispatches `viewportCaptureResult` with `{ status: "capturing" }` (progress indicator)
+4. `get_active_viewport()` → `capture_viewport_to_buffer(viewport, callback)` — captures raw RGBA pixels into memory (no temp files — avoids Windows file-lock permission issues with `capture_viewport_to_file`)
+5. Callback delivers `(buffer, buffer_size, width, height, pixel_format)` via an asyncio `Future`; buffer is a **PyCapsule**, extracted via `ctypes.PyCapsule_GetPointer` into Python `bytes`
+6. PIL converts raw RGBA to JPEG (quality 95) or PNG in a `BytesIO` buffer
+7. Stores the encoded image in `_CaptureStore` (thread-safe dict) keyed by a random UUID
+8. Sends `viewportCaptureResult` with `{ status: "ready", port, captureId, filename, width, height }` through the data channel (small message, well within 64 KB)
+9. Old captures are cleaned up after `_CAPTURE_TTL` (120 seconds); successfully downloaded captures are removed immediately (`pop`)
+
+#### HTTP server
+
+- Binds to `0.0.0.0:49300` (accessible from any network interface)
+- `GET /<captureId>` → serves the image as an attachment download with CORS headers, then removes it from the store (one-time download)
+- `OPTIONS` → CORS preflight
+- Runs in a daemon thread; shut down on extension shutdown
+- Suppresses HTTP request logging (`log_message` is a no-op)
+
+#### Web side (`useCustomEventHandler.ts`)
+
+1. `viewportCaptureResult` with `status: "capturing"` → sets `viewportCaptureStatus` to `'capturing'` (UI shows spinner)
+2. `status: "ready"` → constructs URL as `http://${window.location.hostname}:${port}/${captureId}`, creates `<a>` with `download` attribute, clicks it → browser downloads the image directly from Kit's HTTP server
+3. `status: "error"` → logs error, resets status
+
+File naming: `rendered_{width}x{height}_{timestamp}.jpg`
+
+## Events
+
+| Event | Direction | Payload |
+|-------|-----------|---------|
+| `viewportCaptureRequest` | Web → Kit | `{ format?: "jpeg" \| "png" }` (default: jpeg) |
+| `viewportCaptureResult` | Kit → Web | `{ status: "capturing" }` — progress |
+| `viewportCaptureResult` | Kit → Web | `{ status: "ready", port: int, captureId: string, filename: string, width: int, height: int }` — download ready |
+| `viewportCaptureResult` | Kit → Web | `{ status: "error", error: string }` — failure |
+
+## HTTP Transfer (not data channel)
+
+The image is transferred via a standard HTTP GET request, not the WebRTC data channel. The data channel is only used for the small control messages (capture request, ready notification). This avoids the 64 KB NVST message size limit and works efficiently for any image size.
+
+Port 49300 is used by default (`_CAPTURE_PORT`). Ports 49100–49200 are reserved for WebRTC signaling/media. For multi-instance deployments, each Kit container should expose port 49300 alongside the streaming ports.
+
+## Gotchas & Lessons Learned
+
+1. **`capture_viewport_to_file` has Windows file-lock issues** — the renderer may hold the file handle after `wait_for_result()` returns, causing `PermissionError: [Errno 13]` on read. Solution: use `capture_viewport_to_buffer` instead (entirely in-memory).
+2. **Buffer is a PyCapsule, not bytes** — Kit's `capture_viewport_to_buffer` callback delivers the pixel data as a `PyCapsule` (C pointer wrapper). Must use `ctypes.PyCapsule_GetPointer` to extract raw bytes.
+3. **NVST data channel limit is 64 KB** — cannot send image data through the WebRTC data channel. Use an HTTP sidecar server instead.
+4. **Click-outside popup race** — `pointerdown` fires before `click` in the browser event sequence. A click-outside handler using `pointerdown` on `document` will close a popup before button `click` handlers fire. Fix: `onPointerDown={(e) => e.stopPropagation()}` on the popup container.
+5. **Rendered JPEG is smaller than snapshot PNG** — this is expected (format difference, not quality difference). JPEG 95 is visually lossless for rendered scenes.
+
+## Frontend UI
+
+### Tools menu (hamburger → Tools → Viewport Capture)
+
+Two inline buttons in the "Viewport Capture" section:
+- **📷 Snapshot** — instant, calls `doSnapshotCapture('snapshot')`
+- **🎨 Rendered** — sends `viewportCaptureRequest`, shows "Rendering..." while waiting
+- Hint text: "Snapshot: instant stream frame. Rendered: full GPU quality from Kit."
+
+### Camera lens bar (placed camera view)
+
+The **📸 Capture** button in the bottom lens bar opens a floating popup above the button with two options:
+- **📷 Snapshot** — file named `{cameraLabel}_{focalLength}mm_{timestamp}.png`
+- **🎨 Rendered** — file named `rendered_{width}x{height}_{timestamp}.jpg`
+
+The popup uses a click-outside-to-close pattern:
+- `useEffect` adds a `pointerdown` listener on `document` (with `{ once: true }`) when the popup opens
+- The popup container has `onPointerDown={(e) => e.stopPropagation()}` to prevent clicks inside the popup from triggering the close handler (see Gotcha #4)
+
+## State
+
+| State | Location | Purpose |
+|-------|----------|---------|
+| `viewportCaptureStatus` | `StreamOnlyWindow.tsx` (`useState<'idle' \| 'capturing'>`) | UI feedback for rendered capture in progress |
+| `capturePopupOpen` | `UIControls.tsx` (local `useState`) | Controls camera bar popup visibility |
+
+## Key Files
+
+| File | Purpose |
+|------|---------|
+| `source/extensions/younite.viewport_capture_extension/younite/viewport_capture_extension/extension.py` | Kit extension — viewport capture, PIL encode, HTTP server, store |
+| `source/extensions/younite.viewport_capture_extension/config/extension.toml` | Extension config, depends on `omni.kit.viewport.utility` |
+| `web-viewer-sample-main/src/features/dev/controls/UIControls.tsx` | Snapshot helper, rendered helper, Tools menu section, camera bar popup |
+| `web-viewer-sample-main/src/features/streaming/hooks/useCustomEventHandler.ts` | Handles `viewportCaptureResult` events, constructs download URL |
+| `web-viewer-sample-main/src/features/streaming/StreamOnlyWindow.tsx` | `viewportCaptureStatus` state |
+| `source/extensions/younite.messaging_core_extension/younite/messaging_core_extension/extension.py` | `viewportCaptureResult` registered as outbound event |
+
+## Future Enhancements
+
+- **Format selector in UI** — the Kit extension already supports `format: "jpeg" | "png"` in the request payload; adding a UI toggle/dropdown would let users choose lossless PNG when needed
+- **JPEG quality slider** — currently hardcoded to 95; could be exposed as a UI control
+- **HDR/EXR capture** — `capture_viewport_to_buffer` supports `is_hdr=True`; would need a new format path and appropriate encoding
+- **Cloud storage** — when cloud infrastructure is available, captures could be uploaded to object storage instead of served from the Kit instance directly
+
+## Related
+
+- Streaming resolution & video element: `.cursor/rules/topics/resolution-streaming.mdc`
+- Events 2.0 / messaging patterns: `.cursor/rules/topics/events-api.mdc`
+- Camera depth capture (different — PhysX raycasting): `.cursor/rules/topics/camera_depth_capture.mdc`

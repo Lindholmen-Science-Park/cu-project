@@ -1,0 +1,122 @@
+#usda 1.0
+(
+    defaultPrim = "Root"
+    metersPerUnit = 0.01
+    upAxis = "Y"
+)
+
+def Xform "Root" (
+    prepend references = [
+        @./scandinavium_project_overrides.usda@,
+        @../../nucleus/skandinavium/Skandinavium.usda@
+    ]
+    prepend variantSets = "lod"
+    variants = {
+        string lod = "full"
+    }
+)
+{
+    def "ArenaStairs" (
+        prepend payload = @../Arena stairs/ArenaStairs.usdc@
+    )
+    {
+        float3 xformOp:rotateXYZ = (0, 0, 0)
+        float3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (-204.100003041327, 1494.200022265315, -13.600000202655792)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+
+        over "ArenaStairs"
+        {
+            over "ArenaStairs"
+            {
+                over "Trappa_nedre_parkett001"
+                {
+                    float3 xformOp:rotateXYZ = (-90, 0, 0)
+                    double3 xformOp:translate = (18.80000028014183, 67.90000101178885, 19.700000293552876)
+                }
+
+                over "Trappa_nedre_parkett002"
+                {
+                    float3 xformOp:rotateXYZ = (-90, -34.600002, 3.8827406e-15)
+                    double3 xformOp:translate = (-309.7000046148896, 65.70000097900629, 1082.3000161275268)
+                }
+
+                over "Trappa_nedre_parkett003"
+                {
+                    float3 xformOp:rotateXYZ = (-90, -67.00001, -3.2560045e-14)
+                    double3 xformOp:translate = (-1040.5000155046582, 65.1000009700656, 1706.4000254273415)
+                }
+
+                over "Trappa_nedre_parkett004"
+                {
+                    float3 xformOp:rotateXYZ = (-90, -83.97, -2.4342144e-13)
+                    double3 xformOp:translate = (-699.1000104174018, 65.50000097602606, 1667.0000248402357)
+                }
+
+                over "Trappa_nedre_parkett005"
+                {
+                    float3 xformOp:rotateXYZ = (90, -84.1, 180)
+                    double3 xformOp:translate = (746.1000111177564, 66.4000009894371, 1668.100024856627)
+                }
+
+                over "Trappa_nedre_parkett006"
+                {
+                    float3 xformOp:rotateXYZ = (90.5, -67.1, 180)
+                    double3 xformOp:translate = (1101.500016413629, 61.200000911951065, 1712.7000255212188)
+                    uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+
+                    over "Trappa_nedre_parkett001"
+                    {
+                        double3 xformOp:rotateXYZ = (0, 0, 0)
+                        double3 xformOp:scale
+                    }
+                }
+
+                over "Trappa_nedre_parkett007"
+                {
+                    double3 xformOp:translate = (366.1000054553151, 63.70000094920397, 1105.2000164687634)
+                }
+
+                over "Trappa_nedre_parkett008"
+                {
+                    double3 xformOp:translate = (-351.26995442589333, 64.00000095367432, -1060.8000158071518)
+                }
+
+                over "Trappa_nedre_parkett009"
+                {
+                    double3 xformOp:translate = (-1040.0000154972076, 68.2000010162592, -1679.2000250220299)
+                }
+
+                over "Trappa_nedre_parkett010"
+                {
+                    double3 xformOp:translate = (-630.9000094011426, 64.40000095963478, -1636.8000243902206)
+                }
+
+                over "Trappa_nedre_parkett011"
+                {
+                    float3 xformOp:rotateXYZ = (90, 83.200005, 180)
+                    double3 xformOp:translate = (681.7000101581216, 68.70000102370977, -1634.9000243619084)
+                }
+
+                over "Trappa_nedre_parkett012"
+                {
+                    float3 xformOp:rotateXYZ = (90, 66.700005, 180)
+                    double3 xformOp:translate = (1062.6000158339739, 65.00000096857548, -1670.60002489388)
+                }
+
+                over "Trappa_nedre_parkett013"
+                {
+                    double3 xformOp:translate = (369.40000550448895, 64.00000095367432, -1078.5000160709023)
+                }
+            }
+        }
+    }
+    variantSet "lod" = {
+        "full" {
+        }
+        "light" (
+            prepend references = @./scandinavium_lod_light_overrides.usda@
+        ) {
+        }
+    }
+}

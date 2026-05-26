@@ -1,0 +1,25 @@
+#usda 1.0
+
+over "World"
+{
+    def "ipad" (
+        prepend payload = @../../interaction_icons/ipad.usd@
+    )
+    {
+        float3 xformOp:rotateXYZ = (0, 0, 0)
+        float3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (2568.2810000402915, 2460.0306797947032, -824.7920836704492)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+
+        def Cube "Collider" (
+            prepend apiSchemas = ["PhysicsCollisionAPI", "PhysxCollisionAPI"]
+        )
+        {
+            float3 xformOp:scale = (20, 30, 20)
+            double3 xformOp:translate = (0, 30, 0)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+            token visibility = "invisible"
+            bool physics:collisionEnabled = 1
+        }
+    }
+}

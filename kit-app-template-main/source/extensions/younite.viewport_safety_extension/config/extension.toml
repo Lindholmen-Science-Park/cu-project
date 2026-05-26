@@ -1,0 +1,20 @@
+[package]
+title = "Younite Viewport Safety Extension"
+description = "Disables selection/manipulators/tools for streaming-style viewer"
+version = "0.1.0"
+authors = ["Younite"]
+category = "Feature"
+
+[dependencies]
+"omni.usd" = {}
+"omni.kit.viewport.utility" = {}
+
+[[python.module]]
+name = "younite.viewport_safety_extension"
+
+[build]
+include = [
+    "younite/**/*.py",
+    "*.toml",
+]
+

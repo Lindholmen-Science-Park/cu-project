@@ -1,0 +1,97 @@
+---
+description: Tile management extension — distance-based culling in first-person, show-all in bird's-eye, three-zone warmup model, Payload Orchestrator integration. Read when working on tile visibility, payload loading, city geometry performance, or distance culling.
+globs:
+  - "**/distance_culling_extension/**"
+alwaysApply: false
+---
+
+# Tile management
+
+## Purpose
+
+`younite.distance_culling_extension` (v2) manages city tile visibility and payload loading using a hybrid culling strategy. All mutations go through the Payload Orchestrator for frame-budgeted execution.
+
+**Starts disabled by default** — enable via web UI toggle.
+
+## Extension location
+
+`source/extensions/younite.distance_culling_extension/`
+
+- `extension.py` — entry point, `scene.loaded` listener, web toggle
+- `tile_manager.py` — discovery, hybrid culling loop, orchestrator calls
+
+## Hybrid culling strategy
+
+The active strategy is chosen automatically based on `/younite/camera/viewType` (written by `player_core`):
+
+### First-person — distance-based (`[D]`)
+
+Uses player XZ position and squared distance to each tile centre. Chosen over frustum culling here to avoid RTX path-tracing reconvergence flicker.
+
+| Zone | Distance | State | Orchestrator ops |
+|------|----------|-------|-----------------|
+| **Active** | 0–500 m | loaded + visible | `show(HIGH)` |
+| **Warmup** | 500–700 m | loaded + invisible | `load_prim(BACKGROUND)` + `hide(MEDIUM)` |
+| **Outer** | > 700 m | invisible + unloaded | `hide(LOW)` + `unload_prim(LOW)` |
+
+### Bird's eye — show all (`[B]`)
+
+When switching to bird's-eye, all tiles are immediately restored to Active (loaded + visible) via `_show_all()`. No culling runs while in bird's-eye — the loop returns early each tick.
+
+This avoids the lag spikes caused by USD composition re-evaluation and BVH rebuilds during rapid camera panning. When the user switches back to first-person, distance-based culling resumes and gradually unloads distant tiles through the normal cooldown path.
+
+### Hysteresis
+
+Both modes use 15% hysteresis on zone boundaries to prevent flickering.
+
+## Managed tiles
+
+Discovered at runtime after `scene.loaded`:
+
+- **CU_DT tiles** — children of `/World/CU_DT_8km2_Project_Scene/Geometry/`. Each tile has its own **payload arc** (restructured from stacked references via `convert_refs_to_payloads.py`) — **full load/unload supported**, freeing GPU memory.
+- **Legacy tiles** — children of `/World/legacy_buildings/`. No payload arcs — **visibility only**.
+- **Edited tiles** — `/World/edited_tile_*`. Each has its own payload arc — **full load/unload supported**.
+- **Never managed** — Skandinavium, Skandinavium_lights.
+
+Tiles with payload arcs (~132 of ~137) are fully unloaded from VRAM in the Outer zone. Tiles without payloads (legacy) are only hidden.
+
+## Web UI toggle
+
+- **Web → Kit**: `tileCullingToggle` with `{ enabled: true/false }`
+- **Kit → Web**: `tileCullingToggleStatus` with `{ enabled: true/false }`
+- `tileCullingToggleStatus` registered in `messaging_core_extension` outbound events
+
+Frontend files: `useControlHandlers.ts`, `useCustomEventHandler.ts`, `UIControls.tsx`, `StreamOnlyWindow.tsx`.
+
+## Lifecycle
+
+1. Extension starts disabled, subscribes to `scene.loaded` and `tileCullingToggle`.
+2. On `scene.loaded`: `TileManager.discover()` traverses known parent paths, computes bounding-box centres via `UsdGeom.BBoxCache`, records `HasPayload()`.
+3. User enables via web UI → `TileManager.start()` begins 1 Hz async loop.
+4. Each tick: read view type; in first-person compute per-tile distance zone and issue orchestrator ops (capped at `MAX_OPS_PER_TICK`); in bird's-eye show all tiles and skip culling.
+5. User disables → `TileManager.stop()` → all tiles restored to active via `CRITICAL` priority.
+
+## Tuning constants
+
+At the top of `tile_manager.py`:
+
+| Constant | Default | Description |
+|----------|---------|-------------|
+| `VISIBLE_RADIUS` | 50000 | Active zone boundary (distance mode) |
+| `WARMUP_RADIUS` | 100000 | Warmup zone boundary (distance mode) |
+| `HYSTERESIS_FACTOR` | 1.15 | In/out threshold gap |
+| `UPDATE_INTERVAL` | 1.0 | Seconds between ticks |
+| `MAX_OPS_PER_TICK` | 5 | Cap on orchestrator requests per tick |
+| `FRUSTUM_ACTIVE_MARGIN` | 3.5 | NDC active boundary (frustum mode, 1.0 = screen edge) |
+| `FRUSTUM_WARMUP_MARGIN` | 7.0 | NDC warmup boundary (frustum mode) |
+| `FRUSTUM_HYSTERESIS` | 1.15 | Frustum mode hysteresis |
+| `UNLOAD_COOLDOWN` | 10.0 | Seconds tile must stay in OUTER before payload unload |
+| `TILE_PARENTS` | — | Parent prim paths to scan |
+| `EDITED_TILE_PREFIX` | — | Prefix for edited tile prims |
+| `NEVER_MANAGE` | — | Prim paths always kept active |
+
+## Relationship to other extensions
+
+- **Payload Orchestrator** — all mutations routed through it
+- **Light Culling** — independent; manages lights on session layer directly
+- **Old distance culling / LOD management** — fully replaced by this extension

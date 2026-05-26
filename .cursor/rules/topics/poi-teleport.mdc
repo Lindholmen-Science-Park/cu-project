@@ -1,0 +1,228 @@
+---
+description: POI teleportation — instant teleport to seats, exits, restrooms, and any future Xform-based POI. Read when working on teleport, "Take Me There", or adding new POI types.
+globs:
+  - "**/teleport_service*"
+  - "**/teleport_registry*"
+  - "**/PoiRoutesWidget*"
+  - "**/SeatNavigateWidget*"
+  - "**/ExitsWidget*"
+  - "**/RestroomWidget*"
+  - "**/QuietZoneWidget*"
+  - "**/useNavigationHandlers*"
+alwaysApply: false
+---
+
+# POI Teleportation (Take Me There)
+
+Instant teleport to any point of interest — seats, exits, restrooms, or future POI types (kiosks, restaurants, etc.). Bypasses NavMesh pathfinding entirely; uses `TeleportService` to reposition the player directly.
+
+## Two teleport flavours
+
+| Flavour | Event | Lookup | Used by |
+|---|---|---|---|
+| **Seat teleport** | `seatTeleport` | `seat_lookup.json` (seat ID → world coords) | `SeatNavigateWidget`, `SeatNavigateWidget` (FP "Take Me There") |
+| **POI teleport** | `poiTeleport` | USD stage prim transform (`ComputeLocalToWorldTransform`) | `PoiRoutesWidget` (exits, restrooms, quiet zones, any Xform-based POI), `MapMarkerPoiSheet` (bird-eye restroom / quiet-zone sheets) |
+
+Both call `TeleportService.teleport_to_coordinates(...)`. **Seat** teleports may pass **`camera_local_yaw_deg=`** so the player spawns already facing the bowl center; **POI** teleports pass **`world_body_yaw_deg=`** from the target prim’s authored/world rotation so the player faces the same way as that spawn Xform (elevator floors, restrooms, exits).
+
+> "Take Me There" (these two events) is the **stay-in-FP, just-move-position** path. The visually-similar bird-eye → FP "Teleport me there" button on `MapMarkerPoiSheet` for restrooms / quiet zones also dispatches `poiTeleport`, but the surrounding view-transition flow does an FP-enter via `_async_first_person_enter(start_pose=…)` first — that path uses `TeleportService.teleport_to_pose` (camera reset + body rotation toward route endpoint) and is documented in `camera-teleport.mdc`. Do not conflate the two: `teleport_to_coordinates` preserves the camera rotation the user was looking around with; `teleport_to_pose` resets it deliberately because we just left bird-eye.
+
+## Architecture overview
+
+```
+Seat path:
+[SeatNavigateWidget]  ──onSeatTeleport──▸  handleSeatTeleport
+                                                 │
+                                       beginViewTransition({
+                                         onFadeOutComplete: () => sendMessage('seatTeleport')
+                                       })
+                                                 │ (after fade-out)
+                                       [Kit: _on_seat_teleport]
+                                         seat_lookup → position + optional yaw toward bbox center
+                                         TeleportService.teleport_to_coordinates(..., camera_local_yaw_deg=?)
+                                         dispatch younite.player.immediateViewAngles (sync input)
+                                                 │
+                                         dispatch('seatTeleportResult')
+                                         dispatch('viewTransitionReady')
+                                                 │
+[useCustomEventHandler]  ◂───────────────────────┘
+  viewTransitionReady → fade-in overlay
+
+POI path (generic — exits, restrooms, quiet zones, future types):
+[PoiRoutesWidget]  ──onTeleport──▸  handlePoiTeleport
+                                          │
+                                beginViewTransition({
+                                  onFadeOutComplete: () => sendMessage('poiTeleport')
+                                })
+                                          │ (after fade-out)
+                                [Kit: _on_poi_teleport]
+                                  stage.GetPrimAtPath()
+                                  ComputeLocalToWorldTransform()
+                                  TeleportService.teleport_to_coordinates()
+                                          │
+                                  dispatch('poiTeleportResult')
+                                  dispatch('viewTransitionReady')
+                                          │
+[useCustomEventHandler]  ◂────────────────┘
+  viewTransitionReady → fade-in overlay
+```
+
+## TeleportService API surface
+
+**File**: `stage_core_extension/services/kit_services/teleport_service.py`. Three teleport entry points; all wrap PhysX CCT + USD xform writes. The same singleton is shared (camera switching, FP-enter, "Take Me There") — access via `teleport_registry.get_teleport_service()`.
+
+| Method | Touches body rot? | Resets camera? | Use case |
+|---|---|---|---|
+| `teleport_to_spawn_point(name)` | yes — read from spawn USD | yes (RotateXYZ → 0) | Foyer / Arena / authored map markers |
+| `teleport_to_pose(x, y, z, *, body_yaw_deg=0)` | yes — `(0, body_yaw_deg, 0)` | yes (RotateXYZ → 0) | Synthesized spawn for navmesh POIs without authored spawn (restrooms / quiet zones / pin) — caller computes `body_yaw_deg` to face the route's other endpoint |
+| `teleport_to_coordinates(x, y, z, *, camera_local_yaw_deg=None)` | **no** | only camera if `camera_local_yaw_deg` set (then dispatches `immediateViewAngles`) | "Take Me There" inside FP (seat / POI lists); do not use for view-transition flows — the body keeps whatever rotation was already there |
+
+**`teleport_to_spawn_point` / `teleport_to_pose` share `_apply_transform_to_player`** internally (translate, body rotation, camera reset to identity, scale, xform op order, movement-controller reset callback). The Foyer / restroom / pin flows therefore land in identical player+camera state shapes — only the input data (translate + body yaw) differs. See `camera-teleport.mdc` → "TeleportService" for the full breakdown of why the two coordinate APIs exist.
+
+**`teleport_to_coordinates` camera-yaw branch.** When **`camera_local_yaw_deg`** is set (first-person **camera-local** yaw, degrees — matches `RotateXYZ` pitch/yaw order on `first_person_camera`):
+
+1. After position (and optional `movement_controller_reset_callback`), writes **`first_person_camera`** `RotateXYZ` to `(0, yaw, 0)`.
+2. Dispatches **`younite.player.immediateViewAngles`** `{ yaw, pitch: 0 }`.
+
+**Player core** (`extension.py`) observes that event: **`NavigationOrchestratorService.stop_face_turn_if_active()`** then **`PlayerInputController.set_view_angles`**, so internal yaw matches USD and no smooth-turn fights the teleport.
+
+## Seat teleport (Kit backend)
+
+**Handler**: `_on_seat_teleport` in `navmesh_route_extension/extension.py`
+**Event**: `seatTeleport` — payload `{ seatNumber: string }`
+**Response**: `seatTeleportResult` — `{ seatNumber, success, position?, error? }`
+
+Flow:
+1. Looks up seat position via `seat_lookup.get_seat_position(seatNumber)`
+2. Checks availability via `is_seat_available(seatNumber)`
+3. Optionally computes **`camera_local_yaw_deg`** toward `get_seat_positions_bbox_center_xz()` via **`camera_local_yaw_to_face_world_xz`** (player prim + seat XZ + center XZ)
+4. Calls `TeleportService.teleport_to_coordinates(x, y, z, camera_local_yaw_deg=...)` or position-only if yaw cannot be computed
+5. On success: stops active `seat_nav` route, unhighlights seat
+6. Dispatches `seatTeleportResult` + async settle → `viewTransitionReady`
+
+Seats use a separate event because their positions come from a lookup JSON (`seats_lookup.json`), not from a scene prim.
+
+## POI teleport (Kit backend — generic)
+
+**Handler**: `_on_poi_teleport` in `navmesh_route_extension/extension.py`
+**Event**: `poiTeleport` — payload `{ primPath: string }`
+**Response**: `poiTeleportResult` — `{ primPath, success, error? }`
+
+Flow:
+1. Reads prim at `primPath` from the USD stage
+2. Resolves world position + body yaw via `TeleportService._read_spawn_point_transform(prim)` (same rules as named spawn points: nested prims such as `/World/NavShortcuts/.../floor_*` use world forward from local `+Z`; direct `/World` children use authored `rotateXYZ` / `rotateYXZ`)
+3. Calls `TeleportService.teleport_to_coordinates(x, y, z, world_body_yaw_deg=yaw)` so the player body and camera align with the target Xform (zeros camera local yaw and syncs `immediateViewAngles`)
+4. Dispatches `poiTeleportResult` with `arrivalLabel` / `arrivalLabelI18nKey` (from `shortcuts.json` node labels for NavShortcuts teleports, else POI `display_name` by prim leaf) + `viewTransitionReady`
+
+This handler is type-agnostic — works for any Xform prim (exits, restrooms, kiosks, etc.).
+
+## Web frontend
+
+### SeatNavigateWidget
+
+**File**: `widgets/SeatNavigateWidget.tsx`
+
+"Take Me There" appears below the seat inputs. It uses the same **`SeatQuery`** as Get directions (`buildQuery()`): structured `{ section, row, seat }` with **uppercase** `section`/`row` and **plain numeric** `seat` (same as walking; canonical wheelchair ids look like `C-6-14` after the JSON post-process). No route calculation needed. Sends `seatTeleport` after the view-transition fade-out. Independent from Get directions (NavMesh route).
+
+**Props**: `onSeatTeleport?: (query: SeatQuery) => void` — see `.cursor/rules/topics/seat-navigation.mdc` for the pipeline, hierarchy, and legacy `WC`/`R*` data notes.
+
+### PoiRoutesWidget (shared list component, in-FP "Take Me There")
+
+**File**: `widgets/PoiRoutesWidget.tsx`
+
+Optional `onTeleport` prop. When provided and an item is active (route selected), a "Take Me There" button appears next to the existing "Move to" button at the bottom of the list.
+
+**Props**: `onTeleport?: (primPath: string, itemKey: string) => void`
+
+Optional `hideUnreachable` prop (default `false`). When `true`, items with `success: false` are filtered out of the rendered list. If all items are filtered, shows "No reachable locations found." This is used by `QuietZoneWidget` in wheelchair mode to hide spots unreachable by the wheelchair NavMesh.
+
+Widgets that use `PoiRoutesWidget` and inherit teleport:
+- `ExitsWidget` — passes `onTeleport` through
+- `RestroomWidget` — passes `onTeleport` through (FP only — the bird-eye click branch is described below)
+- `QuietZoneWidget` — passes `onTeleport` through (FP only); also sets `hideUnreachable={accessibilityMode === 'wheelchair'}`
+- Future POI widgets — just pass `onTeleport` to get teleport for free
+
+### MapMarkerPoiSheet (bird-eye sheet for restroom / quiet-zone / map markers)
+
+**File**: `widgets/MapMarkerPoiSheet.tsx`
+
+In **bird-eye view**, clicking a list item in `RestroomWidget` / `QuietZoneWidget` does NOT open the FP "Take Me There" / "Move to" pair. Instead the widget closes its list and opens the same sheet that map-markers (Foyer / Arena) use, carrying a **`useNavmeshPoiTeleport: true`** flag in `MapMarkerSheetData`. The flag flips the sheet's two action buttons:
+
+| Button | Sheet payload field used | Event sent | Result |
+|---|---|---|---|
+| Teleport me there | `primPath` | `poiTeleport` (this topic) | Same generic `_on_poi_teleport` handler — wraps in `beginViewTransition` so we get the FP-enter overlay |
+| Get directions | `primPath` (as `endpointPath`) + view-transition | `mapMarkerDirectionsStart` (see `bird-eye-route.mdc`) | Bird-eye → FP with body-yaw aligned to route via `start_pose` |
+
+The `useNavmeshPoiTeleport` flag also unlocks the swap arrow on `MapMarkerDirectionsPanel` for these POIs (their reverse direction `pin → stored FP` is supported via `startEndpointPath`). For map-markers without a `useNavmeshPoiTeleport` flag (Foyer / Arena), the swap path uses the authored `spawnPoint` instead.
+
+A **flag pin** is also injected at the POI's prim location while the sheet is open via the `birdEyePinShowAtPrim` event (Web → Kit) — the user sees the destination on the map before pressing either button. Dismissing the sheet without committing fires `birdEyePinDismiss`, same lifecycle as the ad-hoc pin from `bird-eye-pin-anywhere.mdc`.
+
+### Navigation hooks (where teleports are sent)
+
+| Handler | Module | Sends | Purpose |
+|---|---|---|---|
+| `handleSeatTeleport(SeatQuery)` | **`useSeatNavigation.ts`** | `seatTeleport` (inside `beginViewTransition` `onFadeOutComplete`) | Seat lookup-based teleport + fade |
+| `handlePoiTeleport(primPath)` | **`useNavmeshCore.ts`** | `poiTeleport` (same transition pattern) | Generic prim-path teleport + fade |
+
+Both wrap the Kit command in **`beginViewTransition({ onFadeOutComplete })`** — the message is sent once the overlay is fully black. Fade-in is driven by **`viewTransitionReady`**.
+
+The overlay label for every teleport flow (seat, POI, MapMarkerPoiSheet, ChatWidget move-accept, geo) is **`i18n.t('streaming.switchingFirstPerson')`** — the convention is to name the overlay by the destination view, never by the action. See `camera-teleport.mdc` → "Overlay message convention" for the rationale and the historic bugs this avoids (e.g. the Foyer map-marker briefly showing the *button label* "Teleport me there" as the overlay text).
+
+**Seat arrival celebration** (`helpers.ts`): **`scheduleSeatArrivalCelebration(ctx, { skipFaceTowardCenter: true })`** on **`seatTeleportResult`** so Kit-applied spawn yaw is not followed by a second smooth turn from **`playerFaceStadiumCenter`**. Walk arrivals omit the flag → **`playerFaceStadiumCenter`** → navmesh bridge → **`playerFaceWorldXZ`**. Details: `.cursor/rules/topics/seat-navigation.mdc`.
+
+### useCustomEventHandler
+
+| Event | Action |
+|---|---|
+| `viewTransitionReady` | Triggers overlay fade-in (unified signal for all teleport/view-switch paths) |
+| `seatTeleportResult` (success) | Clear seat route state, play arrival sound, show "Teleported to seat X" toast |
+| `seatTeleportResult` (failure) | Show error state (not_found / not_available) for 3 seconds |
+| `poiTeleportResult` (success) | Play arrival sound, show "Teleported to {name}" toast |
+
+## Adding teleport to a new POI type
+
+When creating a new POI widget (e.g. kiosks, restaurants):
+
+1. Use `PoiRoutesWidget` as the list component (existing pattern)
+2. Pass `onTeleport={nav.handlePoiTeleport}` from `StreamOnlyWindow.tsx`
+3. Done — no backend changes needed. The generic `poiTeleport` handler reads any prim's world transform.
+
+For a non-prim-based POI (like seats, which use a lookup JSON), add a dedicated event + handler following the `seatTeleport` pattern.
+
+## Events summary
+
+| Event | Direction | Payload | Purpose |
+|---|---|---|---|
+| `seatTeleport` | Web → Kit | `{ section, row, seat }` (or legacy `seatNumber`) | Teleport to seat (lookup-based) |
+| `seatTeleportResult` | Kit → Web | `{ seatNumber, success, position?, error? }` | Result payload |
+| `poiTeleport` | Web → Kit | `{ primPath }` | Teleport to any Xform prim |
+| `poiTeleportResult` | Kit → Web | `{ primPath, success, error? }` | Result payload |
+| `viewTransitionReady` | Kit → Web | `{ result }` | Unified fade-in trigger (dispatched after result events) |
+| `playerFaceStadiumCenter` | Web → Kit | `{}` | Seat walk celebration → navmesh bridges to `playerFaceWorldXZ` |
+| `playerFaceWorldXZ` | Kit internal | `{ x, z }` | Smooth yaw toward world point (orchestrator) |
+| `younite.player.immediateViewAngles` | Kit internal | `{ yaw, pitch }` | Sync input after `teleport_to_coordinates` sets camera yaw |
+
+## Key files
+
+| File | Role |
+|---|---|
+| `teleport_service.py` | `teleport_to_spawn_point` / `teleport_to_pose` / `teleport_to_coordinates` — see API surface table above |
+| `seat_lookup.py` | Bbox center XZ + `camera_local_yaw_to_face_world_xz` for seat teleport facing |
+| `player_core/extension.py` | Subscribes to `younite.player.immediateViewAngles` |
+| `navigation_orchestrator_service.py` | `face_toward_world_xz`, `playerFaceWorldXZ`, `stop_face_turn_if_active` |
+| `teleport_registry.py` | Singleton access for other extensions |
+| `navmesh_route_extension/extension.py` | `_on_seat_teleport`, `_on_poi_teleport` handlers |
+| `SeatNavigateWidget.tsx` | "Take Me There" button for seats |
+| `PoiRoutesWidget.tsx` | "Take Me There" button for generic POIs (shared component) |
+| `ExitsWidget.tsx` | Passes `onTeleport` through to `PoiRoutesWidget` |
+| `RestroomWidget.tsx` | Passes `onTeleport` through to `PoiRoutesWidget` |
+| `QuietZoneWidget.tsx` | Passes `onTeleport` through to `PoiRoutesWidget`; sets `hideUnreachable` in wheelchair mode |
+| `useSeatNavigation.ts` | `handleSeatTeleport` |
+| `useNavmeshCore.ts` | `handlePoiTeleport` |
+| `useCustomEventHandler.ts` | `viewTransitionReady`, `seatTeleportResult`, `poiTeleportResult` handlers |
+
+## Related
+
+- Camera view switching and spawnpoint teleport: `.cursor/rules/topics/camera-teleport.mdc`
+- Seat navigation, auto-move, highlighting: `.cursor/rules/topics/seat-navigation.mdc`
+- Route measurement (distance/time for walk paths): `.cursor/rules/topics/route-measurement.mdc`

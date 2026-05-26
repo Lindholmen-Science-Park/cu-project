@@ -1,0 +1,10 @@
+#usda 1.0
+(
+    customLayerData = {
+        string description = "Heatmap visualization layer — mesh created dynamically at runtime."
+    }
+)
+
+over "World"
+{
+}

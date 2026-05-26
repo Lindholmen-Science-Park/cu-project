@@ -1,0 +1,17 @@
+#usda 1.0
+
+over "World"
+{
+    def Xform "IoT_OsmPois" (
+        kind = "group"
+    )
+    {
+        custom string younite:description = "Baked OpenStreetMap POI markers (dev IoT); child prims authored at runtime from open_data_live."
+
+        def Scope "Stations" (
+            kind = "group"
+        )
+        {
+        }
+    }
+}

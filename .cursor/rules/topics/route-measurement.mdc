@@ -1,0 +1,180 @@
+---
+description: Route measurement — distance and estimated time for navmesh paths, "move to x" and routes to exits
+---
+
+# Route measurement service
+
+Distance and estimated time for navmesh paths: base (no crowd costs) and actual (with area/crowd costs). Used for "move to x" measure and for the routes-to-exits widget.
+
+**Lives in**: `younite.navmesh_route_extension` (same extension as NavMesh routes; not a separate extension)  
+**Package**: `younite.navmesh_route_extension/.../services/kit_services/route_measure/` — import `from ...route_measure import ...` or `from ...route_measure.route_measure_service import ...` (facade module re-exports the public API). Implementation is split across `compute_single.py`, `compute_multi.py`, `exits.py`, `shortcut_fallback.py`, `resolve.py`, `costs.py`, `constants.py`, `types.py`.
+
+**Does not use other extensions.** It only uses the same extension's `scripts/navmesh_shortest_path` (`calculate_path_points`, `path_length_cm`, `estimate_walk_time_seconds`).  
+`calculate_path_points` runs the **NavMesh query** (always) and the optional **validated XZ straightening** stage documented in `.cursor/rules/topics/navmesh-path-refinement.mdc` (currently OFF for every calculated route — gated by `ENABLE_VALIDATED_STRAIGHTEN_CALCULATED_ROUTES` in `route_engine/constants.py`; player point-and-click still straightens).  
+When results flow through the unified **`RouteInstance._compute_path`** (drawn routes, including "move to x" with path), the polyline runs through the **`RouteComposer`**, then conditional **`smooth_path_xz`** (single-leg NavMesh-only paths). The route engine prefers `compose_with_measure()` for distance/time on drawn routes; the legacy `compute_route_measure` is now used **only** by `compute_routes_to_exits` for the bulk one-shot exits widget. When the dev "Use shortcuts" toggle is on, that same widget call also retries failed entries via `RouteComposer.compose(enable_shortcuts=True)` so wheelchair-mode discovery can surface destinations behind stairs (see `shortcuts.mdc` § "POI / quiet / exit visibility (shortcut-aware fallback)"). See `route-composer.mdc` for the unified pipeline.
+
+The **navmesh_route_extension** that hosts it uses **younite.messaging_core_extension** to send measure events to the web (`navmeshRouteMeasure`, `navmeshRoutesToExitsResult`).
+
+## Exit points
+
+Exit points are defined as `/World/exit_point_XX` Xform prims in the sublayer `sublayers/exit_points_layer.usda` (referenced from `main_scene.usda`). Discovery is **data-gated**: only exits with a matching entry in `source/data/exit_data.json` (and `in_use: true`) are included. Results are sorted by shortest estimated time and **the top 10** are returned. Each result includes a `metadata` dict with the JSON entry's properties. See `poi-data-pipeline.mdc` for full details on the data-driven POI pipeline.
+
+### Exit route navigation (click-to-route with spheres + automove)
+
+Uses `routeId = "exit_nav"` (same pattern as seat navigation with `"seat_nav"`).
+
+**Flow:**
+1. Web requests `navmeshRoutesToExitsRequest` (empty payload) → Kit discovers exits, returns top 5 sorted.
+2. User **hovers** exit in widget → visual highlight (CSS).
+3. User **clicks** exit → web sends `navmeshRouteCalculate` with `routeId: 'exit_nav'`, `endpointPath: '/World/exit_point_XX'`, `drawPath: true`. Since the route ID is not `player`/`default`, `face_direction=True` is set automatically.
+4. On the first successful waypoint dispatch, the player's camera smoothly turns to face the route direction (`faceDirection` in `navmeshRouteWaypoints` → `NavigationOrchestratorService._face_route_direction()`). Periodic recalculations do not trigger this. Path spheres appear.
+5. User clicks **"Move to ..."** button → web sends `navigationStateSet` with `autoMove: true`, `routeId: 'exit_nav'`. Auto-mover follows waypoints.
+6. Kit sends `autoMoveStatus { routeId: 'exit_nav', reason: 'arrived'|'cancelled' }` → web clears state.
+
+**State variables** (StreamOnlyWindow.tsx):
+- `activeExitRouteId` — exit key with drawn route (null = none)
+- `movingToExitId` — exit key player is auto-moving toward (null = not moving)
+- `lastExitPrimPathRef` — cached prim path for resume after cancel
+
+## API (`route_measure/` package)
+
+- **`RouteMeasure`** — Dataclass: `distance_meters_base`, `estimated_time_seconds_base`, `distance_meters_actual`, `estimated_time_seconds_actual`, plus per-source deltas: `distance_meters_crowd_delta`, `estimated_time_seconds_crowd_delta`, `distance_meters_sound_delta`, `estimated_time_seconds_sound_delta`.
+- **`DEFAULT_WALK_SPEED_M_PER_S`** — 1.3; override for evacuation/exit if needed.
+- **`compute_route_measure(start_ref, end_ref, *, start_use_ground, camera_area_costs, sound_area_costs, include_base, speed_m_per_s)`**  
+  Returns `(success, points_actual, measure_or_none, error)`. Computes up to 3 paths (base, camera-only, actual) to derive per-source breakdowns. Camera and sound costs are passed separately so the function can attribute the extra distance/time to each source independently.
+- **`compute_routes_to_exits(player_ref, exit_refs, *, camera_area_costs, sound_area_costs, speed_m_per_s)`**  
+  One-shot: player → each exit; returns list of result dicts sorted by best time (for exit widget).
+
+`player_ref` may be either a USD prim path (e.g. `"/World/PlayerCharacter"`) or a `(x, y, z)` tuple — the service accepts both for any-source player position. See "Bird-eye player ref" below.
+
+Stage units are centimeters; speeds in m/s.
+
+### Bird-eye player ref (POI lists)
+
+In bird-eye view `/World/PlayerCharacter` is the orbit camera, **not on the navmesh**, so any `compute_routes_to_exits(...)` call using it fails every segment with `"Segment failed in multi-segment measure"` and the search-card distance/time previews come back blank.
+
+The `_on_routes_to_pois_request` handler in `navmesh_route_extension/extension.py` resolves the player reference through a small helper `_resolve_player_ref_for_poi_lists()` that picks:
+
+| Active view | Player ref returned |
+|---|---|
+| `firstPerson` (or unknown / `lastFpPosValid` false) | `"/World/PlayerCharacter"` (USD prim path — service derives current position) |
+| `birdEye` and `lastFpPosValid` is true | `(lastFpPosX, lastFpPosY, lastFpPosZ)` tuple from `/younite/player/lastFp*` carb settings |
+
+This is the same `lastFp*` carb-setting block that `bird-eye-route.mdc` reads for `_resolve_bird_eye_start` and that `interactions_extension/services/kit_services/projectables_loop.py` reads for the user-location arrow on the bird-eye stream — kept in one place because every "where was the player last grounded?" question needs the same answer.
+
+The exits-list handler (`_on_routes_to_exits_request`) currently still uses the default `/World/PlayerCharacter` ref because the exits sheet is FP-only; if exits are ever surfaced in the bird-eye search overlay too, route through the same helper.
+
+### Crowd/sound breakdown logic
+
+When both camera and sound costs have non-default values (> 1.05), three paths are computed:
+1. **Base** (no custom costs) → `distance_meters_base`, `estimated_time_seconds_base`
+2. **Camera-only** (only camera area costs) → used to derive crowd delta
+3. **Actual** (all costs: camera + sound) → `distance_meters_actual`, `estimated_time_seconds_actual`
+
+Deltas: `crowd_delta = camera_only - base`, `sound_delta = actual - camera_only` (clamped ≥ 0).
+
+When only one source is active, that source gets the full delta and the other is 0.
+
+## Lightweight remaining-distance updates
+
+Between full recalculations the periodic loop (`route_engine/instance_base.py`) emits cheap updates every **`LIGHTWEIGHT_MEASURE_INTERVAL_SEC`** (`route_engine/constants.py`; tunable; historically **1.5 s**, project may use e.g. **0.5 s** for snappier UI). `_emit_lightweight_measure()` in `route_engine/arrival.py` resolves the player's position once, projects it onto the stored polyline via `_remaining_distance_along_path()`, and dispatches `navmeshRouteMeasure` with the remaining distance/time (and **turn-by-turn** extras when active — see `.cursor/rules/topics/navigation-turn-by-turn.mdc`). No NavMesh re-query is performed.
+
+If the player is inside the **cached world-space AABB** at the polyline endpoint **and** remaining distance along the path is ≤ **`ARRIVAL_PATH_GUARD_MAX_REMAINING_CM`** (12 m), the route fires `navmeshRouteArrival` and stops — manual arrival for **exit**, **restroom**, **quiet_zone**, and other POIs (not `seat_nav` auto-walk; see below). The AABB is rebuilt whenever the path updates (`route_engine/instance_base.py` + half-extents in `route_engine/constants.py`: `ARRIVAL_AABB_HALF_*_CM`; wider XZ for `seat_nav` manual walk). No PhysX and no per-frame USD bound queries.
+
+**Seat (`seat_nav`) exceptions** (see `.cursor/rules/topics/seat-navigation.mdc`):
+
+- **Auto-move on**: under **1 m** remaining along the polyline the route **logs once** (`ROUTE_ARRIVAL_THRESHOLD_CM`) but **keeps running** until the auto-mover finishes (or enters the same AABB on the final approach — see `PointClickAutoMover`) → player core snaps to `seats_lookup` → `autoMoveStatus` / celebration.
+- **Auto-move off**: when the player is inside the **seat-manual AABB** at the path end and the path guard passes, Kit fires `navmeshRouteArrival` with **`manualNearDestination: true`** and stops with `lightweight_arrival` (distinct from user cancel) so the web celebration runs without treating the stop as route failure.
+
+### `navmeshRouteWaypoints` arrival volume (auto-move)
+
+Successful waypoint dispatches may include **`arrivalAabbMin`** / **`arrivalAabbMax`** (world-space `[x,y,z]` each). `PointClickAutoMover` uses them for **early** `arrived` when the player is already inside the box on the **last or second-to-last** segment, snapping XZ to the live position and Y to the polyline end before `autoMoveStatus`.
+
+### Polyline projection (measures only)
+
+`_remaining_distance_along_path()` still projects the player onto the polyline (XZ for segment choice; Y contributes to segment length) for **remaining distance** in `navmeshRouteMeasure` and for **turn-by-turn** (`navigation_measure_extras`). Arrival no longer uses a separate vertical-offset tolerance vs the polyline projection — the **AABB** defines acceptable Y at the goal.
+
+### Auto-move suppresses full recalcs
+
+When auto-move is active (`_auto_move_active` flag on `_RouteInstance`), the periodic loop emits lightweight measures only — full NavMesh re-queries are skipped entirely. This prevents waypoint routing from mis-routing back through entrance corridors while the player follows the stored path. The flag is set via the `autoMove` field in `navmeshRouteCalculate` and cleared when `autoMoveStatus` fires (auto-move finished or cancelled), at which point an immediate full recalc is triggered.
+
+### Events flow
+
+| Event | Direction | When |
+|---|---|---|
+| `navmeshRouteMeasure` | Kit → Web | Every `LIGHTWEIGHT_MEASURE_INTERVAL_SEC` (lightweight) or on full recalc; may include `navigationNextMeters` / `navigationNextAction` for POI routes |
+| `navmeshRouteGuide` | Kit → Web | On full waypoint dispatch for `seat_nav` / `exit_nav` / `poi_nav` / `quiet_zone_nav` (see navigation-turn-by-turn topic) |
+| `navmeshRouteArrival` | Kit → Web | Manual arrival: player inside endpoint **AABB** + path guard; `seat_nav` manual adds `manualNearDestination` |
+| `autoMoveStatus` | Kit → Web | Auto-move completed/cancelled (clears `_auto_move_active`, triggers recalc) |
+
+### Stale route cleanup after arrival
+
+When any route completes (arrival or manual stop), the web sends `navigationStateSet { routeId: 'player', autoMove: false, endPos: null, endpointPath: null }` to reset the navigation orchestrator. The `endPos: null, endpointPath: null` fields are **critical** — without them, the orchestrator's `_apply_state()` still holds the old destination in `end_pos` and would silently create a new `player` route pointing to the stale endpoint. Any subsequent rebake (e.g. from a mode switch) would then recalculate and redraw this ghost route via `recalc_all_routes()`.
+
+Additionally, when a `seat_nav` route is stopped, Kit also calls `stop_route("player")` to remove any stale `player` route instance and its path curve from the stage.
+
+## Who uses it
+
+- **RouteEngine / RouteInstance** (`services/kit_services/route_engine/`, same extension): drawn routes run `compose_with_measure()` (in `route_composer/measure.py`) when route measurement is enabled and `route_id ≠ "player"`. Per-source crowd / sound deltas are derived by orchestrating up to three composer calls — see `route-composer.mdc`.
+- **NavMeshRouteService** (same extension): calls `compute_routes_to_exits` (`route_measure/exits.py`) for the exits widget — primary path still routed through `compute_route_measure` (`route_measure/compute_single.py`) for speed, with a `RouteComposer.compose(enable_shortcuts=True)` fallback for entries that fail the direct measure when the dev "Use shortcuts" toggle is on (`viaShortcut: true` flag on the result). Dispatches `navmeshRouteMeasure` and `navmeshRoutesToExitsResult` via messaging.
+
+## Cost category toggles
+
+Three independent toggles control whether cost categories affect pathfinding. All default to OFF (costs ignored, treated as 1.0).
+
+| Toggle | UI location | Category key | Backend flag | Controls |
+|---|---|---|---|---|
+| **Avoid crowds** | Seat navigate widget | `"crowd"` | `_crowd_costs_active` | Camera area costs for seat/NPC/exit routes |
+| **Avoid noise** | Seat navigate widget | `"sound"` | `_sound_costs_active` | Sound area costs for seat/NPC/exit routes |
+| **Areas affect player movement** | Navigation hamburger menu | `"player"` | `_player_costs_active` | All area costs for point-and-click (player/default) routes |
+
+- **Toggle OFF** (default): Kit treats all costs for that category as 1.0 (default/no effect), regardless of slider values. Sliders still display and store their values.
+- **Toggle ON**: Kit uses the actual slider values for that cost category.
+
+**Backend**: `NavMeshRouteService` has `_crowd_costs_active`, `_sound_costs_active`, and `_player_costs_active` flags (all default `False`). Cost gating is baked into lambdas at `_RouteInstance` creation time: player/default routes gate on `_player_costs_active`; all other routes gate on `_crowd_costs_active` / `_sound_costs_active`. Method `set_cost_category_active(category, active)` updates the flag and recalculates all active routes.
+
+**Frontend**: `avoidCrowds` / `avoidNoise` / `pointClickCostsActive` booleans in `StreamOnlyWindow`. Handlers send `navmeshCostCategoryToggle` with the appropriate category. Sliders always send cost updates to Kit (values are stored even when inactive).
+
+**Event**: `navmeshCostCategoryToggle` (inbound) — `{ category: "crowd"|"sound"|"player", active: bool }`. Toggles whether that cost category affects pathfinding.
+
+## Events
+
+- **`navmeshRoutesToExitsRequest`** (inbound) — Web sends `{}` (empty payload = auto-discover exits) or `{ exitRefs: [...] }` for explicit list.
+- **`navmeshRouteMeasure`** (outbound) — Payload: `routeId`, `success`, `distanceMetersBase`, `estimatedTimeSecondsBase`, optional `distanceMetersActual`, `estimatedTimeSecondsActual`, optional crowd/sound delta fields, `error`. Emitted on the lightweight interval (`LIGHTWEIGHT_MEASURE_INTERVAL_SEC`) and on each full recalculation. For guided POI routes, optional **`navigationNextMeters`**, **`navigationNextAction`** (`turn_left` \| `turn_right` \| `approach`).
+- **`navmeshRouteGuide`** (outbound) — Full turn-by-turn **`steps`** and **`destinationKind`** for guided routes. See `.cursor/rules/topics/navigation-turn-by-turn.mdc`.
+- **`navmeshRouteArrival`** (outbound) — Payload: `routeId`, optional `manualNearDestination` (seat manual walk). Fires when the player is inside the route’s cached **world AABB** at the polyline end and remaining along-path distance ≤ `ARRIVAL_PATH_GUARD_MAX_REMAINING_CM`. Web clears route state, plays arrival sound, toast/celebration per route.
+- **`navmeshRoutesToExitsResult`** (outbound) — Payload: `results` (list of exit measure dicts with `metadata`, max 10, sorted by quickest).
+- **`navmeshRouteCalculate`** (inbound) — Used with `routeId: 'exit_nav'` for individual exit route with drawn path. Includes `autoMove: bool` to signal whether auto-move is active (suppresses full recalcs during auto-move).
+- **`autoMoveStatus`** (outbound) — `routeId`, `active: false`, `reason: 'arrived'|'cancelled'`. Route extension listens for this to clear `_auto_move_active` and trigger an immediate full recalc.
+
+## Face route direction on initial calculation
+
+When a non-player route (e.g. `exit_nav`, `seat_nav`, `poi_nav`, `quiet_zone_nav`) is first calculated, the player's camera **smoothly rotates** to face the route direction. This makes it easy to spot the path spheres without manually turning around, and the gradual turn avoids disorienting the user.
+
+**Mechanism**: `NavMeshRouteService.set_route_for_id(..., face_direction=True)` adds the route ID to `_face_pending_routes`. On the first successful waypoint dispatch (`dispatch_navmesh_route_waypoints` in `navmesh_route_service/waypoint_dispatch.py`), `faceDirection: true` is included in the `navmeshRouteWaypoints` payload and the pending entry is cleared. The `NavigationOrchestratorService._face_route_direction()` method receives this flag and:
+1. Walks 800 stage-units along the route polyline (look-ahead)
+2. Computes world-space yaw, converts to camera-local by subtracting the player capsule's parent yaw
+3. Starts a **per-frame smooth rotation** (`_start_face_turn`) toward the target yaw
+
+**Smooth face-turn** (`_start_face_turn` / `_on_face_turn_update` in `navigation_orchestrator_service.py`):
+
+- **`profile="route"`** (this section — initial calculation only): rate-limited yaw with angular ease-in/out via **`ease_scale_remaining`** (`ease_helpers.py`). Constants: **`FACE_ROUTE_TURN_RATE`** 132°/s, **`FACE_ROUTE_EASE_ZONE_DEG`** 62, **`FACE_ROUTE_EASE_MIN_SCALE`** 0.18, **`FACE_ROUTE_ZONE_CAP_FRACTION`** 0.62, done threshold 0.4°.
+- **`profile="stadium"`** (seat arrival only — see `seat-navigation.mdc`): **not** rate×ease; **smootherstep01** on normalized turn progress over `duration = clamp(|Δyaw| / FACE_STADIUM_AVG_DEG_PER_S, 0.45, 1.65)` with **`FACE_STADIUM_AVG_DEG_PER_S`** = **74**°/s mean (~139°/s peak). Avoids the route-style cruise plateau.
+
+Reads **`event.payload["dt"]`** on `GLOBAL_EVENT_UPDATE` (see `events-api.mdc`). While any orchestrator face-turn runs, **`PointClickAutoMover` defers yaw** (`is_face_turn_active`). Falls back to instant snap (`_apply_yaw_instant`) if subscription setup fails. **`_sync_controller_yaw`** every frame prevents movement-controller snap-back.
+
+**Key files**: `navigation_orchestrator_service.py` — `_face_route_direction`, `_start_face_turn`, `_capture_face_turn_span`, … For **walking** look-ahead while auto-moving, see `auto_mover.py` + `cct-movement.mdc` § Click-to-navigate face-turn.
+
+**Not triggered by**: periodic recalculations, cost/area updates, point-and-click **`player`** routes (no `faceDirection` on first leg except OSM overlay first-leg flag — see `osm-route-overlay.mdc`).
+
+**Seat-only post-arrival**: After **walking** to a seat, web **`playerFaceStadiumCenter`** → Kit **`playerFaceWorldXZ`** → **`face_toward_world_xz(profile="stadium")`**. **Seat teleport** sets yaw in **`teleport_to_coordinates(..., camera_local_yaw_deg=)`** and skips the web face message. See `seat-navigation.mdc` § Face toward bowl center.
+
+## Related
+
+- **Turn-by-turn UI guide** (events, constants, web pill): `.cursor/rules/topics/navigation-turn-by-turn.mdc`
+- NavMesh pathfinding and areas: `.cursor/rules/topics/navmesh-areas.mdc`
+- **Path refinement** (native straighten, validated XZ straightening, `smooth_path_xz`, threaded player pipeline): `.cursor/rules/topics/navmesh-path-refinement.mdc`
+- **Corridor `nav_waypoint_*` multi-segment routes**: `.cursor/rules/topics/waypoint-routing.mdc`
+- Route lifecycle (start/stop, draw, waypoints): `navmesh_route_service/` package (`service.py`, `waypoint_dispatch.py`, …) in the same extension
+- Seat navigation (same pattern): `.cursor/rules/topics/seat-navigation.mdc`
+- **Omniverse NavMesh API reference**: [API Commands](https://docs.omniverse.nvidia.com/extensions/latest/ext_navigation-mesh/api.html)

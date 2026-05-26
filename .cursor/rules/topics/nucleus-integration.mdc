@@ -1,0 +1,144 @@
+---
+description: Nucleus integration — pull-to-local sync, local wrappers, defaultPrim fix, folder structure, adding new Nucleus sources
+---
+
+# Nucleus Integration (Pull-to-Local)
+
+Heavy 3D assets (city tiles, Skandinavium model) live on an NVIDIA Nucleus server. Code, scene wrappers, and overrides live in Git. A **pull-to-local** strategy syncs Nucleus content to local disk on demand, keeping the project functional even if Nucleus is unreachable.
+
+## Architecture
+
+```
+Git (tracked)                          Nucleus (remote, not in Git)
+─────────────                          ────────────────────────────
+main_scene.usda                        omniverse://10.1.116.242/
+  └─ payload → city tiles wrapper        /Projects/CU/SBF/USD/Tiles/
+  └─ payload → scandinavium_asset        /Projects/CU/SBF/USD/References/
+                                         /Projects/CU/Scandinavium/
+Local wrappers (in Git)
+  └─ nucleus/city_tiles/CU-DT-8km2.Project.Scene.usda
+  └─ Assets/Skandinavium/scandinavium_asset.usda
+
+Pulled content (gitignored)
+  └─ nucleus/city_tiles/Tiles/       ← 128 tile folders
+  └─ nucleus/city_tiles/References/  ← materials, assets
+  └─ nucleus/skandinavium/           ← Skandinavium.usda + Assets/
+```
+
+## Key Files
+
+| File | Role |
+|------|------|
+| `preinstall.bat` | Full setup — checks `.env`, calls `pullnucleus.bat` (skips if no creds), then calls `runscripts.bat` |
+| `pullnucleus.bat` | Nucleus sync only — loads `.env` creds, builds Kit, runs `pullnucleus.py` via Kit |
+| `runscripts.bat` | Post-processing scripts (e.g. seasonal texture generation) — can run standalone |
+| `kit-app-template-main/pullnucleus.py` | Python sync script using `omni.client` (runs inside Kit for API access) |
+| `kit-app-template-main/nucleus_sync.json` | Declarative mapping of remote Nucleus paths → local destinations |
+| `.env` | `NUCLEUS_SERVER`, `NUCLEUS_USERNAME`, `NUCLEUS_PASSWORD` |
+| `.env.example` | Template with placeholder credentials |
+
+## Wrapper Pattern
+
+Nucleus files may lack a `defaultPrim`, which breaks USD payload composition. Local `.usda` wrappers solve this:
+
+**City tiles wrapper** (`nucleus/city_tiles/CU-DT-8km2.Project.Scene.usda`):
+- Text-based `.usda` with `defaultPrim = "scene"` (Xform wrapping Geometry + Materials)
+- References individual tiles via relative paths: `./Tiles/00xxx_CU-DT-8km2/...`
+- References materials via `./References/Materials/Materials.usd`
+- Tracked in Git (excluded from the gitignore via `!` rule)
+- The Nucleus-pulled binary `.usd` files in `Tiles/` are unused — only the individual tile folders matter
+
+**Skandinavium wrapper** (`Assets/Skandinavium/scandinavium_asset.usda`):
+- Sets `defaultPrim = "Root"`, references `../../nucleus/skandinavium/Skandinavium.usda`
+- Applies project overrides and LOD variant set locally
+
+## Folder Structure
+
+```
+source/data/nucleus/                    ← .gitkeep tracked; contents gitignored
+├── city_tiles/
+│   ├── CU-DT-8km2.Project.Scene.usda  ← LOCAL wrapper (tracked in Git)
+│   ├── Tiles/                          ← pulled from Nucleus (gitignored)
+│   │   ├── 00000_CU-DT-8km2/          ← individual tile geometry
+│   │   ├── ...                         ← 128 tile folders
+│   │   ├── CU-DT-8km2.Project.Scene.usd   ← Nucleus original (unused)
+│   │   └── CU-DT-8km2.Project.Scene2.usd  ← Nucleus original (unused)
+│   └── References/                     ← pulled from Nucleus (gitignored)
+│       ├── Assets/
+│       └── Materials/
+└── skandinavium/
+    ├── Skandinavium.usda               ← pulled from Nucleus
+    └── Assets/                         ← pulled from Nucleus
+```
+
+## Sync Config (`nucleus_sync.json`)
+
+Each rule maps a remote Nucleus path to a local destination:
+
+```json
+{
+  "sync_rules": [
+    {
+      "name": "City Tiles (SBF)",
+      "remote_path": "/Projects/CU/SBF/USD/Tiles/",
+      "local_path": "source/data/nucleus/city_tiles/Tiles/",
+      "recursive": true
+    }
+  ]
+}
+```
+
+## Workflow
+
+1. **First-time setup**: Run `preinstall.bat` — pulls Nucleus content + runs post-processing scripts (e.g. texture generation). Skips Nucleus gracefully if `.env` is missing.
+2. **Refresh content**: Run `pullnucleus.bat` to re-sync from Nucleus, then `runscripts.bat` to regenerate derived assets. Or just `preinstall.bat` again.
+3. **Regenerate only**: Run `runscripts.bat` standalone to re-run post-processing without pulling from Nucleus.
+4. **Launch**: Run `./startstream` or `./startcomposer` as normal — uses local files
+5. **Verify**: If pulled content breaks the scene, the old local files were overwritten (no automatic rollback yet)
+
+## Adding New Nucleus Sources
+
+1. Add a sync rule to `nucleus_sync.json` (remote path → local path)
+2. Create a local `.usda` wrapper if the Nucleus file needs a `defaultPrim` fix or local overrides
+3. Reference the wrapper from `main_scene.usda` (or relevant scene file)
+4. Add gitignore entries for the pulled content; use `!` to exclude the wrapper
+5. Run `./pullnucleus` to verify the sync works
+
+## Authentication
+
+`pullnucleus.py` uses `omni.client.register_authentication_callback()` to authenticate with Nucleus. Credentials come from environment variables loaded by `pullnucleus.bat` from `.env`. The script runs inside a Kit environment (via `kit.exe --exec`) because `omni.client` is only available within Kit's extension stack.
+
+## Future Considerations
+
+- **Direct `omniverse://` references**: The native Nucleus approach — no sync script needed, Kit resolves paths over the network. Trade-off: no offline fallback, no update control.
+- **Dev/prod split**: Parameterize `nucleus_sync.json` to pull from different Nucleus folders (e.g. `/dev/Tiles/` vs `/prod/Tiles/`). The local wrapper stays the same since it uses relative paths.
+- **Backup before pull**: Copy `nucleus/` before syncing to enable instant rollback if new content breaks things.
+
+## Rules
+
+- **Never modify Nucleus-pulled files locally** — they get overwritten on next pull
+- **Wrappers are the integration point** — all local customisation (defaultPrim, overrides, LOD variants) goes in wrappers, not in Nucleus content
+- **Keep wrappers in Git** — they are the source of truth for how Nucleus content is composed into the scene
+- **Gitignore pulled content** — only wrappers and `.gitkeep` are tracked under `nucleus/`
+
+## Cursor / AI troubleshooting (`.cursorignore` vs `.cursorindexingignore`)
+
+Per [Cursor ignore docs](https://cursor.com/docs/reference/ignore-file): **`.cursorignore`** *blocks* paths from semantic search, Tab/Agent/Inline, and **`@` discovery** — too aggressive for pulled stadium/city geometry if you still want Quick Open / Explorer workflows. **`.cursorindexingignore`** excludes paths from **indexing only**; they stay **reachable for AI features** and (in typical setups) normal editor open.
+
+**Repo convention:** bulky pulled Nucleus trees and generated seasonal PNGs live in **`.cursorindexingignore`**; **`.cursorignore`** keeps *secrets* (`.env`), `node_modules`, build/cache dirs, logs, etc.
+
+Pulled Nucleus trees (`source/data/nucleus/skandinavium/`, `.../city_tiles/Tiles/`, `.../References/`, `videos/` bulk, `sounds/`, `symbolic_buildings/`, etc.) are **large and gitignored**. They are **not missing on disk** — they are the runtime source of truth after `pullnucleus.bat`.
+
+**When a bug might be material/model/USD under `nucleus/`** (missing ref, wrong variant, MDL path, post-pull regression):
+
+1. **Agent / human**: Prefer **explicit paths** — user **`@`**-mentions a file, or pastes a **Kit / Hydra log line** with the full layer or prim path.
+2. **Wrappers first**: Inspect **tracked** wrappers (`nucleus/city_tiles/CU-DT-8km2.Project.Scene.usda`, `Assets/Skandinavium/scandinavium_asset.usda`) — they show how pulled content is composed in.
+3. **Binary USD**: Use `usdcat` to emit a readable `.usda` when the agent must inspect a `.usdc` payload.
+4. **Sync**: Confirm `pullnucleus.bat` was run after remote changes; re-pull and compare. Do **not** hand-edit pulled files — they are overwritten on the next sync (see **Rules** above).
+5. **Temporary widen access**: Comment out the relevant block in **`.cursorindexingignore`** (or `.cursorignore` if the path is listed there), reindex / restart Cursor if needed, then restore.
+
+**Agent expectation**: If diagnosis needs a path inside an ignored tree and nothing is attached, **say so in one line** — ask for an **`@` path**, a **log excerpt**, or **OK to temporarily relax** `.cursorindexingignore` / `.cursorignore` for that investigation.
+
+**If Explorer search or drag-and-drop still skips Nucleus files:** use **File → Open File** with a pasted path, or report to Cursor support (product behaviour can change between versions).
+
+**Quick Open (Ctrl+P) still missing `nucleus/**/*.usda`:** those trees are **`.gitignored`**. VS Code / Cursor **omit gitignored paths from Quick Open** by default (independent of `.cursorignore`). This repo sets **`.vscode/settings.json`** → `"search.useIgnoreFiles": false` plus an explicit **`search.exclude`** list so `node_modules`, `dist`, `extscache`, `.env`, etc. stay excluded while **pulled Nucleus files remain pickable**. Reload the window after changing settings.

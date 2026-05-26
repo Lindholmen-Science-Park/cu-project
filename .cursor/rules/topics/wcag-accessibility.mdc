@@ -1,0 +1,179 @@
+---
+description: WCAG accessibility — required patterns for CU UI (semantic HTML, ARIA, keyboard, focus, touch targets, motion, localization, TTS), checklist for new features, how to escalate design conflicts
+---
+
+# WCAG Accessibility
+
+The CU mode is a **mobile-first, public-facing application** used by visitors at a stadium, including users with disabilities and assistive tech. All CU UI (and any text Kit projects to the frontend) must follow WCAG 2.1/2.2 AA. This includes new features.
+
+> **If a proposed design conflicts with WCAG**, do NOT silently work around it. Surface the conflict to the user explicitly so they can talk it through with the designer. State which WCAG criterion is at risk, what the violation is, and what alternatives exist.
+
+> **Do not add visible copy that is not in the design** for accessibility alone. Use existing labels/placeholders, ARIA, and `.sr-only` helper text when a programmatic hint helps screen readers. If visible instructions or error copy are needed, escalate to design — do not invent new on-screen sentences in code.
+
+Examples of conflicts worth escalating: contrast ratios under 4.5:1 for body text, touch targets under 44×44 px, keyboard-inaccessible custom widgets, animations without a reduced-motion fallback, color-only state indication, untranslatable hardcoded strings.
+
+## Scope
+
+- **Always applies**: `web-viewer-sample-main/src/features/cu/**` and any `streaming/overlays/**` rendered in CU mode.
+- **Also applies**: text projected from Kit (`interactions.json` `ui.title`, `npcConfig.greeting`, etc.) — Kit text becomes part of the CU UI.
+- **Doesn't apply**: `features/dev/**` (developer tools, intentionally English-only and not user-facing).
+
+## Checklist for new CU features
+
+Run through this **before** writing the code, not after:
+
+1. **Semantic HTML first** — `<button>`, `<a>`, `<nav>`, `<main>`, `<dialog>` etc. before custom `<div role="...">`.
+2. **Localize every string** from day 1 via `t('namespace.key')`. Add the key to `en/sv/fr/es.json` simultaneously. Kit-projected text uses i18n key references in `interactions.json` (e.g. `"interactions.<id>.greeting"`) — see `localization.mdc`.
+3. **Keyboard reachable** — every interactive element via Tab; arrow keys for listbox/tablist/carousel; `Escape` closes modals and panels.
+4. **Focus visible** — never `outline: none` without a `:focus-visible` replacement. Project default in `src/app/index.css` already handles this.
+5. **ARIA where needed** — `aria-label` for icon-only buttons, `aria-pressed` for toggles, `aria-expanded`/`aria-controls` for disclosures, `aria-modal="true"` for modals, `aria-live="polite"` for status regions, `role="tabpanel"`/`role="tablist"` for tabbed UIs.
+6. **Touch target ≥ 44×44 px** (WCAG 2.5.5 AAA, but our minimum). For tiny visual elements use `border: <n>px solid transparent` + negative margin to expand the hit area without changing layout — see `OnboardingOverlay.css` `.onboarding-dot`.
+7. **Don't rely on color alone** — pair color with icon, label, or pattern. **Checklist 1.4.1 = Yes** (May 2026 audit): CU controls use non-color cues (`aria-pressed`, switch glyphs, icons + text on chips, active borders) — re-verify when adding new toggle-only or icon-only controls.
+8. **Respect `prefers-reduced-motion`** — `index.css` already disables long animations globally; new bespoke animations should also honour it.
+9. **TTS for any read-aloud content** — see `text-to-speech.mdc`. Voice language must match text language.
+10. **Restore focus** when closing modals/overlays (capture `document.activeElement` on mount, restore on unmount).
+11. **Skip-to-content** — already provided by `StreamOnlyWindow.tsx` `.skip-to-content` link + `<main id="main-content">`. Don't break it.
+
+## Existing patterns to reuse
+
+| Pattern | Reference implementation |
+|---------|--------------------------|
+| Combobox / listbox dropdown (keyboard nav, roving tabindex, click-away) | `features/cu/controls/LanguageDropdown.tsx`, `EventDropdown.tsx`, `seat-navigate/components/SeatChoiceDropdown.tsx` |
+| Seat route errors + suggestions (3.3.1 / 3.3.3 / 4.1.3) | `SeatFormBody.tsx` — visible `#cu-seat-form-error` (engineering i18n; may not match current nav — product left as-is). Dropdowns only list valid seats. `.sr-only` `seat.formInstructions` only. |
+| POI / restroom / quiet-zone / directions route failures (4.1.3 / 3.3.x) | **Evaluated Partial** — interim only: `RouteErrorAlert.tsx` (`.sr-only`), `navRouteErrorMessages.ts`, `routeErrorByRouteId`; list rows `.sr-only` + `aria-describedby`. **Do not add visible error UI** until design supplies per-case copy; then replace sr-only with approved strings. |
+| Tablist + tabpanel (carousel with arrow keys) | `features/cu/overlays/onboarding/OnboardingOverlay.tsx` |
+| Tabbed settings panel (all tabs in Tab order; Arrow Left/Right optional) | `features/cu/controls/SettingsPanel.tsx` |
+| Stacked modal: foreground sheet + `inert` background | `useSeatSheetForeground` + `inert` on Controls menu / Settings / People when Find my seat sheet is open (`SeatNavigateWidget`, `ControlsMenu.tsx`, etc.) |
+| Modal: focus restore + Tab trap | `useModalAccessibility` in `features/streaming/hooks/useModalAccessibility.ts` (wraps `useFocusRestore` + `useFocusTrap`) — Settings/People/Controls menu, PoiInfoCard, videobook overlays, `ChatWidget`, restroom/quiet-zone/map-marker sheets, directions panel, seat dock |
+| Focus trap only (no restore) | `useFocusTrap` in `features/streaming/hooks/useFocusTrap.ts` — **only wraps Tab when focus is already inside the container** (never pull focus in from behind) |
+| Immersive chrome while keyboard-focused | `useControlsAutoHide` in `features/streaming/hooks/useControlsAutoHide.ts` |
+| Focus-not-obscured scroll margin | `:focus-visible { scroll-margin: 8px; }` in `src/app/index.css` (WCAG 2.4.11) |
+| Async status / toast announcements | `role="status"` + `aria-live="polite"` — `TriggerZoneToast`, `ControlsMenu` AI bubble, `ChatWidget` typing, loading overlays |
+| Slider with `aria-valuetext` | `features/cu/controls/SettingsPanel.tsx` (text size, environment volume) |
+| Push-to-talk + click-to-toggle voice button | `features/cu/hooks/useVoiceSearch.ts` |
+| Map marker with text alt + `aria-label` | `streaming/overlays/interactionBoxes/InteractionBoxesOverlay.tsx` (`MapMarkerPin`) |
+| Video player with focus-within reveal, keyboard play/pause/seek | `streaming/overlays/videoPlayer/VideoPlayerOverlay.tsx` |
+| Immersive media transport (mute/CC/play/seek) | `features/cu/controls/MediaPlayerControls.tsx` — mute + CC use `aria-pressed`; play/pause uses **dynamic `aria-label` only** (not `aria-pressed`); seek bars use `aria-valuetext` via `common.mediaSeekPosition` |
+| Immersive media auto-hide chrome (360° / spatial / videobook) | Tab or pointer into overlay calls the same `resetControlsTimer` as tap — do **not** use `aria-hidden` on faded toolbars; `onFocusCapture` reveals chrome for keyboard users (`Video360Overlay`, `SpatialSoundOverlay`, `VideoBookPlayer`) |
+| Controls menu search chips | `ControlsMenu.tsx` — `role="group"` + `aria-label`; each chip `button` + `aria-pressed` + visible label |
+| Interaction overlay cards | `InteractionBoxesOverlay.tsx` — map pins `aria-label`; clickable speech bubbles `aria-label`; video trigger labeled; TTS speaker `aria-pressed` |
+| Flat video modal player | `VideoPlayerOverlay.tsx` — `role="dialog"`; play/pause via `aria-label` only (not `aria-pressed`); seek `aria-valuetext` |
+| TTS "Listen" button with `aria-pressed` | `streaming/overlays/avatarChat/AvatarChatOverlay.tsx`, `npcBubble/NpcBubbleOverlay.tsx` |
+| Loading status with `aria-live="polite"` + `sr-only` text | `app/App.tsx` |
+| Document `<html lang>` and `<title>` synced to i18n | `i18n/index.ts` |
+
+## Foundation in `src/app/index.css`
+
+Don't duplicate; reuse:
+
+- `.skip-to-content` — visually-hidden anchor revealed on focus (placed first in the DOM by `StreamOnlyWindow`).
+- `.sr-only` — visually-hidden text for screen-reader-only labels.
+- `:focus-visible { outline: 4px auto -webkit-focus-ring-color; outline-offset: 2px; }` — keyboard-only focus ring.
+- `@media (prefers-reduced-motion: reduce)` — global animation/transition shutoff, **with an `essential-motion` opt-out** (see pitfall §1 below).
+- `.essential-motion` — opt-out class for indicators that MUST keep animating (loading spinners, recording pulses) even when the user prefers reduced motion. Apply to the animated element directly.
+
+## Pitfalls (lessons from real bugs)
+
+These are real regressions we hit while making the project WCAG-compliant. They share a theme: **WCAG fixes interact with the existing styling stack (Bootstrap reboot, browser UA, Chromium quirks) in non-obvious ways**. Always re-test affected UI after applying any of these patterns.
+
+### 1. Reduced-motion blanket rules will freeze your loading spinners
+
+The canonical recipe — `*, *::before, *::after { animation-duration: 0.001ms !important; ... }` — kills *every* animation, including indeterminate progress indicators. WCAG 2.3.3 only requires reducing **non-essential** motion. Loading spinners are essential per WCAG 4.1.3 (Status Messages): without motion the user can't tell the app isn't frozen.
+
+Pattern:
+- Keep the global kill switch in `index.css`.
+- Add an `.essential-motion` exemption in the same `@media` block that re-asserts sane explicit values (`animation-duration: 1s !important; animation-iteration-count: infinite !important;`). **Do NOT use `revert`** — it reverts to the user-agent default (`0s` / `1`), which kills the animation just as effectively as the kill switch.
+- Apply `className="essential-motion"` to the spinning element. Also add `role="progressbar"` + `aria-label` while you're there.
+- Reference: `LoadingOverlay.tsx`, `SceneLoadingOverlay.tsx`.
+
+### 2. Expanding a touch target makes the existing focus halo suddenly visible
+
+The 44×44 touch-target trick (`border: 18px solid transparent` + negative margin + `background-clip: padding-box`) doesn't add a focus halo — it just **enlarges the element**, so the focus ring that was *always* being drawn (Bootstrap reboot's `:focus` `box-shadow`, the browser's `-webkit-focus-ring-color` UA ring) now paints around a 45×45 area instead of the original tiny 9×9, and the previously-invisible halo becomes obvious.
+
+When using the transparent-border touch-target trick on `<button>`, also do all of:
+
+```css
+.your-dot {
+    -webkit-appearance: none;
+    appearance: none;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+    background-clip: padding-box !important;   /* don't let any state reset this */
+    background-image: none !important;
+    border-color: transparent !important;
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+.your-dot:hover,
+.your-dot:focus,
+.your-dot:active {
+    outline: none !important;
+    box-shadow: none !important;
+    background-image: none !important;
+    border-color: transparent !important;
+    /* IMPORTANT: don't re-set background-color here. Re-asserting the same
+       value retriggers any transition and can flash a paint on Chromium. */
+}
+
+.your-dot:focus-visible {
+    outline: 2px solid <token> !important;
+    outline-offset: 2px;
+    box-shadow: none !important;
+}
+
+/* Touch-primary devices: hide the keyboard ring because some Chromium
+   builds incorrectly match :focus-visible on tap, leaving a stuck halo
+   on the just-tapped element. The state colour change is the indicator. */
+@media (hover: none) and (pointer: coarse) {
+    .your-dot:focus-visible {
+        outline: none !important;
+    }
+}
+```
+
+And in the TSX, suppress focus-on-pointer with:
+
+```tsx
+<button
+    onMouseDown={(e) => e.preventDefault()}   // mousedown is the spec-defined focus-killer
+    onClick={...}
+/>
+```
+
+`mousedown` (not `pointerdown`) is the only spec-defined way to skip focus on click. Touch synthesises `mousedown`, so this covers tap and double-tap. Keyboard activation goes through `keydown`, so Enter/Space + Arrow-key navigation still focus the element correctly.
+
+Reference: `OnboardingOverlay.tsx` + `OnboardingOverlay.css` `.onboarding-dot`.
+
+### 3. Bootstrap reboot leaks through
+
+The project imports `bootstrap/dist/css/bootstrap.min.css` globally. Bootstrap reboot adds `:focus` `box-shadow` and other styling to bare `<button>` and form elements. When killing focus visuals, you need `outline: none !important; box-shadow: none !important;` to defeat both the UA default ring and Bootstrap's reboot — author-level styles without `!important` lose to Bootstrap's specificity in some cases.
+
+### 4. Re-asserting the same `background-color` on `:hover` can flash
+
+If your element has `transition: background-color 0.25s ease` and you write a `:hover` rule that sets the same colour the element already has, Chromium can still trigger a transient repaint that — combined with `background-clip` mid-paint — looks like a halo flicker. Don't write hover rules just to "be defensive" if they don't change anything. Only restate properties on `:hover/:focus/:active` if you actually need to override an inherited value.
+
+### 5. CU keyboard vs dev stream focus
+
+**CU production** uses point-and-click / touch — **not** WASD (`controlMode === 'wasd'` is dev-only, `DevViewLayer` / Navigation submenu). When auditing CU Tab order, ignore WASD.
+
+- `#remote-video` stays **`tabIndex={-1}`** (`AppStreamCore`) so the stream canvas is not a tab stop in CU.
+- Dev WASD may set `tabIndex={0}` and refocus the video in `StreamOnlyWindow` only when `controlMode === 'wasd'`; refocus must **not** run when Tab moves to another control (`relatedTarget` must be empty).
+- When a **foreground bottom sheet** stacks over an still-visible modal (Find my seat over Search), mark the background dialog **`inert`** and disable its focus trap — see `useSeatSheetForeground`.
+
+## Localization & TTS cross-references
+
+- **Localization**: `localization.mdc` — i18next setup, EN/SV/FR/ES, AI API en/sv constraint, `aiLanguageFor()` for outgoing AI requests.
+- **Text-to-Speech**: `text-to-speech.mdc` — voice language vs text language, `AvatarVoiceProfile`, per-avatar voice data in `interactions.json`.
+
+## Workflow when uncertain
+
+1. Pick the closest existing pattern from the table above and read it before coding.
+2. If the design needs something not in the table, decide: is there a WCAG-compliant way to express the intent? If yes, do that.
+3. If no — **stop and tell the user**: "This design proposes X, which conflicts with WCAG criterion Y because Z. Options are A, B, C. Should I check with design before implementing?"
+4. Don't ship a workaround that silently fails WCAG just to match a mockup.
+
+## Checklist & backlog
+
+- **Spreadsheet:** `kit-app-template-main/source/data/WCAG/Checklist.WCAG2.2(WCAG 2.csv`
+- **Further rounds (open work):** `kit-app-template-main/source/data/WCAG/WCAG_FURTHER_ROUNDS.md`

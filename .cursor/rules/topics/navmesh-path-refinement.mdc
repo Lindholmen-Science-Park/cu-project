@@ -1,0 +1,141 @@
+---
+description: NavMesh path refinement — native straighten, validated XZ straightening, Laplacian smoothing; threaded player pipeline; auto-mover ground snap
+---
+
+# NavMesh path refinement (shortest-path post-processing)
+
+All runtime NavMesh polylines used for **walking** (point-and-click, seat/exit/NPC routes with `navmeshRouteWaypoints`, multi-segment via corridor waypoints) are produced from **`omni.anim.navigation.core`** and then refined in **`younite.navmesh_route_extension`**.  
+**Python package**: `scripts/navmesh_shortest_path/` (`calculate_path_points`, `smooth_path_xz`, etc. — see `navmesh-shortest-path-package.mdc`).  
+**Route assembly & dispatch**: `services/kit_services/route_engine/` (`compute.py`: `RouteInstance._compute_path` for non-player routes; `player_route.py`: `_player_compute_in_thread` for the threaded point-and-click path). All non-player legs run through `RouteComposer.compose(...)` — see `route-composer.mdc`.
+
+## Player point-and-click pipeline (`routeId` `player`)
+
+Runs **`query_shortest_path` on a background thread** via `run_in_executor` to avoid blocking the Python GIL and freezing the Kit UI. Key mechanisms:
+
+1. **Generation counter** (`_player_calc_gen`): each click bumps the counter. Before and after the expensive native call, the worker checks `my_gen != self._player_calc_gen` — if a newer click arrived, the stale result is discarded.
+2. **`is_stale` callback**: passed into `calculate_path_points` so the function can bail before `query_shortest_path` if a newer click is already queued.
+3. **1-second timeout** (`PLAYER_PATH_CALC_TIMEOUT_SEC`): `asyncio.wait_for` caps the wait. If the native query takes longer (e.g. unreachable destination), the result is abandoned and an error is dispatched so the next click is immediately responsive.
+4. **Yields one frame** (`next_update_async()`) before running the thread so pending input (e.g. the next click) is processed first.
+
+**Rapid click override**: click unreachable → gen bump + yield → click reachable → gen bump → first task's thread result is discarded on gen mismatch → second task runs. The user never waits for the unreachable query.
+
+**Path sphere visualization** (`draw_path` → `draw_path_curve`): **Off by default** for `routeId` `player`/`default` — the web client sends `drawPath: false` in `navigationStateSet`, and `navmesh_route_extension/extension.py` defaults `draw_path = False` when not explicitly provided. Point-and-click routes never show spheres. POI routes (`seat_nav`, `exit_nav`, `poi_nav`, `quiet_zone_nav`, spots) explicitly pass `drawPath: true` via `navmeshRouteCalculate` or Kit handlers, so spheres are visible for those navigations. Every route that renders the sphere trail also gets an **end-of-route flag marker** placed 50 cm before the true endpoint (`update_route_end_flag` runs alongside `_place_spheres` inside `draw_path_curve`); see `route-end-flag.mdc`.
+
+**Ground snap on arrival**: when the auto-mover reports `arrived`, `_snap_player_to_ground_after_arrival()` in `player_core extension.py` runs `_gentle_ground_snap()` — NavMesh-based Y correction for drift (no max cap; ignores corrections under 2 cm). **`seat_nav`** is excluded here: player core snaps to **`seats_lookup`** via `TeleportService.teleport_to_coordinates` (same as seat teleport) before `autoMoveStatus`, then skips gentle snap for that route id.
+
+## Pipeline overview
+
+| Stage | Where | What |
+|-------|--------|------|
+| 0. Fast reject | `calculate_path_points()` | `_endpoint_snap_errors_navmesh()` — two `query_closest_point` calls vs start/end; if snapped point is farther than `PATHFIND_FAST_REJECT_XZ_CM` (default **400** cm) in **XZ**, return error **before** `query_shortest_path`. (No vertical rejection — stairs / multi-level must remain valid.) |
+| 1. Query | `calculate_path_points()` | `navmesh.query_shortest_path(..., straighten=True)` — Omniverse's built-in string-pull / funnel straightening on the polygon corridor. **Always on** for all routes. |
+| 2. Validated straighten | `calculate_path_points(..., apply_navmesh_validated_straighten=True)` | `_straighten_path(navmesh, points)` — XZ reprojection after extra NavMesh sub-queries. **`True` for player point-and-click only** (via `_player_compute_in_thread`). **Off for every calculated / guided route** (`seat_nav` / `find_my_seat` / `find_toilets` / `quiet_zone_nav` / `poi_nav` / `default`, single- or multi-leg) because `_straighten_path`'s XZ-only snap validation can accept a chord that clips through a low wall — most visible on the seat-nav near-seat leg. Gated by the module-level toggle **`ENABLE_VALIDATED_STRAIGHTEN_CALCULATED_ROUTES`** in `route_engine/constants.py` (see § "Master switch" below). |
+| 3. Laplacian smooth | `route_engine/compute.py` + `route_engine/player_route.py` | `smooth_path_xz(points)` on the final tuple list, applied **only when** the route has no OSM segments and no via-points (pure single-leg NavMesh). Multi-segment / OSM-bridged paths skip this stage so junction kinks are not blurred. |
+
+Distance-only callers (`waypoint_router._navmesh_distance`, `route_measure.compute_multi.measure_multi_segment`) use `navmesh_path_length_cm()` — a lightweight wrapper around `query_shortest_path` + `path_length_cm(get_points())` that skips the full `calculate_path_points` pipeline (position resolution, stage access, `Gf` conversion). The full pipeline is only used when the polyline itself is needed (route drawing, straightening).
+
+The composer-driven `compose_with_measure` (drawn-route distance/time) reuses the same `_navmesh_leg` as the polyline path, so stages 1–2 stay in sync between drawn and measured outputs. The legacy `route_measure.compute_single.compute_route_measure` (still used only by the bulk exits widget) does **not** use stage 2.
+
+## Why waypoint count must stay fixed (stages 2–3)
+
+`PointClickAutoMover` in `younite.usd_viewer_player_core_extension` interpolates **Y** along the polyline using the target waypoint's Y directly. **Pruning** waypoints (removing intermediate points) caused visible **floating** and odd speed in the past.  
+
+**`_straighten_path` only reprojects XZ** onto validated straight segments and **preserves every waypoint's Y** and **the number of points**. `smooth_path_xz` also keeps the same count (in-place blend of interior X/Z only).
+
+## Stage 1 — Native `straighten=True`
+
+Documented on `INavMesh.query_shortest_path`: `straighten (bool)` enables optional straightening of the A* result. It does **not** guarantee visually straight corridors: the shortest path inside the baked polygon mesh can still hug asymmetric edges. Project-specific refinement is stages 2–3.
+
+## Stage 2 — NavMesh-validated straightening (`_straighten_path`)
+
+### Master switch (calculated routes vs point-and-click)
+
+`route_engine/constants.py` defines a module-level constant:
+
+```python
+ENABLE_VALIDATED_STRAIGHTEN_CALCULATED_ROUTES = False  # default
+```
+
+| Toggle | Calculated routes (`seat_nav` / `find_my_seat` / `find_toilets` / `quiet_zone_nav` / `poi_nav` / `default`) | Player point-and-click |
+|---|---|---|
+| **`False`** (default) | Validated straightening **OFF** for every calculated route, regardless of via-point shape. Polylines keep the raw NavMesh output (still cleaned up by Stage 1 native string-pull and Stage 3 Laplacian smoothing on pure single-leg paths). | **ON** (always — independent of the toggle). |
+| **`True`** | Restores the legacy behaviour: single-leg routes (`via_points` empty) get straightening; multi-leg corridor routes still skip it because `RouteComposer._build_multi_segment_navmesh_route` hard-codes `False` per inner leg. | **ON** (unchanged). |
+
+The gate lives in one expression in `RouteInstance._compute_path` (`route_engine/compute.py`):
+
+```python
+apply_validated = (
+    ENABLE_VALIDATED_STRAIGHTEN_CALCULATED_ROUTES
+    and not bool(via_points)
+)
+```
+
+`_player_compute_in_thread` (`route_engine/player_route.py`) is **not** gated and always passes `apply_navmesh_validated_straighten=True`, so point-and-click visual quality is unaffected by the toggle.
+
+### Why off by default
+
+`_straighten_path`'s per-interior-point snap validation only checks **XZ** distance to the nearest NavMesh point (with `STRAIGHTEN_SNAP_TOLERANCE_CM = 50` cm tolerance). Two compounding weaknesses:
+
+1. **`_is_segment_clear` ratio threshold (1.10) is too permissive on short legs.** When the NavMesh detour around a low wall is short (e.g. a wall with an aisle 2-3 m away), `path.length() / straight_line_3D_distance` can come in under 1.10 and the chord is accepted as "clear". Most visible on `seat_nav`'s final near-seat leg, after `_prune_passed_via_points` (or `plan_route`'s start-side shortcut) has emptied the corridor list and the leg collapses to a direct A→B query.
+2. **XZ-only snap validation accepts vertically-displaced "snaps".** A probe placed inside the wall at the corridor `orig_y` snaps to whichever NavMesh point is XZ-closest — typically the aisle on the other side of the wall or the seating tier above. The Y delta (often 80 cm — 1 m) is thrown away because the check is `dx*dx + dz*dz` only. Reprojection passes, the rendered polyline cuts through the wall.
+
+The `seat_nav` near-seat case is the surfaced example, but the same hazard exists on any short A→B leg in tight indoor geometry. A blanket OFF for calculated routes is safer than per-case filters; the trade-off is one or two extra cosmetic kinks on long open corridor legs (rarely noticeable in practice — Stage 1 native string-pull already does most of the visible work).
+
+### Re-enabling later
+
+If `_straighten_path` is reworked to lift the wall-clip hazard, flipping `ENABLE_VALIDATED_STRAIGHTEN_CALCULATED_ROUTES = True` in `route_engine/constants.py` restores the legacy behaviour exactly. Candidate hardening directions discussed when the toggle was introduced:
+
+- **3D-distance / Y-coherence in the snap check** — switch the per-interior-point validation from `dx*dx + dz*dz <= tol_sq` to 3D distance, or additionally require `|cp.y − orig_y| ≤ STRAIGHTEN_SNAP_VERTICAL_TOLERANCE_CM` (~30 cm). A probe inside a wall whose nearest NavMesh point sits a metre above/below fails.
+- **Sample the chord, not only the original waypoint indices** — between Phase 1 keys A and B, walk the chord at a fixed interval (e.g. every 50 cm) and run the Y-aware snap check at each sample. Catches walls that sit between the original interior waypoints.
+- **Pass `area_costs` into `_is_segment_clear`** — currently uses NavMesh defaults; if cost overlays change topology meaningfully vs defaults, validation conservatism could diverge from the main route.
+
+### Constants (in `navmesh_shortest_path.py`)
+
+- `STRAIGHTEN_LENGTH_RATIO` (default `1.10`) — a candidate shortcut from waypoint **A** to **B** is accepted only if a **fresh** `query_shortest_path` from A→B has `path.length() <= STRAIGHTEN_LENGTH_RATIO × straight_line_distance`. Open-corridor drift is typically a few percent; real detours around obstacles are much larger, so the ratio separates the two cases.
+- `STRAIGHTEN_TIME_BUDGET_SEC` (default `0.15`) — **wall-time** cap on phase‑1 straightening only. If exceeded, the function returns the **original** NavMesh polyline (same point count). Avoids UI freezes when many `_is_segment_clear` sub-queries pile up near awkward topology; **no cap on main path length**.
+- `STRAIGHTEN_SNAP_TOLERANCE_CM` (default `50.0`) — after XZ reprojection, each intermediate point is snapped back to NavMesh via `query_closest_point`. If the snap moves it more than this (cm), the reprojection crossed a gap/wall — keep the original NavMesh point instead. **Note: XZ-only check, see "Why off by default" above for the wall-clip implication.**
+
+**NavMesh agent radius matters**: straightening relies on the NavMesh properly excluding walls. With `agentMinRadius = 35.0` / `agentMaxRadius = 35.0` (set in `main_scene.usda`), the NavMesh has ~70 cm gaps at walls, so `_is_segment_clear` reliably rejects segments that cross walls (the NavMesh path through a doorway will be much longer than straight-line distance).
+
+**When the main path "fails":** `calculate_path_points` returns immediately after stage‑0 snap rejection, or after `query_shortest_path` yields `None` or ≤1 point — **no** `_straighten_path`, no extra NavMesh work.
+
+**Web / player UX:** `PointClickAutoMover.on_route_waypoints` calls `stop(_reason="route_failed")` when `success` is false so timed‑out or failed routes do not leave stale waypoints blocking the next interaction.
+
+**Performance note:** Farthest-first validation can require **many** `query_shortest_path` sub-queries (worst case **O(n²)**). The time budget bounds worst-case latency without limiting how many points the **first** query may return.
+
+**Algorithm:**
+
+1. **Anchor scan (farthest-first)** — From each anchor index, try the farthest later waypoint such that `_is_segment_clear(navmesh, anchor, candidate)` is true; that defines a **key segment**.
+2. **XZ reprojection** — For interior indices between two keys, project their **XZ** onto the chord from key start to key end, with **monotonic** parameter `t` along the segment so ordering is preserved. **Y unchanged.**
+
+**`_is_segment_clear`** uses `query_shortest_path` with `straighten=True` and **does not pass `area_costs`**. Validation therefore uses the NavMesh's **default** area costs. The main route uses `camera_area_costs` / merged costs when configured; if cost overlays strongly change topology vs defaults, straightening conservatism could theoretically diverge — prefer tuning `STRAIGHTEN_LENGTH_RATIO` or extending `_is_segment_clear` to pass the same `area_costs` if needed.
+
+## Stage 3 — Laplacian smoothing (`smooth_path_xz`)
+
+**Constants**: `PATH_SMOOTH_ALPHA` (0.5), `PATH_SMOOTH_ITERATIONS` (3), `PATH_SMOOTH_MIN_POINTS` (4).
+
+Interior points blend their **X/Z** toward the midpoint of neighbors; endpoints pinned. **Y** taken from the pre-smooth polyline per index. Applied in `route_engine/compute.py` and `route_engine/player_route.py` (via `smooth_path_xz` from `scripts/navmesh_shortest_path`) to the tuple list after `calculate_path_points` / multi-segment merge / measure path extraction.
+
+## Auto-mover height handling
+
+`PointClickAutoMover` uses the target waypoint's Y directly (`new_y = float(tgt[1])`). There is no height offset — each waypoint's Y comes from the NavMesh query, ensuring the player follows terrain height (stairs, ramps) accurately. Ground snap on arrival (`_gentle_ground_snap`) corrects any residual drift.
+
+## Auto-mover camera yaw
+
+During auto-move, `PointClickAutoMover.update(dt)` controls camera yaw via look-ahead direction + exponential smoothing (`YAW_SMOOTH_FACTOR = 0.095`) + rate-limited rotation (`turn_rate_deg_per_s * dt * turn_ease`; walk `ease_scale` is separate — see `cct-movement.mdc`). User swipe defers look-ahead while `TouchLookHandler.is_active()` (includes release coast). Key details:
+
+- **`_smoothed_yaw` initialization**: When a new path starts (`_smoothed_yaw is None`), the smoother is seeded from **`cur_yaw`**, then low-passes toward `raw_target_yaw` — avoids an instant heading snap on ground click. Guided routes (`faceDirection: true`) also run **`_face_route_direction`** → orchestrator **`profile="route"`** on the first waypoint dispatch; auto-mover defers yaw until that turn completes (`is_face_turn_active`). Seat **arrival** bowl-center turn is separate: **`profile="stadium"`** smootherstep — see `cct-movement.mdc`.
+- **Touch/swipe override**: While the user swipes (`touch_active`), camera control is skipped and `_user_looking` is set. On release, `_smoothed_yaw` is reset to `None` → re-seeded from the look-ahead direction on the next frame, providing a smooth return to the path heading.
+- **Movement controller sync**: After setting the camera yaw, `mc.set_view_angles()` is called to keep the movement controller's internal state in sync, preventing snap-back on the next `mc.update()` call.
+
+## Corridor waypoint routes (multi-segment)
+
+See `.cursor/rules/topics/waypoint-routing.mdc`. Each leg is still `calculate_path_points(start, end, …)`; legs are concatenated, then **one** `smooth_path_xz` pass runs over the full polyline. **Stage 1** (native `straighten=True`) applies per leg inside `calculate_path_points`. **Stage 2** (validated XZ straightening) is currently OFF for every calculated route — see § "Master switch" — so multi-segment routes get only the native string-pull per leg, the per-leg polylines are concatenated raw, and the global `smooth_path_xz` pass at the end provides the only Laplacian softening.
+
+## Related
+
+- **Corridor `nav_waypoint_*` graph & `plan_route()`**: `.cursor/rules/topics/waypoint-routing.mdc`
+- **Route distance/time & exits widget**: `.cursor/rules/topics/route-measurement.mdc`
+- **Seat flows**: `.cursor/rules/topics/seat-navigation.mdc`
+- **Area costs & `query_shortest_path(area_costs=…)`**: `.cursor/rules/topics/navmesh-areas.mdc`
+- **Omniverse NavMesh API reference** (INavMeshPath, query_shortest_path, etc.): [API Commands](https://docs.omniverse.nvidia.com/extensions/latest/ext_navigation-mesh/api.html)

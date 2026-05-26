@@ -1,0 +1,41 @@
+{
+  "pois": [
+    {
+      "id": "skandinavium",
+      "name": "Skandinavium",
+      "lat": 57.69924423840406,
+      "lon": 11.987666514336354,
+      "description": "Indoor arena in Gothenburg, opened in 1971. Hosts concerts, sports events, and entertainment.",
+      "color": [1.0, 0.0, 0.0],
+      "enabled": true
+    },
+    {
+      "id": "gothia_towers",
+      "name": "Gothia Towers",
+      "lat": 57.697425993993384,
+      "lon": 11.989505198099934,
+      "description": "Landmark hotel complex next to Liseberg in central Gothenburg. Modern architecture with distinctive twin towers.",
+      "color": [0.0, 1.0, 0.0],
+      "enabled": true
+    },
+    {
+      "id": "museum_of_art",
+      "name": "Museum of Art",
+      "lat": 57.696527422112105,
+      "lon":  11.980606385720284,
+      "description": "Art museum with collections from the 15th century to contemporary works. Located at Götaplatsen.",
+      "color": [0.0, 0.0, 1.0],
+      "enabled": true
+    },
+    {
+      "id": "poseidon_statue",
+      "name": "Poseidon Statue",
+      "lat": 57.69718823460453,
+      "lon": 11.97960588070765,
+      "description": "Statue of Poseidon at Götaplatsen. The statue is a symbol of Gothenburg and is a popular tourist attraction.",
+      "color": [1.0, 0.0, 0.0],
+      "enabled": true
+    }
+  ]
+}
+

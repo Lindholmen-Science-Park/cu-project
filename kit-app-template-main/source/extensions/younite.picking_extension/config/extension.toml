@@ -1,0 +1,24 @@
+[package]
+title = "Younite Picking Extension"
+description = "Raycast picking; emits intent/requestId-correlated results"
+version = "0.1.0"
+authors = ["Younite"]
+keywords = ["picking", "raycast", "events"]
+category = "Feature"
+
+[dependencies]
+"younite.messaging_core_extension" = {}
+"omni.usd" = {}
+"omni.kit.viewport.utility" = {}
+"omni.kit.raycast.query" = {}
+"omni.physx" = {}
+
+[[python.module]]
+name = "younite.picking_extension"
+
+[build]
+include = [
+    "younite/**/*.py",
+    "*.toml",
+]
+

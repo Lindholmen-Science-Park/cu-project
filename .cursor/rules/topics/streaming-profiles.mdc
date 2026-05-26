@@ -1,0 +1,107 @@
+---
+description: Streaming Kit profiles — dev vs prod extension separation, adding new extensions
+globs:
+  - source/apps/*.kit
+  - startstream*.bat
+  - kit-app-template-main/start_streaming*.bat
+  - kit-app-template-main/premake5.lua
+  - kit-app-template-main/repo.toml
+---
+
+# Streaming Kit Profiles (Dev vs Prod)
+
+## Architecture
+
+Two `.kit` files in `kit-app-template-main/source/apps/`:
+
+- **`younite.usd_viewer_streaming_base.kit`** — single source of truth for all shared `[settings]` and the **production** `[dependencies]` (core stack, navigation, interactions, sky, video, livestream, etc.). This is also the production entry point — launch it directly for production. Edit shared settings and production extensions **only here**.
+- **`younite.usd_viewer_streaming_dev.kit`** (dev) — thin layer: depends on `younite.usd_viewer_streaming_base` and adds **dev/CU-only** extensions (ai_chat, camera_data_visualization, camera_depth, camera_placement, geo_poi, incident, maintenance_bot, open_data_live, osm_navigation, sound_area, viewport_capture, Cesium when ready).
+
+The dev kit carries a `[settings.app.exts] folders.'++' = [...]` block with extension search paths so Kit can discover the base `.kit` in `${app}/../apps` before resolving dependencies. This block is required — without it Kit cannot find the base.
+
+## Launch
+
+| Script (repo root)      | Kit app launched                                  |
+|--------------------------|---------------------------------------------------|
+| `startstream.bat`        | `younite.usd_viewer_streaming_dev.kit` (dev)          |
+| `startstream_prod.bat`   | `younite.usd_viewer_streaming_base.kit` (production) |
+
+Both build Kit automatically via `repo.bat build` inside `start_streaming.bat` / `start_streaming_prod.bat`.
+
+## Creating a New Extension
+
+All five steps required — missing any = extension silently won't load:
+
+1. **Folder**: `source/extensions/younite.<name>/` with `younite/<name>/` Python package.
+2. **`premake5.lua`** in extension root:
+   ```lua
+   local ext = get_current_extension_info()
+   project_ext (ext)
+   repo_build.prebuild_link {
+       { "younite", ext.target_dir.."/younite" },
+   }
+   ```
+3. **`__init__.py`** in `younite/<name>/` — MUST import the extension class:
+   ```python
+   from .extension import MyExtension
+   ```
+4. **`config/extension.toml`**: needs `[package]`, `[dependencies]`, `[[python.module]]`, `[build]`.
+5. **`.kit` app file** — add to `younite.usd_viewer_streaming_dev.kit` `[dependencies]` with `order` (core ≤ 1000, feature = 1200).
+
+**Default: dev only.** Every new extension goes into the dev kit first. After it's confirmed working, **ask the user** whether to promote to production. Never add directly to base without explicit user confirmation.
+
+## Promoting an Extension to Production
+
+1. Move the `"younite.<name>" = { order = ... }` line from `younite.usd_viewer_streaming_dev.kit` to `younite.usd_viewer_streaming_base.kit` `[dependencies]`.
+2. Remove the line from `younite.usd_viewer_streaming_dev.kit` (it is now inherited via the base dependency).
+3. Rebuild (`repo.bat build`).
+
+## Editing Shared Settings
+
+All shared settings (renderer, livestream, PhysX, viewport, fog, DLSS, etc.) live in `younite.usd_viewer_streaming_base.kit`. Dev inherits them automatically. Only override a setting in the dev kit if you specifically need a different value for development (e.g. window title says "(Dev)").
+
+## Build Tooling
+
+- `premake5.lua`: `define_app` for base and dev (plus composer) so batch files and symlinks are generated.
+- `repo.toml` `[repo_precache_exts].apps`: lists base and dev so precache / version lock runs for each.
+- The precache tooling auto-injects a `BEGIN GENERATED PART` version lock block into each `.kit` file. This is normal and should not be manually edited.
+
+## Critical pitfall: production kit must explicitly list every runtime-required extension
+
+**Symptom:** A teammate clones the repo (or deletes `_build/` after a Kit version bump), runs `startstream_prod.bat` *without ever running `startstream.bat` first*, and sees red "fallback" materials on parts of the scene that use MDL materials (notably the seated crowd). The Kit log spams:
+
+```
+[Error] [omni.rtx.materials] Unable to find SdrShaderNode for prim: '...' with identifier: '<hash><MaterialName><mdl>'
+```
+
+After they run `startstream.bat` (dev) once, prod starts working too — and stays working.
+
+**Root cause:** Kit's MDL plugin chain (`omni.mdl`, `omni.mdl.neuraylib`, `omni.mdl.usd_converter`, `omni.kit.material.library`, `omni.kit.usd.mdl`) is what reads `info:mdl:sourceAsset` attributes in USD and registers `SdrShaderNode` entries that Hydra then binds. If those extensions aren't loaded, Hydra has nothing to bind and falls back to the red error material.
+
+These extensions are normally pulled in *transitively* by editor/composer-only extensions (e.g. `omni.kit.window.material`, `omni.kit.material.library` consumers). They are **not** transitively required by the lean production extension list (`omni.hydra.rtx`, `omni.kit.renderer.core`, etc.). So:
+
+- `repo.bat build` runs `repo precache_exts` against all three apps in `repo.toml` (`composer`, `streaming_base`, `streaming_dev`) — composer/dev pull them, base does not.
+- The downloaded extensions land in the **shared** `_build/.../release/extscache/` and stay there.
+- Once cached, *any* subsequent `repo launch <kit>` finds them and Kit auto-loads them as transitive deps of `omni.hydra.rtx`. Prod silently works because the cache is already warm.
+- After **a Kit version bump + `_build/` delete**, the cache is empty. If the teammate's first command is `startstream_prod.bat`, only the prod-app precache resolves; the MDL chain is never fetched. Prod loads, can't find the shader nodes, renders red.
+
+**Mitigation (already applied):** `younite.usd_viewer_streaming_base.kit` now explicitly lists the MDL chain in `[dependencies]`:
+
+```toml
+"omni.mdl" = {}
+"omni.mdl.neuraylib" = {}
+"omni.mdl.usd_converter" = {}
+"omni.kit.material.library" = {}
+"omni.kit.usd.mdl" = {}
+```
+
+This guarantees they are part of the prod resolution closure and get fetched/cached/loaded even on a prod-only fresh build.
+
+**Rule of thumb after a Kit SDK bump:** when adding any new feature that uses MDL materials, USD shader graphs, render-settings extensions, or other "editor-adjacent" Kit subsystems, **explicitly list the underlying runtime extension in base.kit `[dependencies]`** rather than relying on transitive resolution. The transitive graph is *not* stable across Kit versions, and silent breakage on fresh prod builds is the price of relying on it. If you see "Unable to find SdrShaderNode", "missing render setting", or similar runtime resolver errors in prod but not dev, this is the pattern to suspect first.
+
+**Triage checklist (for the next time it happens):**
+
+1. Reproduce on a clean machine: `git clean -xdf _build/` then `startstream_prod.bat`. If it red-materials, you have a missing prod dep.
+2. Compare `_build/.../release/extscache/` between a working machine and the broken one. Anything related to the failing subsystem (`omni.mdl.*`, `omni.rtx.*`, `omni.kit.material.*`, etc.) that's present on the working box but missing on the broken one is your missing dep.
+3. Add the missing extension(s) to `younite.usd_viewer_streaming_base.kit` `[dependencies]`. Re-run `repo.bat build` to refresh `extscache/` and the version lock.
+4. Verify with `git clean -xdf _build/ && startstream_prod.bat` on the previously-broken machine.

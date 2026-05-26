@@ -1,0 +1,88 @@
+#usda 1.0
+(
+    defaultPrim = "Environment"
+    metersPerUnit = 0.01
+    upAxis = "Y"
+)
+
+def Xform "Environment"
+{
+    custom float time:current = 14.009137
+
+    def Xform "sky" (
+        prepend references = @https://omniverse-content-production.s3.us-west-2.amazonaws.com/Environments/2024_1/DomeLights/Dynamic/CumulusLight.usd@
+    )
+    {
+        float3 xformOp:rotateZYX = (0, 0, 0)
+
+        over "Looks"
+        {
+            over "SkyMaterial"
+            {
+                over "Shader"
+                {
+                    float inputs:Azimuth = 139.93712
+                    custom float inputs:CloudCoverage = 0
+                    float inputs:DayOfYear = 100
+                    float inputs:Declination = 7.9998345
+                    float inputs:Elevation = 40.139137
+                    float inputs:Latitude = 57.7089
+                    float inputs:Longitude = -0.985
+                    float inputs:NorthOrientation = 0
+                    float inputs:SHA = 29.793592
+                    float inputs:TimeOfDay = 14.009137
+                    float inputs:TimeOfDaySpeed = 0.001
+                }
+            }
+        }
+
+        over "AxisNorth"
+        {
+            double3 xformOp:rotateZYX = (0, 0, 0)
+
+            over "AxisLatitude"
+            {
+                double3 xformOp:rotateZYX = (0, 0, 57.7089)
+
+                over "AxisSHA"
+                {
+                    double3 xformOp:rotateZYX = (150.20640829557885, 0, 0)
+
+                    over "AxisDeclination"
+                    {
+                        double3 xformOp:rotateZYX = (0, 0, 7.999834338981633)
+
+                        over "DistantLight"
+                        {
+                            color3f inputs:color = (1, 0.98, 0.95)
+                            float inputs:intensity = 5000
+                        }
+                    }
+                }
+            }
+
+            over "AxisAzimuth"
+            {
+                double3 xformOp:rotateZYX = (0, 139.9371142832247, 0)
+
+                over "AxisElevation"
+                {
+                    double3 xformOp:rotateZYX = (0, 0, 40.1391377706579)
+                }
+            }
+        }
+
+        over "DomeLight" (
+            prepend apiSchemas = ["ShadowAPI"]
+        )
+        {
+            # CumulusLight.usd references ./textures/office2.hdr (often missing when
+            # the package is not resolved next to the layer). Point IBL at a shipped EXR.
+            asset inputs:texture:file = @./textures/color_0C0C0C.exr@
+            float inputs:intensity = 0.9
+            bool inputs:shadow:enable = false
+            float3 xformOp:rotateZYX = (270, 0, 0)
+        }
+    }
+}
+

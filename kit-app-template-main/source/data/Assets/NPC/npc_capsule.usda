@@ -1,0 +1,15 @@
+#usda 1.0
+(
+    defaultPrim = "NpcModel"
+)
+
+def Xform "NpcModel"
+{
+    def Capsule "Body"
+    {
+        double height = 100
+        double radius = 25
+        token axis = "Y"
+        color3f[] primvars:displayColor = [(1.0, 0.5, 0.0)]
+    }
+}

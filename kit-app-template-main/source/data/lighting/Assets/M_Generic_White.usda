@@ -1,0 +1,34 @@
+#usda 1.0
+(
+    defaultPrim = "M_Generic_White"
+    upAxis = "Z"
+)
+
+def Material "M_Generic_White"
+{
+    token outputs:surface.connect = </M_Generic_White/SurfaceShader.outputs:surface>
+    token outputs:unreal:surface.connect = </M_Generic_White/UnrealShader.outputs:out>
+
+    def Shader "UnrealShader"
+    {
+        uniform token info:implementationSource = "sourceAsset"
+        uniform asset info:unreal:sourceAsset = @/Game/4_Materials/Generic/M_Generic_White.M_Generic_White@
+        token outputs:out
+    }
+
+    def Shader "SurfaceShader"
+    {
+        uniform token info:id = "UsdPreviewSurface"
+        float inputs:anisotropy = 0
+        color3f inputs:diffuseColor = (0.6795425, 0.6795425, 0.6795425)
+        color3f inputs:emissiveColor = (0, 0, 0)
+        float inputs:metallic = 0
+        normal3f inputs:normal = (0.49803925, -0.49803925, 1)
+        float inputs:occlusion = 1
+        float inputs:roughness = 0.29803923
+        float inputs:specular = 0.49803925
+        normal3f inputs:tangent = (1, -0.49803925, 0.49803925)
+        token outputs:surface
+    }
+}
+

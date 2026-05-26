@@ -1,0 +1,33 @@
+.env
+
+# Nucleus-pulled content (synced via pullnucleus.bat)
+# Heavy model/mesh/texture files that live on the Nucleus server.
+# Local wrappers and overrides in Assets/ are still tracked.
+kit-app-template-main/source/data/nucleus/skandinavium/
+kit-app-template-main/source/data/nucleus/symbolic_buildings/
+kit-app-template-main/source/data/nucleus/videos/
+kit-app-template-main/source/data/nucleus/sounds/
+kit-app-template-main/source/data/nucleus/city_tiles/
+!kit-app-template-main/source/data/nucleus/city_tiles/CU-DT-8km2.Project.Scene.usda
+!kit-app-template-main/source/data/nucleus/.gitkeep
+# Lightweight WebVTT caption sidecars travel with the repo (videos themselves stay on Nucleus).
+!kit-app-template-main/source/data/nucleus/videos/captions/
+!kit-app-template-main/source/data/nucleus/videos/captions/**
+
+# Generated seasonal textures (regenerated via runscripts.bat)
+kit-app-template-main/source/data/Assets/SeasonalTextures/*.png
+kit-app-template-main/source/data/Assets/SeasonalTextures/Frost/
+
+# Heavy people source assets. Runtime scene data should come from generated
+# wrappers/instances or Nucleus, not from committing these source folders.
+kit-app-template-main/source/data/Assets/People/PeopleStanding/
+kit-app-template-main/source/data/Assets/People/Materials/
+kit-app-template-main/source/data/Assets/People/Animations/
+kit-app-template-main/source/data/Assets/People/Props/
+
+# Experimental elevator test (scene + assets; keep locally or move folder out of repo)
+kit-app-template-main/source/data/Assets/Elevator/
+
+# Local scratch / temp folders (never commit vendored wheels or one-off experiments).
+_tmp_*/
+

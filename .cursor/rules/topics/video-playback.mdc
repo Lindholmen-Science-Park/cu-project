@@ -1,0 +1,275 @@
+---
+description: Video playback — pre-rendered video overlay, Kit video catalog, videoTrigger interaction bubble, mobile-first player. Read when working on video, media playback, or video trigger features.
+---
+
+# Video Playback
+
+Fullscreen HTML5 video overlay on top of the streaming app. The stream continues running underneath; after the video the user returns to the scene. Video catalog is managed Kit-side; the frontend resolves sources and plays them client-side.
+
+**Extension**: `younite.video_extension`
+**Frontend**: `VideoPlayerOverlay.tsx` + `.css`, state in `useControlHandlers`, events in `useCustomEventHandler`
+**Depends on**: `younite.messaging_core_extension`, `younite.interactions_extension` (for trigger-box integration)
+
+## Architecture
+
+```
+Kit (video catalog)  ──videoListSync──▶  Frontend (video list state)
+                     ◀──videoListRequest──
+                     ──videoOpen──▶       Frontend (opens player overlay)
+                     ◀──videoPlaybackEvent──  (opened / ended / closed)
+```
+
+- Kit holds the **source of truth** for which videos are available (catalog in `_DEFAULT_VIDEOS`, future: JSON config or DB).
+- Frontend requests the catalog on scene load (`videoListRequest`), receives it via `videoListSync`.
+- Kit can also push `videoOpen` to tell the frontend to play a specific video (for trigger boxes / interactions).
+- Frontend notifies Kit of playback lifecycle via `videoPlaybackEvent` (for analytics / post-video actions).
+
+## Video source resolution
+
+`VideoPlayerOverlay` resolves `source` strings in this order:
+
+1. **Full URL** (`http://` / `https://`) — used as-is (future: S3/CDN)
+2. **Filename** — resolved via Vite alias `@kit-videos` → `source/data/Assets/Videos/`
+
+The Vite alias is defined in `web-viewer-sample-main/vite.config.ts` and the `server.fs.allow` includes the Kit data path. Videos are discovered at build time via `import.meta.glob('@kit-videos/*.{mp4,webm,ogg}')`.
+
+## Messaging contracts
+
+### Inbound (web → Kit)
+
+| Event | Payload | Purpose |
+|-------|---------|---------|
+| `videoListRequest` | `{}` | Frontend asks for the video catalog |
+| `videoPlaybackEvent` | `{ videoId, action }` | Playback lifecycle notification (`opened`, `ended`, `closed`) |
+
+### Outbound (Kit → web)
+
+| Event | Payload | Purpose |
+|-------|---------|---------|
+| `videoListSync` | `{ videos: VideoConfig[] }` | Full video catalog |
+| `videoOpen` | `VideoConfig` fields | Push-open a video from Kit (trigger boxes, interactions) |
+
+Both outbound events are registered in `messaging_core_extension/extension.py`.
+
+## VideoConfig schema
+
+```typescript
+interface VideoConfig {
+    id: string;
+    title: string;
+    description?: string;
+    source: string;            // filename or full URL
+    durationSeconds?: number;
+    onCompleteAction?: {       // post-video action (teleport, chain video, etc.)
+        type: string;
+        payload: Record<string, any>;
+    };
+}
+```
+
+## Frontend components
+
+### VideoPlayerOverlay
+
+- Fullscreen overlay (`z-index: 10000`) with dark backdrop
+- `object-fit: contain` — video always shown in full, letterboxed on mobile
+- Auto-hiding controls (show on mouse move / tap, hide after 3 s during playback)
+- Keyboard: `Esc` = close, `Space` / `k` = play/pause
+- Disables player movement input while open (`movementInputControl`)
+- Backdrop click = close
+
+### State (useControlHandlers)
+
+| State | Type | Purpose |
+|-------|------|---------|
+| `videoPlayerOpen` | `boolean` | Whether the overlay is shown |
+| `videoPlayerConfig` | `VideoConfig \| null` | Currently playing video |
+| `videoList` | `VideoConfig[]` | Catalog received from Kit |
+
+Handlers: `handlePlayVideo(video?)`, `handleVideoClose()`, `handleVideoComplete(config)`
+
+### Event handling (useCustomEventHandler)
+
+- `videoListSync` → updates `videoList`
+- `videoOpen` → sets `videoPlayerConfig` + opens overlay
+
+### Interaction action registry
+
+`video.open` is registered in `StreamOnlyWindow.tsx` via `useInteractionActions`. It is invoked both by Kit-side `interactionTriggered` events and by the `onAction` callback from the `InteractionBoxesOverlay`.
+
+## Trigger-box integration (videoTrigger overlay style)
+
+Videos are triggered in-scene via the interactions system. A single `interactions.json` entry with the `videoTrigger` projectable style shows a proximity-gated bubble with a clickable "Watch" button. No separate click entry is needed.
+
+### interactions.json entry pattern
+
+```json
+{
+    "id": "video_trigger_01_card",
+    "label": "Watch Video",
+    "interactionType": "object",
+    "category": "interactive",
+    "scene": "main_scene",
+    "position": { "type": "xform", "primName": "video_trigger_01", "positionOffset": [0, -50, 0] },
+    "trigger": { "type": "proximity", "radiusMeters": 10, "activation": "always" },
+    "behaviors": [
+        {
+            "type": "projectable",
+            "ui": {
+                "title": "Welcome to the Arena",
+                "style": "videoTrigger",
+                "action": "video.open",
+                "actionPayload": {
+                    "videoId": "test_video_01",
+                    "title": "Welcome to the Arena",
+                    "source": "test_video.mp4"
+                }
+            }
+        }
+    ]
+}
+```
+
+Key `ui` fields for `videoTrigger` style:
+- **`style`**: `"videoTrigger"` — selects the bubble renderer with play button
+- **`action`**: action string dispatched via `onAction` callback (default: `"video.open"`)
+- **`actionPayload`**: payload passed to the action handler (video config fields)
+
+### USD layer setup
+
+The trigger prim needs a Collider child (standard convention) for overlay anchoring:
+
+```usda
+def Xform "video_trigger_01"
+{
+    double3 xformOp:translate = (...)
+    ...
+    def Cube "Collider" (
+        prepend apiSchemas = ["PhysicsCollisionAPI", "PhysxCollisionAPI"]
+    )
+    {
+        float3 xformOp:scale = (50, 120, 50)
+        double3 xformOp:translate = (0, 60, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+        token visibility = "invisible"
+        bool physics:collisionEnabled = 1
+    }
+}
+```
+
+The Collider is used by `_resolve_prim_top()` for overlay screen-projection anchoring. Use `positionOffset` in the interaction config to fine-tune bubble height.
+
+### Data flow
+
+```
+Player walks near trigger prim (proximity check)
+  → interactions extension sends projectable update
+    → InteractionBoxesOverlay renders videoTrigger bubble
+      → User clicks "Watch" button
+        → onAction callback fires
+          → interactionActions.dispatch('overlay', 'video.open', payload)
+            → video.open handler opens VideoPlayerOverlay
+```
+
+## Menu entry
+
+Hamburger menu → **Media** → **Play Video**. The Media category is a top-level entry for future media features. Clicking "Play Video" opens the first video from the Kit catalog.
+
+## Adding a new video trigger
+
+1. Place the video file in `source/data/Assets/Videos/` (`.mp4`, `.webm`, or `.ogg`)
+2. Add an entry to `_DEFAULT_VIDEOS` in `younite.video_extension/extension.py`
+3. Create an Xform with a Collider child in a sublayer (or use an existing prim)
+4. Add a `videoTrigger` interaction entry to `interactions.json` (copy the pattern above, update `primName`, `videoId`, `source`, `title`)
+5. The bubble appears when the player is near; clicking "Watch" opens the video
+
+For external URLs (S3, CDN), set `source` to the full URL — no local file needed.
+
+## Post-video actions (onCompleteAction)
+
+`VideoConfig.onCompleteAction` supports dispatching actions after the video ends. To implement:
+
+1. Set `onCompleteAction` in the video data (interactions.json `actionPayload` or Kit catalog):
+   ```json
+   "onCompleteAction": { "type": "teleport", "payload": { "primPath": "/World/PlayerSpawnPoint_Arena" } }
+   ```
+2. Extend `handleVideoComplete` in `useControlHandlers.ts` to read `config.onCompleteAction` and dispatch (e.g. `sendMessage('teleportToSpawnpoint', ...)` or route through the interaction action registry).
+
+Possible action types: `teleport`, `video.open` (chain), `avatarChat.open`, `sendMessage` (generic Kit event).
+
+## Videobook (chapter-based video for icon interactions)
+
+Icon interactions (`interactionType: "icon"`) open the `VideoBookOverlay` — a chapter-based video player with a menu of chapters, autoplay, and settings buttons. Data is defined in `iconConfig` within `interactions.json`.
+
+### Localization
+
+All user-facing videobook text is localized via i18n key references in `interactions.json`:
+
+- `iconConfig.greeting` — icon bubble greeting (e.g. `"interactions.icon_ipad.greeting"`)
+- `iconConfig.title` — videobook title (e.g. `"interactions.icon_ipad.title"`)
+- `iconConfig.subtitle` — videobook subtitle
+- `iconConfig.chapters[n].label` — chapter button labels (e.g. `"interactions.icon_ipad.chapter_queues"`)
+
+`VideoBookOverlay.tsx` creates a `localizedEntry` via `useMemo` that resolves all text fields through `t()`. The "Autoplay" and "Settings" UI labels use the `videobook.autoplay` and `videobook.settings` keys from the `"videobook"` section of each locale file.
+
+See `.cursor/rules/topics/localization.mdc` § Interaction locale keys for the full key structure.
+
+### Timestamp precision
+
+Chapter timestamps (`timestampSeconds`) support fractional seconds (hundredths). The `formatTime()` function in `VideoBookPlayer.tsx` displays time as `MM:SS:FF` where FF is hundredths of a second.
+
+### Captions (sidecar WebVTT, locale-aware)
+
+Videobook captions follow a **convention-over-configuration** pattern: drop a sidecar `.vtt` next to the video, in a per-locale subfolder named after the i18n base language code:
+
+```
+source/data/nucleus/videos/
+  security_4.mp4
+  captions/
+    en/security_4.vtt   ← shown when i18n.language is en/en-GB/...
+    sv/security_4.vtt
+    fr/security_4.vtt
+    es/security_4.vtt
+```
+
+The basename must match the video filename (sans extension). `interactions.json` does **not** need a `captionsUrl` field for this to work — `VideoBookPlayer.tsx` runs a build-time `import.meta.glob` over `nucleus/videos/captions/*/*.vtt`, and `resolveCaptionSource(videoUrl, lang)` looks up the URL using the active locale (with `en-GB → en` fallback). If no VTT exists for the active language the CC button stays disabled (greyed out), matching the spatial-sound pattern.
+
+Explicit `iconConfig.captionsUrl` (used by spatialSound / video360 plumbing — see `topics/spatial-audio.mdc` and `topics/360-video.mdc`) still wins, so a Kit-side payload can override the convention if needed.
+
+Native HTML5 `<track kind="subtitles">` loads the VTT for cue timing, but **on-screen** copy is drawn in a custom strip (`VideoBookPlayer.css`, `.vbp-caption-line`) so Lexend and the chip frame match design; native `::cue` styling is not used. The `<track>` element is **re-keyed** on locale change so the browser reloads the new VTT, and a `useEffect` re-applies `TextTrack.mode = 'showing' | 'hidden'` to preserve the user's CC on/off choice across that remount (otherwise the track resets to `'disabled'`).
+
+The `nucleus/videos/captions/` subtree is allow-listed in `.gitignore` (the rest of `nucleus/videos/` is excluded), so lightweight VTT sidecars travel with the repo while the heavy MP4s stay on the Nucleus server.
+
+#### Caption size (Figma; shared with 360° and spatial sound)
+
+Videobook, 360° video, and spatial-sound players share the same **three** caption size steps, driven by `captionSizeIndex` in `VideoBookSettingsContext` (slider in `VideoBookSettingsPanel`, step table in `web-viewer-sample-main/src/features/cu/videobook/videoBookSettings.ts` as `CAPTION_SIZE_STEPS`). Each overlay sets `data-caption-size={captionSizeIndex}` on its caption container; CSS scales `.vbp-caption-line` / `.v360-caption-line` / `.ssp-caption-line` accordingly.
+
+- **Small** (index 0) — 14px, line-height 130%, Lexend, weight 400, letter-spacing 0
+- **Default** (index 1) — 18px, line-height 130%
+- **Large** (index 2) — 30px, line-height 120%
+
+See `react-contexts.mdc` for where `VideoBookSettingsProvider` sits in the tree. `topics/360-video.mdc` and `topics/spatial-audio.mdc` point at the same tokens for their overlays.
+
+## Key files
+
+| File | Purpose |
+|------|---------|
+| `younite.video_extension/extension.py` | Kit extension: video catalog, event handlers |
+| `VideoPlayerOverlay.tsx` + `.css` | Fullscreen video player overlay |
+| `VideoBookOverlay.tsx` + `.css` | Chapter-based videobook overlay (icon interactions) |
+| `VideoBookPlayer.tsx` | Videobook video player with chapter seeking |
+| `InteractionBoxesOverlay.tsx` + `.css` | `videoTrigger` style renderer + `onAction` callback |
+| `useControlHandlers.ts` | Video state + handlers |
+| `useCustomEventHandler.ts` | `videoListSync` / `videoOpen` event handling |
+| `UIControls.tsx` | Media → Play Video menu entry |
+| `StreamOnlyWindow.tsx` | Wiring: overlay render, `video.open` action, `onAction` callback, catalog request |
+| `interactions.json` | Video trigger + icon interaction definitions (hot-reloaded) |
+| `video_stream_trigger_layer.usda` | Video trigger Xform prims with Colliders |
+| `vite.config.ts` | `@kit-videos` alias |
+| `source/data/Assets/Videos/` | Video file storage |
+
+## Related topics
+
+- Interactions extension (spatial triggers, projectables, action registry): `.cursor/rules/topics/interactions.mdc`
+- NPC avatar interactions (similar bubble + click pattern): `.cursor/rules/topics/interactions-avatars.mdc`
+- Localization (i18n key pattern for interactions): `.cursor/rules/topics/localization.mdc`

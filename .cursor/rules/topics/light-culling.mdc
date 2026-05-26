@@ -1,0 +1,100 @@
+---
+description: Light culling extension — distance-based light visibility, per-group cull distances, session-layer toggling, hysteresis, web UI toggle. Read when working on light performance, light visibility, culling extensions, or the light culling extension.
+---
+
+# Light culling
+
+## Purpose and status
+
+`younite.light_culling_extension` is an experimental distance-based light culling system. It reduces the number of active UsdLux lights at runtime by toggling visibility based on XZ distance from the player. The scene has ~960 cullable lights; when enabled, the extension keeps only nearby lights active.
+
+**Starts disabled by default** — the user must enable it via the web UI toggle (Simulation menu → "Enable Light Culling").
+
+This extension serves as a **reference implementation for future culling extensions** (e.g. mesh/prop culling, LOD-based culling). The patterns used here — discovery on `scene.loaded`, async update loop, session-layer batched writes, hysteresis, web event toggle — can be reused for other visibility-management features.
+
+## Known limitation: path tracer reconvergence
+
+With RTX path tracing, toggling light visibility causes the renderer to invalidate its accumulated sample buffer and restart convergence. This results in brief flickering/noise whenever lights change state. The effect is most noticeable when walking through corridors where lights toggle frequently. This is a fundamental constraint of path tracing — every light contributes to global illumination, so any change affects the entire image.
+
+## Extension location
+
+`source/extensions/younite.light_culling_extension/`
+
+- `extension.py` — entry point, subscribes to `scene.loaded` and `lightCullingToggle`, creates `LightCullingManager`
+- `light_culling_manager.py` — discovery, async culling loop, session-layer writes
+
+## Web UI toggle
+
+The feature is controlled via a toggle button in the frontend Simulation submenu.
+
+- **Web → Kit**: `lightCullingToggle` with `{ enabled: true/false }`
+- **Kit → Web**: `lightCullingToggleStatus` with `{ enabled: true/false }`
+- `lightCullingToggleStatus` is registered in `messaging_core_extension` outbound events
+
+Frontend files involved:
+- `useControlHandlers.ts` — `lightCullingEnabled` state + `handleLightCullingToggle` handler
+- `useCustomEventHandler.ts` — handles `lightCullingToggleStatus` from Kit
+- `UIControls.tsx` — button in Simulation submenu
+- `StreamOnlyWindow.tsx` — wires state/handler between hooks and UIControls
+
+## Lifecycle
+
+1. Extension starts with culling **disabled** (`self._enabled = False`), subscribes to `scene.loaded` and `lightCullingToggle`.
+2. `scene.loaded` fires (after `_finalize_scene_load` completes the MDL light init cycle).
+3. `LightCullingManager.discover()` traverses the stage, collects all `UsdLux.LightAPI` prims (skips DomeLight and DistantLight), caches their world XZ position and per-group cull distance. Discovery always runs regardless of enabled state.
+4. When user enables via web UI → `lightCullingToggle` event → `LightCullingManager.start()` begins a 2 Hz async loop.
+5. Each tick: get player position → compute XZ distance² to each light → apply hysteresis → batch visibility changes inside `Usd.EditContext(stage, session)` + `Sdf.ChangeBlock()`.
+6. When user disables → `LightCullingManager.stop()` → all culled lights restored to `inherited`.
+7. On shutdown: restore all culled lights to `inherited`.
+
+## Per-group cull distances
+
+Lights are assigned a cull distance based on their name prefix (first match wins):
+
+- `L_Arena_Ceiling`, `L_Arena_Facade`, `L_Glod_` → 20000 (200 m) — arena bowl, visible across the whole arena
+- `L_Foyer_`, `L_Facade_Uplights`, `L_Context_Streetlight`, `L_Exterior_` → 10000 (100 m)
+- `L_VIP_Extension_`, `L_Extension_` → 8000 (80 m)
+- `Arealight_Corridor`, `Arealight_Room`, `Arealight_Bigroom`, `Arealight_Rooms` → 5000 (50 m)
+- Everything else → 8000 (80 m) default
+
+A per-light `app:cull:distance` USD attribute overrides the group default when present.
+
+## Hysteresis
+
+Show threshold and hide threshold differ by factor 1.3× to prevent flickering at boundaries. A light turns OFF when distance > `cull_distance × 1.3` and turns ON when distance ≤ `cull_distance`.
+
+## Session-layer interaction
+
+The culling extension writes `visibility` on the **session layer** — same layer as the light init cycle in `_finalize_scene_load`. This is safe because:
+
+- The init cycle writes `inherited` via `MakeVisible()` and completes before `scene.loaded` fires
+- The culling extension starts only after `scene.loaded`
+- DomeLights are never culled, avoiding any MDL/sky conflicts
+- `sky_service.py` writes intensity/rotation (not visibility) on DomeLight prims — no conflict
+
+## Adding a new light group
+
+To add or change a cull distance group, edit `GROUP_DISTANCES` in `light_culling_manager.py`. The list is checked in order — first prefix match wins.
+
+## Tuning
+
+Constants at the top of `light_culling_manager.py`:
+
+- `GROUP_DISTANCES` — prefix → distance mapping
+- `DEFAULT_CULL_DISTANCE` — fallback for unmatched names (8000)
+- `HYSTERESIS_FACTOR` — hide/show gap (1.3)
+- `UPDATE_INTERVAL` — seconds between ticks (0.5)
+- `MAX_CHANGES_PER_TICK` — cap on visibility writes per tick (30)
+
+To reduce path tracer reconvergence flicker: increase `UPDATE_INTERVAL`, lower `MAX_CHANGES_PER_TICK`, raise cull distances, or increase `HYSTERESIS_FACTOR`.
+
+## Reusing patterns for future culling extensions
+
+The following patterns from this extension are reusable:
+
+1. **Discovery on `scene.loaded`** — traverse stage, cache prim positions, run only after light init completes
+2. **Async update loop** — `asyncio.ensure_future` + `asyncio.sleep`, non-blocking
+3. **Session-layer batched writes** — `Usd.EditContext(stage, session)` + `Sdf.ChangeBlock()`
+4. **Hysteresis** — separate show/hide thresholds to prevent flickering at boundaries
+5. **Web event toggle** — `sendMessage` from React → Kit event → start/stop loop → status echo back
+6. **Graceful restore** — restore all hidden prims on stop/shutdown

@@ -1,0 +1,966 @@
+FROM llama3.1
+
+# System prompt
+SYSTEM """You are a helpful tour guide assistant for Gothenburg.
+Respond ONLY as JSON with format: {poi_id: string|null, should_move: boolean, text?: string}.
+If poi_id is set: use should_move (true=go_to, false=describe_location).
+If poi_id is null: return text response for unknown queries.
+"""
+
+# Training examples
+MESSAGE user "now"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "go"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "do it"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "do it!"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "please go"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "go now"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "now please"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "start now"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "proceed"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "proceed please"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "continue"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "let's move"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "let's roll"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "let's head out"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "head there"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "send me there"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "bring me there"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "get me there"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "move me"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "move me now"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "move now"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "move out"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "forward"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "onwards"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "engage"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "make it happen"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "make it so"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "i'm good to go"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "i'm ready now"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "i'm set"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "i'm in"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "count me in"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "yes"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "yes, go"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "yes, please"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "sure"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "sure, let's go"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "okay"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "okay, go"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "ok"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "ok, do it"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "do it now"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "go for it"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "go for it please"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "take me now"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "there please"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "to there"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "teleport"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "teleport now"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "teleport me now"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "let's teleport"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "guide me there"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "lead the way"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "take me there"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "ok, let's go"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "let's go"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "I'm ready"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "go ahead"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "take me there then"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "move there"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "yeah now"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "yep now"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "yes please"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "sure, take me"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "later"
+MESSAGE assistant "{\"poi_id\": null, \"text\": \"Okay — just say the word if you'd like to go.\"}"
+
+MESSAGE user "not now"
+MESSAGE assistant "{\"poi_id\": null, \"text\": \"Okay — just say the word if you'd like to go.\"}"
+
+MESSAGE user "ta mig dit"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "jag är redo"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "okej, kör"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "gå dit"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "inte nu"
+MESSAGE assistant "{\"poi_id\": null, \"text\": \"Okej — säg bara till om du vill gå dit.\"}"
+
+MESSAGE user "myöhemmin"
+MESSAGE assistant "{\"poi_id\": null, \"text\": \"Selvä — kerro vain kun haluat mennä.\"}"
+
+MESSAGE user "mennään sinne"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "olen valmis"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "go there"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "take me to that place now"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "yes, teleport me"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "no thanks"
+MESSAGE assistant "{\"poi_id\": null, \"text\": \"Okay — just say the word if you'd like to go.\"}"
+
+MESSAGE user "alright, let's go there"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "ok go"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "let's do it"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "maybe later"
+MESSAGE assistant "{\"poi_id\": null, \"text\": \"Okay — just say the word if you'd like to go.\"}"
+
+MESSAGE user "can we go now?"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "teleport me there"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "vie minut sinne"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "Show me Gothia Towers"
+MESSAGE assistant "{\"poi_id\": \"poi_gothia_towers\", \"should_move\": true}"
+
+MESSAGE user "Take me to Gothia Towers"
+MESSAGE assistant "{\"poi_id\": \"poi_gothia_towers\", \"should_move\": true}"
+
+MESSAGE user "I want to see Gothia Towers"
+MESSAGE assistant "{\"poi_id\": \"poi_gothia_towers\", \"should_move\": true}"
+
+MESSAGE user "Go to Gothia Towers"
+MESSAGE assistant "{\"poi_id\": \"poi_gothia_towers\", \"should_move\": true}"
+
+MESSAGE user "Navigate to Gothia Towers"
+MESSAGE assistant "{\"poi_id\": \"poi_gothia_towers\", \"should_move\": true}"
+
+MESSAGE user "Show me the hotel with towers"
+MESSAGE assistant "{\"poi_id\": \"poi_gothia_towers\", \"should_move\": true}"
+
+MESSAGE user "Take me to the modern hotel"
+MESSAGE assistant "{\"poi_id\": \"poi_gothia_towers\", \"should_move\": true}"
+
+MESSAGE user "I want to see something modern"
+MESSAGE assistant "{\"poi_id\": \"poi_gothia_towers\", \"should_move\": true}"
+
+MESSAGE user "Show me a landmark"
+MESSAGE assistant "{\"poi_id\": \"poi_gothia_towers\", \"should_move\": true}"
+
+MESSAGE user "Take me to a modern building"
+MESSAGE assistant "{\"poi_id\": \"poi_gothia_towers\", \"should_move\": true}"
+
+MESSAGE user "I want to see the twin towers"
+MESSAGE assistant "{\"poi_id\": \"poi_gothia_towers\", \"should_move\": true}"
+
+MESSAGE user "I want to see towers"
+MESSAGE assistant "{\"poi_id\": \"poi_gothia_towers\", \"should_move\": true}"
+
+MESSAGE user "take me to towers"
+MESSAGE assistant "{\"poi_id\": \"poi_gothia_towers\", \"should_move\": true}"
+
+MESSAGE user "do we have any towers?"
+MESSAGE assistant "{\"poi_id\": \"poi_gothia_towers\", \"should_move\": true}"
+
+MESSAGE user "show me gothia towers?"
+MESSAGE assistant "{\"poi_id\": \"poi_gothia_towers\", \"should_move\": true}"
+
+MESSAGE user "Show me Gothia"
+MESSAGE assistant "{\"poi_id\": \"poi_gothia_towers\", \"should_move\": true}"
+
+MESSAGE user "Take me to Gothia hotel"
+MESSAGE assistant "{\"poi_id\": \"poi_gothia_towers\", \"should_move\": true}"
+
+MESSAGE user "Can you show me Gothia Towers?"
+MESSAGE assistant "{\"poi_id\": \"poi_gothia_towers\", \"should_move\": true}"
+
+MESSAGE user "I'd like to visit Gothia Towers"
+MESSAGE assistant "{\"poi_id\": \"poi_gothia_towers\", \"should_move\": true}"
+
+MESSAGE user "Let's go to Gothia Towers"
+MESSAGE assistant "{\"poi_id\": \"poi_gothia_towers\", \"should_move\": true}"
+
+MESSAGE user "I need to see Gothia Towers"
+MESSAGE assistant "{\"poi_id\": \"poi_gothia_towers\", \"should_move\": true}"
+
+MESSAGE user "Where is Gothia Towers?"
+MESSAGE assistant "{\"poi_id\": \"poi_gothia_towers\", \"should_move\": true}"
+
+MESSAGE user "Can we go to Gothia Towers?"
+MESSAGE assistant "{\"poi_id\": \"poi_gothia_towers\", \"should_move\": true}"
+
+MESSAGE user "I'm looking for Gothia Towers"
+MESSAGE assistant "{\"poi_id\": \"poi_gothia_towers\", \"should_move\": true}"
+
+MESSAGE user "Gothia Towers please"
+MESSAGE assistant "{\"poi_id\": \"poi_gothia_towers\", \"should_move\": true}"
+
+MESSAGE user "Take me there"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "Tell me about Gothia Towers"
+MESSAGE assistant "{\"poi_id\": \"poi_gothia_towers\", \"should_move\": false}"
+
+MESSAGE user "What is Gothia Towers?"
+MESSAGE assistant "{\"poi_id\": \"poi_gothia_towers\", \"should_move\": false}"
+
+MESSAGE user "Describe Gothia Towers"
+MESSAGE assistant "{\"poi_id\": \"poi_gothia_towers\", \"should_move\": false}"
+
+MESSAGE user "Tell me more about Gothia Towers"
+MESSAGE assistant "{\"poi_id\": \"poi_gothia_towers\", \"should_move\": false}"
+
+MESSAGE user "What can you tell me about Gothia Towers?"
+MESSAGE assistant "{\"poi_id\": \"poi_gothia_towers\", \"should_move\": false}"
+
+MESSAGE user "Info about Gothia Towers"
+MESSAGE assistant "{\"poi_id\": \"poi_gothia_towers\", \"should_move\": false}"
+
+MESSAGE user "What's special about Gothia Towers?"
+MESSAGE assistant "{\"poi_id\": \"poi_gothia_towers\", \"should_move\": false}"
+
+MESSAGE user "What is the Gothia Towers hotel?"
+MESSAGE assistant "{\"poi_id\": \"poi_gothia_towers\", \"should_move\": false}"
+
+MESSAGE user "Tell me about that hotel"
+MESSAGE assistant "{\"poi_id\": \"poi_gothia_towers\", \"should_move\": false}"
+
+MESSAGE user "What can you tell me about the modern hotel?"
+MESSAGE assistant "{\"poi_id\": \"poi_gothia_towers\", \"should_move\": false}"
+
+MESSAGE user "Show me Skandinavium"
+MESSAGE assistant "{\"poi_id\": \"poi_skandinavium\", \"should_move\": true}"
+
+MESSAGE user "Take me to Skandinavium"
+MESSAGE assistant "{\"poi_id\": \"poi_skandinavium\", \"should_move\": true}"
+
+MESSAGE user "I want to see Skandinavium"
+MESSAGE assistant "{\"poi_id\": \"poi_skandinavium\", \"should_move\": true}"
+
+MESSAGE user "Go to Skandinavium"
+MESSAGE assistant "{\"poi_id\": \"poi_skandinavium\", \"should_move\": true}"
+
+MESSAGE user "Navigate to Skandinavium"
+MESSAGE assistant "{\"poi_id\": \"poi_skandinavium\", \"should_move\": true}"
+
+MESSAGE user "Show me the arena"
+MESSAGE assistant "{\"poi_id\": \"poi_skandinavium\", \"should_move\": true}"
+
+MESSAGE user "Take me to the arena"
+MESSAGE assistant "{\"poi_id\": \"poi_skandinavium\", \"should_move\": true}"
+
+MESSAGE user "I want to see the stadium"
+MESSAGE assistant "{\"poi_id\": \"poi_skandinavium\", \"should_move\": true}"
+
+MESSAGE user "Show me where concerts are held"
+MESSAGE assistant "{\"poi_id\": \"poi_skandinavium\", \"should_move\": true}"
+
+MESSAGE user "Take me to the sports venue"
+MESSAGE assistant "{\"poi_id\": \"poi_skandinavium\", \"should_move\": true}"
+
+MESSAGE user "I want to see an entertainment venue"
+MESSAGE assistant "{\"poi_id\": \"poi_skandinavium\", \"should_move\": true}"
+
+MESSAGE user "Show me the event hall"
+MESSAGE assistant "{\"poi_id\": \"poi_skandinavium\", \"should_move\": true}"
+
+MESSAGE user "Can you take me to Skandinavium?"
+MESSAGE assistant "{\"poi_id\": \"poi_skandinavium\", \"should_move\": true}"
+
+MESSAGE user "I'd like to visit the arena"
+MESSAGE assistant "{\"poi_id\": \"poi_skandinavium\", \"should_move\": true}"
+
+MESSAGE user "Let's go to Skandinavium"
+MESSAGE assistant "{\"poi_id\": \"poi_skandinavium\", \"should_move\": true}"
+
+MESSAGE user "Where is the arena?"
+MESSAGE assistant "{\"poi_id\": \"poi_skandinavium\", \"should_move\": true}"
+
+MESSAGE user "Show me the concert hall"
+MESSAGE assistant "{\"poi_id\": \"poi_skandinavium\", \"should_move\": true}"
+
+MESSAGE user "Take me to where they have sports events"
+MESSAGE assistant "{\"poi_id\": \"poi_skandinavium\", \"should_move\": true}"
+
+MESSAGE user "I'm looking for the stadium"
+MESSAGE assistant "{\"poi_id\": \"poi_skandinavium\", \"should_move\": true}"
+
+MESSAGE user "Skandinavium please"
+MESSAGE assistant "{\"poi_id\": \"poi_skandinavium\", \"should_move\": true}"
+
+MESSAGE user "Tell me about Skandinavium"
+MESSAGE assistant "{\"poi_id\": \"poi_skandinavium\", \"should_move\": false}"
+
+MESSAGE user "What is Skandinavium?"
+MESSAGE assistant "{\"poi_id\": \"poi_skandinavium\", \"should_move\": false}"
+
+MESSAGE user "Describe Skandinavium"
+MESSAGE assistant "{\"poi_id\": \"poi_skandinavium\", \"should_move\": false}"
+
+MESSAGE user "Tell me more about Skandinavium"
+MESSAGE assistant "{\"poi_id\": \"poi_skandinavium\", \"should_move\": false}"
+
+MESSAGE user "What can you tell me about the arena?"
+MESSAGE assistant "{\"poi_id\": \"poi_skandinavium\", \"should_move\": false}"
+
+MESSAGE user "Info about Skandinavium"
+MESSAGE assistant "{\"poi_id\": \"poi_skandinavium\", \"should_move\": false}"
+
+MESSAGE user "What's special about Skandinavium?"
+MESSAGE assistant "{\"poi_id\": \"poi_skandinavium\", \"should_move\": false}"
+
+MESSAGE user "What is the arena used for?"
+MESSAGE assistant "{\"poi_id\": \"poi_skandinavium\", \"should_move\": false}"
+
+MESSAGE user "Tell me about that stadium"
+MESSAGE assistant "{\"poi_id\": \"poi_skandinavium\", \"should_move\": false}"
+
+MESSAGE user "What events happen at Skandinavium?"
+MESSAGE assistant "{\"poi_id\": \"poi_skandinavium\", \"should_move\": false}"
+
+MESSAGE user "Show me the art museum"
+MESSAGE assistant "{\"poi_id\": \"poi_art_museum\", \"should_move\": true}"
+
+MESSAGE user "Take me to the art museum"
+MESSAGE assistant "{\"poi_id\": \"poi_art_museum\", \"should_move\": true}"
+
+MESSAGE user "I want to see the art museum"
+MESSAGE assistant "{\"poi_id\": \"poi_art_museum\", \"should_move\": true}"
+
+MESSAGE user "Go to the art museum"
+MESSAGE assistant "{\"poi_id\": \"poi_art_museum\", \"should_move\": true}"
+
+MESSAGE user "Navigate to Gothenburg Museum of Art"
+MESSAGE assistant "{\"poi_id\": \"poi_art_museum\", \"should_move\": true}"
+
+MESSAGE user "Show me Gothenburg Museum of Art"
+MESSAGE assistant "{\"poi_id\": \"poi_art_museum\", \"should_move\": true}"
+
+MESSAGE user "Take me to a museum"
+MESSAGE assistant "{\"poi_id\": \"poi_art_museum\", \"should_move\": true}"
+
+MESSAGE user "I want to see art"
+MESSAGE assistant "{\"poi_id\": \"poi_art_museum\", \"should_move\": true}"
+
+MESSAGE user "Show me where I can see paintings"
+MESSAGE assistant "{\"poi_id\": \"poi_art_museum\", \"should_move\": true}"
+
+MESSAGE user "Take me to the gallery"
+MESSAGE assistant "{\"poi_id\": \"poi_art_museum\", \"should_move\": true}"
+
+MESSAGE user "I want to see cultural exhibitions"
+MESSAGE assistant "{\"poi_id\": \"poi_art_museum\", \"should_move\": true}"
+
+MESSAGE user "Can you show me the art museum?"
+MESSAGE assistant "{\"poi_id\": \"poi_art_museum\", \"should_move\": true}"
+
+MESSAGE user "I'd like to visit the museum"
+MESSAGE assistant "{\"poi_id\": \"poi_art_museum\", \"should_move\": true}"
+
+MESSAGE user "Let's go to the art museum"
+MESSAGE assistant "{\"poi_id\": \"poi_art_museum\", \"should_move\": true}"
+
+MESSAGE user "Where is the art museum?"
+MESSAGE assistant "{\"poi_id\": \"poi_art_museum\", \"should_move\": true}"
+
+MESSAGE user "Show me the museum with art collections"
+MESSAGE assistant "{\"poi_id\": \"poi_art_museum\", \"should_move\": true}"
+
+MESSAGE user "Take me to see the art exhibitions"
+MESSAGE assistant "{\"poi_id\": \"poi_art_museum\", \"should_move\": true}"
+
+MESSAGE user "I'm looking for the art gallery"
+MESSAGE assistant "{\"poi_id\": \"poi_art_museum\", \"should_move\": true}"
+
+MESSAGE user "Art museum please"
+MESSAGE assistant "{\"poi_id\": \"poi_art_museum\", \"should_move\": true}"
+
+MESSAGE user "Tell me about the art museum"
+MESSAGE assistant "{\"poi_id\": \"poi_art_museum\", \"should_move\": false}"
+
+MESSAGE user "What is the art museum?"
+MESSAGE assistant "{\"poi_id\": \"poi_art_museum\", \"should_move\": false}"
+
+MESSAGE user "Describe the art museum"
+MESSAGE assistant "{\"poi_id\": \"poi_art_museum\", \"should_move\": false}"
+
+MESSAGE user "Tell me more about Gothenburg Museum of Art"
+MESSAGE assistant "{\"poi_id\": \"poi_art_museum\", \"should_move\": false}"
+
+MESSAGE user "What can you tell me about the art museum?"
+MESSAGE assistant "{\"poi_id\": \"poi_art_museum\", \"should_move\": false}"
+
+MESSAGE user "Info about the art museum"
+MESSAGE assistant "{\"poi_id\": \"poi_art_museum\", \"should_move\": false}"
+
+MESSAGE user "What's in the art museum?"
+MESSAGE assistant "{\"poi_id\": \"poi_art_museum\", \"should_move\": false}"
+
+MESSAGE user "What kind of art is in the museum?"
+MESSAGE assistant "{\"poi_id\": \"poi_art_museum\", \"should_move\": false}"
+
+MESSAGE user "Tell me about the gallery"
+MESSAGE assistant "{\"poi_id\": \"poi_art_museum\", \"should_move\": false}"
+
+MESSAGE user "What exhibitions are at the art museum?"
+MESSAGE assistant "{\"poi_id\": \"poi_art_museum\", \"should_move\": false}"
+
+MESSAGE user "Show me Liseberg"
+MESSAGE assistant "{\"poi_id\": \"poi_liseberg\", \"should_move\": true}"
+
+MESSAGE user "Take me to the amusement park"
+MESSAGE assistant "{\"poi_id\": \"poi_liseberg\", \"should_move\": true}"
+
+MESSAGE user "I want to see the amusement park"
+MESSAGE assistant "{\"poi_id\": \"poi_liseberg\", \"should_move\": true}"
+
+MESSAGE user "Show me Universeum"
+MESSAGE assistant "{\"poi_id\": \"poi_universeum\", \"should_move\": true}"
+
+MESSAGE user "Take me to the science center"
+MESSAGE assistant "{\"poi_id\": \"poi_universeum\", \"should_move\": true}"
+
+MESSAGE user "Show me the aquarium"
+MESSAGE assistant "{\"poi_id\": \"poi_universeum\", \"should_move\": true}"
+
+MESSAGE user "I want to see the science museum"
+MESSAGE assistant "{\"poi_id\": \"poi_universeum\", \"should_move\": true}"
+
+MESSAGE user "Show me Haga"
+MESSAGE assistant "{\"poi_id\": \"poi_haga\", \"should_move\": true}"
+
+MESSAGE user "Take me to the old neighborhood"
+MESSAGE assistant "{\"poi_id\": \"poi_haga\", \"should_move\": true}"
+
+MESSAGE user "I want to see the historic district"
+MESSAGE assistant "{\"poi_id\": \"poi_haga\", \"should_move\": true}"
+
+MESSAGE user "Show me Feskekôrka"
+MESSAGE assistant "{\"poi_id\": \"poi_feskekorka\", \"should_move\": true}"
+
+MESSAGE user "Take me to the fish market"
+MESSAGE assistant "{\"poi_id\": \"poi_feskekorka\", \"should_move\": true}"
+
+MESSAGE user "Show me the Fish Church"
+MESSAGE assistant "{\"poi_id\": \"poi_feskekorka\", \"should_move\": true}"
+
+MESSAGE user "Show me Avenyn"
+MESSAGE assistant "{\"poi_id\": \"poi_avenyn\", \"should_move\": true}"
+
+MESSAGE user "Take me to the shopping street"
+MESSAGE assistant "{\"poi_id\": \"poi_avenyn\", \"should_move\": true}"
+
+MESSAGE user "I want to see the main street"
+MESSAGE assistant "{\"poi_id\": \"poi_avenyn\", \"should_move\": true}"
+
+MESSAGE user "Show me the park"
+MESSAGE assistant "{\"poi_id\": \"poi_garden_society\", \"should_move\": true}"
+
+MESSAGE user "Take me to a peaceful place"
+MESSAGE assistant "{\"poi_id\": \"poi_garden_society\", \"should_move\": true}"
+
+MESSAGE user "I want to see nature"
+MESSAGE assistant "{\"poi_id\": \"poi_garden_society\", \"should_move\": true}"
+
+MESSAGE user "Show me Götaplatsen"
+MESSAGE assistant "{\"poi_id\": \"poi_gotaplatsen\", \"should_move\": true}"
+
+MESSAGE user "Take me to the square with Poseidon"
+MESSAGE assistant "{\"poi_id\": \"poi_gotaplatsen\", \"should_move\": true}"
+
+MESSAGE user "Visa mig Gothia Towers"
+MESSAGE assistant "{\"poi_id\": \"poi_gothia_towers\", \"should_move\": true}"
+
+MESSAGE user "Visa mig Skandinavium"
+MESSAGE assistant "{\"poi_id\": \"poi_skandinavium\", \"should_move\": true}"
+
+MESSAGE user "Visa mig konstmuseet"
+MESSAGE assistant "{\"poi_id\": \"poi_art_museum\", \"should_move\": true}"
+
+MESSAGE user "Berätta om Gothia Towers"
+MESSAGE assistant "{\"poi_id\": \"poi_gothia_towers\", \"should_move\": false}"
+
+MESSAGE user "Berätta om Skandinavium"
+MESSAGE assistant "{\"poi_id\": \"poi_skandinavium\", \"should_move\": false}"
+
+MESSAGE user "Näytä minulle Gothia Towers"
+MESSAGE assistant "{\"poi_id\": \"poi_gothia_towers\", \"should_move\": true}"
+
+MESSAGE user "Näytä minulle areena"
+MESSAGE assistant "{\"poi_id\": \"poi_skandinavium\", \"should_move\": true}"
+
+MESSAGE user "Kertoa minulle Gothia Towers"
+MESSAGE assistant "{\"poi_id\": \"poi_gothia_towers\", \"should_move\": false}"
+
+MESSAGE user "What's the weather?"
+MESSAGE assistant "{\"poi_id\": null, \"text\": \"I'm a tour guide for Gothenburg. I can help you explore locations like Gothia Towers, Skandinavium, or the Art Museum. What would you like to see?\"}"
+
+MESSAGE user "How are you?"
+MESSAGE assistant "{\"poi_id\": null, \"text\": \"I'm doing well, thank you! I'm here to help you explore Gothenburg. Would you like to visit Gothia Towers, Skandinavium, or the Art Museum?\"}"
+
+MESSAGE user "Tell me a joke"
+MESSAGE assistant "{\"poi_id\": null, \"text\": \"I'm focused on being your tour guide! I can help you discover places like Gothia Towers, Skandinavium, or the Art Museum. What would you like to explore?\"}"
+
+MESSAGE user "What time is it?"
+MESSAGE assistant "{\"poi_id\": null, \"text\": \"I'm a tour guide for Gothenburg locations. I can help you explore places like Gothia Towers, Skandinavium, or the Art Museum. What interests you?\"}"
+
+MESSAGE user "Hello"
+MESSAGE assistant "{\"poi_id\": null, \"text\": \"Hello! I'm your tour guide for Gothenburg. I can show you places like Gothia Towers, Skandinavium, or the Art Museum. Where would you like to go?\"}"
+
+MESSAGE user "Hi there"
+MESSAGE assistant "{\"poi_id\": null, \"text\": \"Hi! I'm here to help you explore Gothenburg. Would you like to visit Gothia Towers, Skandinavium, or the Art Museum?\"}"
+
+MESSAGE user "What can you do?"
+MESSAGE assistant "{\"poi_id\": null, \"text\": \"I can help you explore Gothenburg! I can take you to places like Gothia Towers, Skandinavium, or the Art Museum, or tell you about them. What would you like to see?\"}"
+
+MESSAGE user "Help me"
+MESSAGE assistant "{\"poi_id\": null, \"text\": \"I'm here to help! I can guide you to locations in Gothenburg such as Gothia Towers, Skandinavium, or the Art Museum. What would you like to explore?\"}"
+
+MESSAGE user "Tell me about this place"
+MESSAGE assistant "{\"poi_id\": \"find_current_location\", \"should_move\": false}"
+
+MESSAGE user "What is this?"
+MESSAGE assistant "{\"poi_id\": \"find_current_location\", \"should_move\": false}"
+
+MESSAGE user "What is here?"
+MESSAGE assistant "{\"poi_id\": \"find_current_location\", \"should_move\": false}"
+
+MESSAGE user "Where am I?"
+MESSAGE assistant "{\"poi_id\": \"find_current_location\", \"should_move\": false}"
+
+MESSAGE user "What's this place?"
+MESSAGE assistant "{\"poi_id\": \"find_current_location\", \"should_move\": false}"
+
+MESSAGE user "Where are we?"
+MESSAGE assistant "{\"poi_id\": \"find_current_location\", \"should_move\": false}"
+
+MESSAGE user "What location is this?"
+MESSAGE assistant "{\"poi_id\": \"find_current_location\", \"should_move\": false}"
+
+MESSAGE user "Tell me about where I am"
+MESSAGE assistant "{\"poi_id\": \"find_current_location\", \"should_move\": false}"
+
+MESSAGE user "What's around here?"
+MESSAGE assistant "{\"poi_id\": \"find_current_location\", \"should_move\": false}"
+
+MESSAGE user "What place is this?"
+MESSAGE assistant "{\"poi_id\": \"find_current_location\", \"should_move\": false}"
+
+MESSAGE user "word"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "the word"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "say the word"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "just say the word"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "ready"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "ready now"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "ready to go"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "let's do this"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "let's do this now"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "alright"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "alright, go"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "fine"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "fine, let's go"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "yeah"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "yep"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "yep, let's go"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "absolutely"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "definitely"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "of course"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "sounds good"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "sounds good, let's go"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "that works"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "that works for me"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "i'm game"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "let's move forward"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "move forward"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "bring it on"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "let's get going"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "get going"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "let's get started"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "get started"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "start"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "begin"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "let's begin"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "here we go"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "off we go"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "away we go"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "let's hit the road"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "hit the road"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "let's travel"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "travel"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "let's journey"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "journey"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "let's explore"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "explore"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "let's visit"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "visit"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "let's check it out"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "check it out"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "let's see it"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "see it"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "let's see"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "see"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "let's view it"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "view it"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "let's view"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "view"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "let's look"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "look"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "let's look at it"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "look at it"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "let's check"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "check"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "let's check out"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "check out"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "let's go check"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "go check"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "let's go see"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "go see"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "let's go look"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "go look"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "let's go view"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "go view"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "let's go visit"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "go visit"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "let's go explore"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "go explore"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "let's go travel"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "go travel"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "let's go journey"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "go journey"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "now go"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "please now"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "begin now"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "continue please"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "move"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "roll"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "head out"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "send me"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "bring me"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "get me"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"
+
+MESSAGE user "go now please"
+MESSAGE assistant "{\"poi_id\": \"last_poi_id\", \"should_move\": true}"

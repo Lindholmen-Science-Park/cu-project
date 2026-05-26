@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "AccessCity — Explore in 3D",
+  "version": "0.1.0",
+  "description": "Send WGS84 coordinates from map tabs to the Goteverse streaming viewer (dev).",
+  "permissions": ["tabs"],
+  "host_permissions": [
+    "http://localhost:5173/*",
+    "http://127.0.0.1:5173/*",
+    "https://www.google.com/*",
+    "https://google.com/*",
+    "https://maps.google.com/*",
+    "https://www.openstreetmap.org/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "AccessCity — Explore in 3D"
+  },
+  "content_scripts": [
+    {
+      "matches": ["http://localhost:5173/*", "http://127.0.0.1:5173/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

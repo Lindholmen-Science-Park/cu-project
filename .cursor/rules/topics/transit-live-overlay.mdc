@@ -1,0 +1,138 @@
+---
+description: Live transit overlay — Västtrafik Planera Resa v4 journey positions as pooled USD vehicles (bus + tram USD models with cube fallback), smooth EMA-driven blends along OSM road graph, streaming dev status/events, web overlay panel (list → bird-eye pan focus + selected-vehicle details, mirrors AIQ/Bike pattern)
+globs:
+  - "**/younite.open_data_live_extension/**"
+  - "**/younite.usd_viewer_player_core_extension/**/extension.py"
+  - "**/TransitLiveDevSection.tsx"
+  - "**/IotTransitLivePanel.tsx"
+  - "**/IotSubmenu.tsx"
+alwaysApply: false
+---
+
+# Live transit overlay (dev)
+
+Kit extension **`younite.open_data_live_extension`** (service: `services/transit_overlay.py`) polls **Västtrafik Travel Planner v4** `GET …/positions` (OAuth2 client credentials) and spawns vehicle prims under `/World/TransitLiveOverlay`. Each slot is an Xform with `translate · rotateY · scale` ops; the body is one of:
+
+- **Bus model** (default, when an asset is found) — the slot's `body` Xform references **`Assets/Bus/bus_edited.usd`** (resolved via `TRANSIT_LIVE_BUS_USD_PATH` env or stage-relative, see resolution rules below) with a constant `rotateY = -90°` bias to align the asset's local +X-forward to our +Z-forward yaw convention. Slot scale stays at `(1,1,1)` because the asset is already self-scaled (mesh points in m × parent scale 100 → cm, ~8 m × 2.1 m × 2.1 m).
+- **Tram model** (default, when an asset is found) — the slot's `body` Xform references **`Assets/Tram/tram.usd`** (resolved via `TRANSIT_LIVE_TRAM_USD_PATH` env or stage-relative) with `rotateY = 0°` bias (the tram asset is authored +Z-forward already). A tram-only body scale compensation is authored at spawn so the rendered size is realistic.
+- **Cube fallback** — unit `UsdGeom.Cube` body driven by the slot's non-uniform scale op (10 m × 2.5 m × 3 m blue rectangle for buses; **33 m × 2.65 m × 3.35 m** green rectangle for trams). Used when the corresponding model asset can't be resolved, or when `TRANSIT_LIVE_BUS_USD_PATH` / `TRANSIT_LIVE_TRAM_USD_PATH` is set to `0` / `off` / `cube`.
+
+**Tram classification** (`_classify_is_tram_from`): if the Västtrafik `line` object on a `/positions` row carries a transport-mode hint (`transportMode` / `productCategory` / `mode`, any case), it wins absolutely — the row is a tram iff the hint matches one of `tram` / `spårvagn` / `sparvagn` / `light_rail` / `lightrail` / `streetcar` (case-insensitive substring). When the feed gives no mode (older v4 payloads sometimes omit it), classification falls back to a route-id allow-list (`TRANSIT_LIVE_TRAM_ROUTE_IDS`), defaulting to Göteborg's Spårvagn lines `1,2,3,4,5,6,7,8,9,10,11,13`. Setting the env to an explicit empty string (`TRANSIT_LIVE_TRAM_ROUTE_IDS=`) disables the route-id heuristic; mode-based detection still runs. The raw mode hint is surfaced in the dev panel under `vehicles[i].dev.transportMode` so it's obvious which path classified each row.
+
+Requires **GeoCoordinateService** (Cesium georeference) on stage.
+
+## Credentials and API
+
+| Env | Purpose |
+|---|---|
+| `VASTTRAFIK_CLIENT_ID` / `VASTTRAFIK_CLIENT_SECRET` | OAuth2 client credentials |
+| `VASTTRAFIK_PLANERA_BASE` | Optional; default `https://ext-api.vasttrafik.se/pr/v4` |
+
+The OAuth **application** must be subscribed to **Travel Planner v4** in the Västtrafik developer portal; otherwise `/positions` returns **403** with fault **900908**.
+
+## Streaming to the web
+
+- **Outbound:** `transitLiveOverlayStatus` — `enabled`, `vehicleCount`, `lastError`, `lastFetchEpochMs`, `hasApiKey` (true when Västtrafik env creds are set), `transitSource` (always `vasttrafik`), optional `hint`, **`vehicles`** (capped dev snapshot rows).
+- **Inbound:** `transitLiveOverlayRequest` — `{ enabled, apiKey? }` (`apiKey` is ignored; credentials come from env).
+
+## Dev vehicle list (`vehicles`)
+
+Each row includes `token` (USD-safe id derived from feed id, with a stable short hash suffix to avoid sanitize/truncate collisions), `sceneXyzCm`, `yawDeg`, plus feed fields such as `routeId`, `lat`, `lon`, `line`, `journeyName`, etc. Max rows: **`TRANSIT_LIVE_DEV_VEHICLE_LIST_MAX`** (default 64).
+
+## Web UI
+
+The transit feature uses the same two-piece shape as **AIQ** and **Bike-share**:
+
+1. **`TransitLiveDevSection.tsx`** — lives inside **`IotSubmenu.tsx`** alongside AIQ + Bike. Renders just the **toggle button** ("Live transit overlay" / "Stop live transit overlay"), a **status hint** (`vehicleCount`, `lastError`, missing-creds hint), and an **"Open transit list"** entry-point that opens the overlay panel. The inline vehicle list that earlier versions rendered here was moved into the panel so all three IoT features have an identical drawer footprint.
+2. **`IotTransitLivePanel.tsx`** (in `features/streaming/overlays/iotTransitLive/`, mounted from `SharedOverlayLayer.tsx`) — overlay panel with the Västtrafik vehicle list on the left and selected-vehicle details on the right, reusing `IotAirStationsPanel.css`. State lives in the controls context (`iotTransitLivePanelOpen`, `iotTransitLiveSelectedVehicleToken`, `dismissIotTransitLivePanel`). The selected token keys off the `vehicles[i].token` field from `transitLiveOverlayStatus`. **Esc** dismisses.
+
+In **bird's-eye** view, clicking a row sends **`birdEyeRouteClear`** then **`birdEyePanFocusWorld`** with `{ worldPos: sceneXyzCm }` so the map pans to center that vehicle **without** drawing a walking route (see `bird-eye-map-controls.mdc` §5). When the camera is not in bird-eye, the row still selects (updating the detail dl) but does not pan; the panel surfaces a one-line hint to switch view.
+
+**Dismiss difference vs AIQ/Bike**: closing the transit panel does **not** clear Kit-side cubes. Vehicle markers are owned by the live overlay toggle in `TransitLiveDevSection`; the panel is purely a list + detail viewer. Use the toggle to stop the Kit overlay itself.
+
+## Rendering & blend architecture
+
+Each vehicle is a `UsdGeom.Xform` (translate · rotateY · scale) whose `body` child is either a referenced model (`bus_edited.usd` / `tram.usd`, each with a constant yaw bias) or a unit `UsdGeom.Cube`. **Per-frame writes touch the slot's translate + rotate only** — scale, color, body kind and model compensation are authored once at spawn. The xform-op handles are cached per-vehicle so the per-frame tick never re-resolves prim paths or `GetOrderedXformOps()`. All per-frame attribute writes for a given tick are flushed inside a single `Sdf.ChangeBlock` so Hydra observes one batched update instead of `2 × N` notifications.
+
+**Slot pool**: prims are never destroyed during normal operation. When a vehicle leaves the feed it's hidden via the **payload orchestrator** (`hide(slot_path, source="transit_live_overlay")`) and its slot path is pushed to a free list. The next new vehicle pops a pooled slot, restores its pose, and re-`show()`s it. Pool reuse is **body-kind aware**: cube slots get the slot-level scale + cube `displayColor` rewritten so the same prim can host buses or trams interchangeably; **model slots skip both writes** (the asset carries its own meter-scaled geometry and authored materials, and we never want to squash it). The body kind is probed from `<slot>/body`'s prim type during handle resolution, so a pooled slot keeps its identity across vehicle hand-offs even if the cache was purged.
+
+Slot paths are synthetic (`/World/TransitLiveOverlay/v_NNNNN`) and decoupled from feed IDs. Full destroy (`stage.RemovePrim`) only happens in `_clear_stage_vehicles` (disable / stage close / shutdown).
+
+**Bus/tram asset resolution** (`_resolve_bus_asset_path`, `_resolve_tram_asset_path`):
+
+1. `TRANSIT_LIVE_BUS_USD_PATH` / `TRANSIT_LIVE_TRAM_USD_PATH` env. Empty / unset → step 2. Values `0` / `off` / `false` / `none` / `cube` → force cube fallback for that vehicle kind. Absolute path → used as-is. Relative → joined to the stage root layer dir, then one level up.
+2. Defaults: `Assets/Bus/bus_edited.usd` and `Assets/Tram/tram.usd`, each joined against the stage root layer dir and one level up — same scheme as `younite.maintenance_bot_extension._resolve_model_path`, so stages checked into `source/data/...` find assets automatically without baking absolute paths.
+
+If the reference fails to compose at spawn, the slot transparently falls back to the cube body and logs `[transit_live] <bus|tram> asset reference failed (...)`.
+
+**Blend timing** — between polls, vehicles ease along an OSM polyline from their last pose to the new API position:
+
+- Polyline source: `OsmGraphService.shortest_path` with a **per-vehicle** mode: buses use `TRANSIT_LIVE_OSM_ROUTE_MODE` (default `car`); trams use `TRANSIT_LIVE_OSM_ROUTE_MODE_TRAM` (default `tram`, which routes on `railway=tram` + `light_rail` edges in the graph). Capped at `TRANSIT_LIVE_OSM_ROUTE_MAX_PER_POLL` Dijkstras per poll. Polylines start at the vehicle's actual current pose and end at the new target so motion is geometrically continuous across cycles.
+- **Regenerate the graph** after the railway import landed: from `source/data/osm/`, `python generate_roads.py --force` (or `set OSM_FORCE_REFETCH=1` once) to pull `way[railway]` + rebuild `gothenburg_graph.json` (schema v3, `includes_railway: true`). Until then, the `tram` mode has no valid nodes and trams fall back to the straight + OSM-Y path below.
+- Shared-street running: OSM may model a tram and the road as **separate** parallel ways, so a tram whose GPS is closer to the road than the `railway=tram` way still snaps in `nearest_node` to the “wrong” component — a known limitation; the straight + OSM-Y fallback covers gaps.
+- Fallback when routing isn't done (disabled, budget gone, or pathfinding failed): the straight `[p0, p1]` line is **subdivided** (~1 sample per 20 m, capped at 8) and Y for each intermediate point is snapped to OSM-terrain height (``_subdivide_straight_with_osm_y``; nearest-node Y for terrain still uses **car** mode in `_osm_terrain_y_at_world` — a cheap ground-height probe).
+- Easing is **linear** on the arc-length parameter (constant velocity within each blend). Combined with the EMA-driven `dur` below, the next blend starts as the current one finishes — no inter-cycle "freeze gap".
+- Tween duration `dur` is driven by an **EMA of observed inter-poll cadence** (`α = 0.35`, ~3-sample memory). Order of preference: `TRANSIT_LIVE_MOVE_BLEND_SEC` env override → `cadence_ema × 0.98` → cold-start fallback `interval_s × 0.92`.
+- Yaw is computed from the polyline tangent at the current arc-length, then passed through a **frame-rate-independent low-pass filter** with time constant `TRANSIT_LIVE_YAW_SMOOTH_TAU_S` (default 0.15 s). This smooths the stair-step yaw at OSM-node boundaries without hiding real turns.
+- Polyline lookup is **incremental**: each blend record carries `seg_idx` advanced in-place by the per-frame tick, so position + yaw share a single O(1)-amortised segment lookup per vehicle per frame.
+- All blend timestamps use `time.monotonic()` so NTP corrections and clock changes can't warp the curves.
+
+**OSM nearest-node** lookup uses a spatial hash (`_build_osm_spatial_index`) bucketing the graph's `valid_nodes_by_mode` into `TRANSIT_LIVE_OSM_GRID_CELL_CM` cells (default 30 000 cm = 300 m). Searches scan the 3×3 cell neighbourhood instead of all ~20 k nodes; falls back to `graph.nearest_node()` only at cell edges or empty buckets.
+
+### OSM graph: roads + rail (no ferries)
+
+`source/data/osm/generate_roads.py` fetches a **union** of:
+
+- `highway=*` (motorway … cycleway, same filter as before)
+- `railway=tram|light_rail|rail|subway|narrow_gauge|preserved|monorail|construction` in the same radius (ferries / water routes are **not** included)
+
+Visual USDA buckets: `rail_tram`, `rail_light_rail`, `rail_subway`, `rail_main`. Graph edge **classes** for `OsmGraphService`: `tram`, `light_rail`, `rail_heavy` (subway + mainline + narrow + preserved + mono + construction all map to `rail_heavy`). Modes in `osm_graph_service.py`: `walking` / `wheelchair` / `car` (roads only), plus `tram` (Spårvagn on tram + light_rail edges) and `train` (light_rail + `rail_heavy`, excludes `tram`-only track).
+
+Re-bake: `python generate_roads.py --force` from `source/data/osm/`, or terrain-follow with Kit: `bake_roads.bat` / `bake_terrain_roads.py` (expects `osm_cache.json` from a prior generate run).
+
+### Tram routing notes
+
+- **Before schema v3 / no rail in JSON:** trams only had the straight + OSM-Y fallback.
+- **After v3:** `_transit_osm_route_mode_for_vehicle` defaults trams to `mode=tram` so Dijkstra uses track edges. Set `TRANSIT_LIVE_OSM_ROUTE_MODE_TRAM=car` only to reproduce the old “snap to road” behaviour (debug).
+
+## Common `TRANSIT_LIVE_*` tuning
+
+| Env | Role |
+|---|---|
+| `TRANSIT_LIVE_CENTER_LAT` / `LON` | WGS84 anchor (default Skandinavium) |
+| `TRANSIT_LIVE_RADIUS_KM` | Haversine filter (default ~3.2 km) |
+| `TRANSIT_LIVE_SCENE_RADIUS_CM` | Optional scene-space cap from anchor |
+| `TRANSIT_LIVE_POLL_SEC` / `MAX_VEHICLES` | Poll interval and cap |
+| `TRANSIT_LIVE_VEHICLE_Y_FROM_OSM` | Y from OSM graph + offset (default on) |
+| `TRANSIT_LIVE_OSM_ROUTE_BETWEEN_UPDATES` | Ease along OSM roads between polls (default on) |
+| `TRANSIT_LIVE_OSM_ROUTE_MAX_PER_POLL` | Max Dijkstras per poll (default 24) |
+| `TRANSIT_LIVE_OSM_ROUTE_MODE` | Buses/road: `car` / `walking` / `wheelchair` / `tram` / `train` (default `car`) |
+| `TRANSIT_LIVE_OSM_ROUTE_MODE_TRAM` | Tram vehicles: `tram` (default, uses track graph), or `car` to debug old road-snapping |
+| `TRANSIT_LIVE_OSM_GRID_CELL_CM` | Spatial-hash cell for nearest-node lookup |
+| `TRANSIT_LIVE_MOVE_BLEND_SEC` | **Override** for tween duration; bypasses EMA |
+| `TRANSIT_LIVE_MOVE_BLEND_MAX_JUMP_CM` | Snap (don't tween) if jump exceeds this |
+| `TRANSIT_LIVE_YAW_SMOOTH_TAU_S` | Yaw low-pass time constant (default 0.15 s; `0` disables) |
+| `TRANSIT_LIVE_TRAM_ROUTE_IDS` | Route-id fallback for tram classification when the feed omits a transport mode. Default: Göteborg Spårvagn (`1,2,3,…,11,13`). Empty string disables the fallback (mode-based detection still runs). |
+| `TRANSIT_LIVE_BUS_USD_PATH` | Override bus model USD (abs path or stage-relative). `0` / `off` / `cube` forces the cube fallback. Default: `Assets/Bus/bus_edited.usd` resolved relative to stage. |
+| `TRANSIT_LIVE_TRAM_USD_PATH` | Override tram model USD (abs path or stage-relative). `0` / `off` / `cube` forces the cube fallback. Default: `Assets/Tram/tram.usd` resolved relative to stage. |
+
+## Key files
+
+| Path | Role |
+|---|---|
+| `source/data/osm/generate_roads.py` | Overpass fetch (highway + railway union), `gothenburg_roads.usda` + `gothenburg_graph.json` (schema v3) |
+| `younite.osm_navigation_extension/.../osm_graph_service.py` | `MODE_COSTS` modes: `walking` / `car` / `tram` / `train` + edge classes `tram` / `light_rail` / `rail_heavy` |
+| `younite/open_data_live_extension/services/transit_overlay.py` | Fetch, parse, USD apply, blend, status payload |
+| `younite/open_data_live_extension/extension.py` | Events wiring (transit + air quality), startup announce |
+| `web-viewer-sample-main/.../sceneHandlers.ts` | Maps `transitLiveOverlayStatus` into control state |
+| `web-viewer-sample-main/.../TransitLiveDevSection.tsx` | Dev IoT drawer block: transit toggle + status + "Open transit list" entry-point |
+| `web-viewer-sample-main/.../overlays/iotTransitLive/IotTransitLivePanel.tsx` | Overlay panel: vehicle list + selected-vehicle detail dl, click → bird-eye pan |
+| `web-viewer-sample-main/.../IotSubmenu.tsx` | Hosts WAQI + Bike + transit sections (one drawer) |
+| `web-viewer-sample-main/.../hooks/useControlHandlers.ts` | Panel state: `iotTransitLivePanelOpen`, `iotTransitLiveSelectedVehicleToken`, `dismissIotTransitLivePanel` |
+
+## Related
+
+- Air + bike markers (same Kit extension): `open-data-live-waqi-gbfs.mdc`
+- Cesium / WGS84: `cesium-geolocation.mdc`
+- Bird-eye pan focus event: `bird-eye-map-controls.mdc` §5
+- Messaging: `events-api.mdc`

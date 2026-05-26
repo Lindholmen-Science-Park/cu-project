@@ -1,0 +1,588 @@
+/*
+ * Stream surface — #main-div is the video stack; seat overlay sits above #remote-video.
+ * Figma 2026 APRIL DEMO — node 5706-9205 (Off-white 64px circle + 32px icon; Play asset from design export).
+ * Node 5691-2411 — arrival confetti + seat (replace assets/seat-arrival-celebration.png with export).
+ */
+
+/* Figma 5691-2411 — centred on the stream area (#main-div), bouncy entrance */
+@keyframes stream-seat-arrival-pop {
+    0% {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(0.68);
+    }
+    55% {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1.06);
+    }
+    100% {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1);
+    }
+}
+
+.stream-seat-arrival-celebration {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: min(80vw, 80vh);
+    height: min(80vw, 80vh);
+    max-width: calc(100% - 32px);
+    max-height: calc(100% - 32px);
+    pointer-events: none;
+    z-index: 44;
+    box-sizing: border-box;
+    transform: translate(-50%, -50%);
+    animation: stream-seat-arrival-pop 0.55s cubic-bezier(0.34, 1.35, 0.45, 1) forwards;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.stream-seat-arrival-celebration img {
+    width: auto;
+    height: auto;
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    display: block;
+    pointer-events: none;
+    user-select: none;
+    image-rendering: auto;
+    image-rendering: -webkit-optimize-contrast;
+    transform: translateZ(0);
+    backface-visibility: hidden;
+}
+.stream-main-div {
+    position: relative;
+    width: 100%;
+    height: 100%;
+}
+
+/* Find my seat — same width as bottom bar; visible alongside the Play button */
+.stream-seat-nav-info {
+    position: absolute;
+    left: 50%;
+    top: 0;
+    transform: translateX(-50%);
+    width: 390px;
+    max-width: 100%;
+    padding: calc(12px + env(safe-area-inset-top, 0px)) var(--page-edge-right) 8px var(--page-edge-left);
+    box-sizing: border-box;
+    pointer-events: none;
+    z-index: 48;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+/* Column: beige card (title + buttons, metrics, turn hint, CU slot) */
+.stream-seat-nav-info__shell {
+    display: flex;
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+    pointer-events: auto;
+    padding: 0;
+    border: none;
+    background: transparent;
+    box-shadow: none;
+    box-sizing: border-box;
+    pointer-events: auto;
+}
+
+/* Turn hint — 16px gap after metrics */
+.stream-seat-nav-info__turns-hint {
+    display: flex;
+    margin-top: 16px;
+    padding: 12px 16px;
+    align-items: center;
+    gap: 8px;
+    align-self: stretch;
+    border-radius: 16px;
+    border: 1px solid rgba(33, 23, 64, 0.3);
+    background: rgba(234, 231, 229, 0.8);
+    box-shadow: 0 3px 7px 0 rgba(0, 0, 0, 0.15);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    box-sizing: border-box;
+}
+
+.stream-seat-nav-info__turns-icon {
+    flex-shrink: 0;
+    display: block;
+    width: 24px;
+    height: 24px;
+    object-fit: contain;
+    pointer-events: none;
+    user-select: none;
+}
+
+.stream-seat-nav-info__turns-icon--mirror {
+    transform: scaleX(-1);
+}
+
+.stream-seat-nav-info__turns-text {
+    flex: 1;
+    min-width: 0;
+    font-size: 13px;
+    line-height: 1.4;
+    font-weight: 500;
+    color: var(--Dark-Purple, #351a84);
+}
+
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme='light']) .stream-seat-nav-info__turns-text {
+        color: #efedf7;
+    }
+}
+
+:root[data-theme='dark'] .stream-seat-nav-info__turns-text,
+body[data-theme='dark'] .stream-seat-nav-info__turns-text {
+    color: #efedf7;
+}
+
+/* Beige glass card: row 1 title + buttons, 4px → metrics, 16px → turn hint, CU */
+.stream-seat-nav-info__route-row {
+    display: flex;
+    padding: 16px;
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: flex-start;
+    gap: 0;
+    align-self: stretch;
+    width: 100%;
+    box-sizing: border-box;
+    border-radius: 16px;
+    border: 1px solid rgba(33, 23, 64, 0.3);
+    background: rgba(234, 231, 229, 0.8);
+    box-shadow: 0 3px 7px 0 rgba(0, 0, 0, 0.15);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+}
+
+/* Row 1: route title + speaker + close */
+.stream-seat-nav-info__header-row {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-width: 0;
+    align-self: stretch;
+}
+
+.stream-seat-nav-info__cu-slot {
+    display: flex;
+    align-self: stretch;
+    width: 100%;
+    min-height: 0;
+    justify-content: center;
+    align-items: center;
+    box-sizing: border-box;
+}
+
+.stream-seat-nav-info__actions {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    align-self: center;
+    gap: 8px;
+    pointer-events: auto;
+}
+
+/* Left: pennant + route title (title wraps to extra lines when needed) */
+.stream-seat-nav-info__title-block {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.stream-seat-nav-info__title-block .stream-seat-nav-info__route-flag {
+    flex-shrink: 0;
+    align-self: flex-start;
+    color: var(--Dark-Purple, #351a84);
+}
+
+/* Dark purple speaker — same 40×40 frame as close (Figma pair).
+ * Glyph uses `currentColor` (same icons as `MediaMuteButton` in media overlays). */
+.stream-seat-nav-info__speaker {
+    flex-shrink: 0;
+    box-sizing: border-box;
+    display: flex;
+    width: 40px;
+    height: 40px;
+    padding: 10px;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    aspect-ratio: 1 / 1;
+    border-radius: 80px;
+    border: 1px solid var(--Dark-Purple, #351a84);
+    background: var(--Dark-Purple, #351a84);
+    color: var(--Off-white, #f6f6f6);
+    box-shadow: 0 2px 3px 0 rgba(0, 0, 0, 0.25);
+    cursor: pointer;
+    transition:
+        background 0.2s ease,
+        border-color 0.2s ease,
+        box-shadow 0.2s ease,
+        transform 0.15s ease;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.stream-seat-nav-info__speaker--muted {
+    background: transparent;
+    border: 1px solid var(--Dark-Purple, #351a84);
+    box-shadow: none;
+    color: var(--Dark-Purple, #351a84);
+}
+
+/* Touch devices synthesize sticky :hover after tap — without this, muted keeps the
+   filled-purple “hover” look and never matches the outline pill next to Close.
+ * Require real hover capability + fine pointer (mouse/trackpad), not primary touch. */
+@media (hover: hover) and (pointer: fine) {
+    .stream-seat-nav-info__speaker:hover {
+        background: #4a258f;
+        border-color: #4a258f;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.22);
+        transform: scale(1.03);
+        color: var(--Off-white, #f6f6f6);
+    }
+
+    .stream-seat-nav-info__speaker--muted:hover {
+        background: var(--Dark-Purple, #351a84);
+        border-color: var(--Dark-Purple, #351a84);
+        box-shadow: 0 2px 3px 0 rgba(0, 0, 0, 0.25);
+        color: var(--Off-white, #f6f6f6);
+    }
+}
+
+.stream-seat-nav-info__speaker:active {
+    transform: scale(0.98);
+}
+
+.stream-seat-nav-info__speaker:focus {
+    outline: none;
+}
+
+.stream-seat-nav-info__speaker:focus-visible {
+    outline: 2px solid rgba(246, 246, 246, 0.9);
+    outline-offset: 3px;
+}
+
+.stream-seat-nav-info__speaker--muted:focus-visible {
+    outline: 2px solid var(--Dark-Purple, #351a84);
+    outline-offset: 3px;
+}
+
+.stream-seat-nav-info__speaker-icon {
+    display: flex;
+    width: 24px;
+    height: 24px;
+    padding: 0 1px;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+    aspect-ratio: 1 / 1;
+    object-fit: contain;
+    pointer-events: none;
+    user-select: none;
+    fill: currentColor;
+}
+
+/* Muted-state speaker glyph used in the seat-nav speaker button. Distinct
+   from the unmuted MediaVolumeOnIcon: wider (49:37) Figma artwork with
+   text-line indicators next to a crossed-out speaker. */
+.stream-seat-nav-info__speaker-icon--muted {
+    height: 16.612px;
+    flex-shrink: 0;
+    align-self: stretch;
+    aspect-ratio: 49 / 37;
+    fill: var(--Dark-Purple, #351a84);
+    object-fit: contain;
+    pointer-events: none;
+    user-select: none;
+}
+
+/* Close — 40×40, Off-white (Figma) */
+.stream-seat-nav-info__close {
+    flex-shrink: 0;
+    box-sizing: border-box;
+    display: flex;
+    width: 40px;
+    height: 40px;
+    padding: 4px;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 0;
+    aspect-ratio: 1 / 1;
+    border: none;
+    border-radius: 80px;
+    background: var(--Off-white, #f6f6f6);
+    color: var(--Dark-Purple, #351a84);
+    box-shadow: 0 2px 3px 0 rgba(0, 0, 0, 0.25);
+    cursor: pointer;
+    transition:
+        background 0.2s ease,
+        box-shadow 0.2s ease,
+        transform 0.15s ease;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.stream-seat-nav-info__close:hover {
+    background: #eeeeee;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    transform: scale(1.03);
+}
+
+.stream-seat-nav-info__close:active {
+    transform: scale(0.98);
+}
+
+.stream-seat-nav-info__close:focus {
+    outline: none;
+}
+
+.stream-seat-nav-info__close:focus-visible {
+    outline: 2px solid rgba(53, 26, 132, 0.45);
+    outline-offset: 3px;
+}
+
+/* Same X geometry as `PanelCloseButton` (CU panels) */
+.stream-seat-nav-info__close-icon {
+    display: block;
+    flex-shrink: 0;
+    width: 23px;
+    height: 23px;
+    pointer-events: none;
+    user-select: none;
+}
+
+/* Medium-Default / H4 — Lexend (stream route label, same row as buttons) */
+.stream-seat-nav-info__title-block .cu-seat-panel__status {
+    display: block;
+    flex: 1 1 auto;
+    min-width: 0;
+    margin-bottom: 0;
+    font-family: Lexend, system-ui, sans-serif;
+    font-size: clamp(12px, 4.2vw, 17px);
+    font-style: normal;
+    font-weight: 500;
+    line-height: 1.25;
+    color: var(--Dark-Purple, #351a84);
+    text-align: left;
+    white-space: normal;
+    overflow-wrap: break-word;
+    word-wrap: break-word;
+}
+
+/* Arrival pill — same visual style as __turns-hint but centred text, no icon */
+.stream-seat-nav-info__arrival-pill {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    align-self: stretch;
+    margin-top: 16px;
+    padding: 12px 16px;
+    border-radius: 16px;
+    border: 1px solid rgba(33, 23, 64, 0.3);
+    background: var(--Off-white, #f6f6f6);
+    box-sizing: border-box;
+    font-family: Lexend, system-ui, sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1.4;
+    color: #402c85;
+    text-align: center;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme='light']) .stream-seat-nav-info__title-block .cu-seat-panel__status:not(.cu-seat-panel__status--error) {
+        color: #efedf7;
+    }
+
+    :root:not([data-theme='light']) .stream-seat-nav-info__title-block .stream-seat-nav-info__route-flag {
+        color: #efedf7;
+    }
+
+    :root:not([data-theme='light']) .stream-seat-nav-info__arrival-pill {
+        color: #efedf7;
+        background: rgba(33, 23, 64, 0.55);
+        border-color: rgba(216, 207, 255, 0.28);
+    }
+}
+
+:root[data-theme='dark'] .stream-seat-nav-info__title-block .cu-seat-panel__status:not(.cu-seat-panel__status--error),
+body[data-theme='dark'] .stream-seat-nav-info__title-block .cu-seat-panel__status:not(.cu-seat-panel__status--error) {
+    color: #efedf7;
+}
+
+:root[data-theme='dark'] .stream-seat-nav-info__title-block .stream-seat-nav-info__route-flag,
+body[data-theme='dark'] .stream-seat-nav-info__title-block .stream-seat-nav-info__route-flag {
+    color: #efedf7;
+}
+
+:root[data-theme='dark'] .stream-seat-nav-info__arrival-pill,
+body[data-theme='dark'] .stream-seat-nav-info__arrival-pill {
+    color: #efedf7;
+    background: rgba(33, 23, 64, 0.55);
+    border-color: rgba(216, 207, 255, 0.28);
+}
+
+/* Row 2: min walk + m left — 4px gap from header row (only when non-empty) */
+.stream-seat-nav-info__metrics-block {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    align-self: stretch;
+    min-width: 0;
+    text-align: left;
+}
+
+.stream-seat-nav-info__metrics-block:not(:empty) {
+    margin-top: 4px;
+}
+
+.stream-seat-nav-info__metrics-block .cu-seat-panel__measure {
+    flex: 0 0 auto;
+    margin-bottom: 0;
+    margin-top: 0;
+    font-size: 12px;
+    color: var(--Dark-Purple, #351a84);
+    line-height: 1.45;
+}
+
+.stream-seat-nav-info__metric-list {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 12px;
+}
+
+.stream-seat-nav-info__metric-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.stream-seat-nav-info__metric-icon {
+    display: block;
+    flex-shrink: 0;
+    width: 16px;
+    height: 16px;
+    object-fit: contain;
+    pointer-events: none;
+    user-select: none;
+}
+
+.stream-seat-nav-info__metric-text {
+    color: var(--Dark-Purple, #351a84);
+    font-family: Lexend, system-ui, sans-serif;
+    font-size: 14px;
+    font-style: normal;
+    font-weight: 500;
+    line-height: 130%;
+    white-space: nowrap;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme='light']) .stream-seat-nav-info__metric-text,
+    :root:not([data-theme='light']) .stream-seat-nav-info__metrics-block .cu-seat-panel__measure {
+        color: #efedf7;
+    }
+}
+
+:root[data-theme='dark'] .stream-seat-nav-info__metric-text,
+body[data-theme='dark'] .stream-seat-nav-info__metric-text,
+:root[data-theme='dark'] .stream-seat-nav-info__metrics-block .cu-seat-panel__measure,
+body[data-theme='dark'] .stream-seat-nav-info__metrics-block .cu-seat-panel__measure {
+    color: #efedf7;
+}
+
+.stream-seat-nav-info__metrics-block .cu-seat-panel__measure-row {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 8px;
+}
+
+/* Bottom strip for Play/Stop — same for seat + restroom stream nav; sit closer to home indicator */
+.stream-seat-nav-overlay {
+    position: absolute;
+    left: 50%;
+    bottom: 0;
+    transform: translateX(-50%);
+    display: flex;
+    width: 390px;
+    max-width: 100%;
+    height: auto;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 0 var(--page-edge-right) calc(20px + env(safe-area-inset-bottom, 0px)) var(--page-edge-left);
+    box-sizing: border-box;
+    pointer-events: none;
+    z-index: 48;
+}
+
+/* Figma — 64px circle, Off-white fill (node 5706-9205) */
+.stream-seat-nav-overlay__btn {
+    display: flex;
+    width: 64px;
+    height: 64px;
+    padding: 8px;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    aspect-ratio: 1 / 1;
+    border-radius: 80px;
+    background: var(--Off-white, #F6F6F6);
+    flex-shrink: 0;
+    border: none;
+    pointer-events: auto;
+    cursor: pointer;
+    transition:
+        background 0.2s ease,
+        box-shadow 0.2s ease,
+        transform 0.15s ease;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.stream-seat-nav-overlay__icon {
+    display: block;
+    flex-shrink: 0;
+}
+
+.stream-seat-nav-overlay__btn:hover {
+    background: #f0f0f0;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+.stream-seat-nav-overlay__btn:active {
+    transform: scale(0.98);
+}
+
+.stream-seat-nav-overlay__btn:focus {
+    outline: none;
+}
+
+.stream-seat-nav-overlay__btn:focus-visible {
+    outline: 2px solid rgba(53, 26, 132, 0.45);
+    outline-offset: 3px;
+}
+
+/* Full-bleed canvas inside #streamonly-wrapper (avoid inline sizing on the stream root). */
+.stream-main-div.stream-canvas-fill {
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    margin: 0;
+}

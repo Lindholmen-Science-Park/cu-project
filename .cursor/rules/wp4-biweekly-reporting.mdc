@@ -1,0 +1,30 @@
+---
+description: WP4 EU bi-weekly Citiverse report — use Goteverse Documentation/WP4_BIWEEKLY_REPORTING.md, git tag wp4-report-*, archive, standing positions
+alwaysApply: false
+---
+
+# WP4 bi-weekly EU reporting (agent)
+
+When the user asks for a **WP4 bi-weekly report**, **EU Citiverse report**, or uses the **standard shortcut** below (or close paraphrase), treat it as **end-to-end**: deliver the bullets **and** persist the baseline (archive + commit + tag), unless they explicitly opt out with **draft only** / **no git** / **bullets only**.
+
+**Standard shortcut (full workflow — default):** *“Generate the WP4 bi-weekly draft using `Goteverse Documentation/WP4_BIWEEKLY_REPORTING.md` and the repo since the last `wp4-report-*` tag.”*
+
+## A — Generate the draft
+
+1. Read **`Goteverse Documentation/WP4_BIWEEKLY_REPORTING.md`** — headlines, workflow, and **Agent workflow** section.
+2. Find the latest **`wp4-report-*` git tag** (`git tag -l 'wp4-report-*' | sort | tail -1`). If none exists, use `git log` from repo root with a sensible recent window, and say so in the reply.
+3. Run **`git log <latest-tag>..HEAD --oneline`** and optionally **`git diff <latest-tag>..HEAD --stat`** (and short path-focused diffs if needed) to infer what changed since the last report.
+4. Read the **newest file** in **`Goteverse Documentation/wp4_reports_archive/`** (by filename / mtime) — avoid repeating the same bullets verbatim; emphasise **delta** or one honest “no change / ongoing as previously reported” line per headline.
+5. Read **`Goteverse Documentation/wp4_standing_positions.md`** for slow-changing LDT/SIMPL/EDIC context when git/commits do not spell it out.
+6. Output **only** the four EU headlines with **1–3 bullets each**; “no activity this period” is valid. Do not invent LDT/SIMPL/EDIC/integration claims not supported by git + standing + archive.
+
+## B — Persist baseline (default: always after A)
+
+**Skip section B only** if the user clearly asked for **draft only** / **no git** / **bullets only** (no commit, no tag, no new archive file).
+
+7. **Report date `D`** — Use **`YYYY-MM-DD`** parsed from the user’s message if they gave an explicit report date; otherwise use **today’s local ISO date** for the workspace. State `D` in the reply.
+8. **Archive** — Write the **same** four-headline markdown as in step 6 to **`Goteverse Documentation/wp4_reports_archive/D.md`**. If that file **or** tag **`wp4-report-D`** already exists, **do not** overwrite or add a duplicate tag; finish step 6 output, then explain the collision and stop before destructive git.
+9. **`git add`** the new archive file (and any doc edits from this turn), **`git commit`** with a clear message (e.g. `chore(wp4): archive bi-weekly report D`), then **`git tag wp4-report-D`** on that commit.
+10. Confirm paths, commit hash, and tag name in the reply.
+
+**Draft vs sent text:** The archive matches **agent output**. If the user later changes wording in the email to Johan, they can ask for a one-line archive fix in a follow-up; otherwise the next fortnight may not match “exact sent” wording.

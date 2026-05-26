@@ -1,0 +1,230 @@
+---
+description: USD editing extension — dev-mode vertex nudging (button + drag-to-move), prim transform (move/rotate), marker create/edit/remove, marker pose clipboard (minimal vs full diagnostic), vertex distance measurement, persistent edit sublayer, session/hard reset
+globs:
+  - kit-app-template-main/source/extensions/younite.usd_edit_extension/**
+  - web-viewer-sample-main/src/features/dev/controls/UsdEditPanel.tsx
+  - web-viewer-sample-main/src/features/streaming/AppStream.tsx
+  - web-viewer-sample-main/src/features/streaming/hooks/useControlHandlers.ts
+  - web-viewer-sample-main/src/features/streaming/hooks/useCustomEventHandler.ts
+  - web-viewer-sample-main/src/features/streaming/hooks/eventHandlers/usdEditHandlers.ts
+  - web-viewer-sample-main/src/features/streaming/StreamOnlyWindow.tsx
+  - web-viewer-sample-main/src/features/streaming/DevViewLayer.tsx
+  - web-viewer-sample-main/src/features/dev/controls/UIControls.tsx
+---
+
+# USD Editing Extension
+
+Lightweight "super-admin" mode for making small geometry and transform adjustments to the scene through the streaming web UI without opening Composer. Edits are written to a dedicated sublayer (`usd_edits.usda`) so original scene files are never modified.
+
+**Dev-only** — loaded in `younite.usd_viewer_streaming_dev.kit` (order 1200).
+
+## Architecture
+
+```
+Extension:   younite.usd_edit_extension
+Dependencies: younite.picking_extension, younite.messaging_core_extension, omni.usd
+
+Kit-side modules:
+  extension.py             – orchestrator, event wiring, pick dispatch
+  edit_layer_manager.py    – persistent sublayer create/load/save/clear
+  vertex_edit_service.py   – mesh vertex read, PointInstancer dots, nudge, drag-to-move
+  prim_transform_service.py – prim translate/rotate via session layer
+  marker_service.py        – create/show/select/nudge/remove leaf Xform markers
+
+Web-side:
+  UsdEditPanel.tsx         – floating panel with Transform / Vertices / Markers tabs
+  useControlHandlers.ts    – state + message dispatch (usdEdit.*), measure-distance state machine
+  useCustomEventHandler.ts – incoming event routing
+  usdEditHandlers.ts       – measure-mode interception of vertex picks
+  AppStream.tsx            – pick intent routing, vertex drag interception
+  StreamOnlyWindow.tsx     – panel mounting gate, measure refs wiring
+  DevViewLayer.tsx         – panel prop wiring
+  UIControls.tsx           – hamburger menu toggle
+```
+
+## Sub-modes
+
+The panel exposes three tabs:
+
+| Tab | Intent string | Kit handler | Purpose |
+|---|---|---|---|
+| **Transform** | `usdEditTransform` | `_handle_transform_pick` → `PrimTransformService` | Move / rotate whole prims |
+| **Vertices** | `vertexEdit` | `_handle_vertex_pick` → `VertexEditService` | Nudge individual mesh vertices |
+| **Markers** | `usdEditMarker` | `_handle_marker_pick` → `MarkerService` | Create, visualise, nudge, and remove leaf Xform markers |
+
+The intent string is attached to `younite.pick.request` so the picking extension routes the result back with the correct context.
+
+## Interaction flow
+
+Both modes use an **arm-to-pick** pattern: once a prim/mesh is selected, scene clicks default to normal point-click navigation. To select a different prim or vertex, the user clicks "Pick Prim" / "Pick Vertex" in the panel to arm the next click. This follows the same pattern as marker/incident/camera placement (`nextClickPlaces*`).
+
+### Click routing (`usdEditIntent`)
+
+The `usdEditIntent` prop on `AppStream` controls whether a tap fires a pick request or navigates:
+
+| Phase | `usdEditIntent` | Click behaviour |
+|---|---|---|
+| `selectMesh` / `selectPrim` (nothing selected yet) | `vertexEdit` / `usdEditTransform` | Always picks |
+| `selectVertex` / `primSelected` (item selected, not armed) | `null` | Normal navigation |
+| `selectVertex` / `primSelected` (armed via button) | `vertexEdit` / `usdEditTransform` | Picks, then auto-disarms |
+
+State: `nextClickSelectsVertex` / `nextClickSelectsPrim` in `useControlHandlers`. Auto-disarmed in `useCustomEventHandler` when Kit sends `usdEditVertexSelected` / `usdEditTransformUpdate`. Reset on tab switch, exit, and mode change.
+
+### Transform mode
+1. User toggles "USD Editing" from dev hamburger menu (default sub-mode).
+2. Click on any prim → Kit walks ancestors via `_find_xformable_ancestor` (stops at `/World`).
+3. `PrimTransformService.select_prim` reads current `xformOp:translate` and `xformOp:rotateXYZ` (or variant).
+4. Panel shows position XYZ + rotation XYZ with ±1/±10 (position) and ±5°/±45° (rotation) nudge buttons, plus a "Pick Prim" button to arm selection of a different prim.
+5. Each nudge sends `usdEdit.nudgeTranslate` or `usdEdit.nudgeRotate` → applies delta on session layer → dispatches `usdEditTransformUpdate` with new values.
+
+### Vertices mode
+1. User switches to Vertices tab.
+2. Click on geometry → Kit walks ancestors via `_find_mesh_ancestor` to find a `UsdGeom.Mesh`.
+3. `VertexEditService.enter_mesh_edit` reads all mesh points, computes world positions via `XformCache`, creates a `UsdGeom.PointInstancer` under `/World/VertexEditDots` on the session layer (blue dots = normal, red dot = selected).
+4. Panel shows "Pick Vertex" button. User clicks it to arm, then clicks near a dot → panel shows vertex index and XYZ nudge controls.
+5. Nudge writes updated `points` attribute on session layer; PointInstancer positions update in sync.
+
+### Vertex drag-to-move
+Once a vertex is selected, a "Drag to Move" toggle appears in the panel. When enabled (`vertexDragEnabled`):
+
+- **Pointer drags** on the stream viewport send `usdEdit.dragVertex { dx, dy }` (raw pixel deltas) instead of the normal `touchLookDelta` camera rotation.
+- **Kit-side** `VertexEditService.drag_vertex(screen_dx, screen_dy)` converts pixel deltas to world-space:
+  - Vertical drag (`dy`) → world Y (inverted: screen down = Y−). Scaled by `DRAG_SENSITIVITY` (default 0.5 world units/px).
+  - Horizontal drag (`dx`) → movement along the active camera's right vector projected onto the XZ plane, same sensitivity.
+  - Camera right vector is obtained from the viewport camera's world transform via `XformCache`; falls back to world X if lookup fails.
+- **Taps** (non-drag clicks) still navigate normally — only the drag gesture is intercepted.
+- State `vertexDragEnabled` resets on: exit edit mode, tab switch, session/hard reset.
+
+### Vertex distance measurement
+In Vertices mode, once a mesh is selected, the panel shows two side-by-side buttons: **Pick Vertex** and **Measure**. These are mutually exclusive — clicking one cancels the other.
+
+1. User clicks "Measure" → enters `pickFirst` state, next vertex click is auto-armed.
+2. First click picks point A, stores its world position, auto-arms the next click (`pickSecond`).
+3. Second click picks point B, computes Euclidean distance, displays result in cm.
+4. Result box shows `#indexA → #indexB` and the distance with a "Clear" button to dismiss.
+
+**State machine** (`measureMode` in `useControlHandlers`): `off` → `pickFirst` → `pickSecond` → `off` (result displayed). The mode uses refs (`measureModeRef`, `measurePoint1Ref`) so `usdEditHandlers.ts` can read the current state synchronously when a `usdEditVertexSelected` event arrives.
+
+**No Kit-side changes** — distance is calculated purely web-side from the world-space coordinates already returned by `select_closest_vertex()`.
+
+**Reset conditions**: measure state clears on sub-mode switch, exit edit mode, session/hard reset, clicking "Pick Vertex", or clicking "Clear".
+
+### Markers mode
+
+Markers are empty `UsdGeom.Xform` prims used as location/reference points (spawn points, exits, restroom markers, etc.). The Markers tab provides **create**, **show/select/nudge**, and **remove** operations.
+
+#### Leaf marker detection
+`MarkerService.find_leaf_markers()` scans direct children of `/World` that are `UsdGeom.Xform` (but not `Mesh` or `Camera`) and have **no children** — matching the pattern in `restroom_layer.usda`, `player_spawnpoints_layer.usda`, etc.
+
+It also scans **leaf Xforms under `/World/NavShortcuts`** (elevator floor points from `nav_shortcuts_layer.usda`, e.g. `/World/NavShortcuts/elevator_1/floor_0`). Those are nested two levels below `/World`, so the top-level scan alone would skip them. World translation for dots/selection uses `ComputeLocalToWorldTransform` (same rule as `shortcut_router.usd_scan`); nudges still write `xformOp:translate` on the floor prim with **Edit original layer** targeting `nav_shortcuts_layer.usda`.
+
+#### Create marker
+1. User selects a target sublayer from a dropdown (populated by `list_active_sublayers()` scanning `rootLayer.subLayerPaths`).
+2. User enters a name and clicks "Place Marker" → arms placement (`arm_placement()`).
+3. Next scene click triggers `_handle_marker_pick` → `create_marker_at()` writes a new `UsdGeom.Xform` with `translate`, `rotateXYZ`, and `scale` ops directly to the chosen sublayer and saves it immediately.
+4. If "Show Markers" is active, dots refresh to include the new marker.
+
+#### Show / select / nudge markers
+1. "Show Markers" checkbox calls `show_markers(visible)` → scans for leaf markers and creates a `PointInstancer` under `/World/MarkerEditDots` on the session layer (green dots = normal, red = selected).
+2. Scene click with show active → `select_nearest_marker()` finds the closest marker by Euclidean distance. The response includes the marker's **defining layer name** (`_find_defining_layer()` walks `prim.GetPrimStack()`).
+3. Panel shows marker name, source layer, position nudge controls, and an "Edit original layer" toggle:
+   - **Off (default)**: nudges write to `usd_edits.usda` (session edits, safe).
+   - **On**: nudges write directly to the marker's defining sublayer and save immediately.
+4. The `editOriginal` flag is sent with each `usdEdit.nudgeMarkerTranslate` message.
+
+#### Remove marker
+1. "Remove Marker" button uses a **two-click confirmation**: first click shows "Click again to confirm removal" (auto-resets after 4s or on marker re-selection).
+2. Confirmed removal calls `remove_marker()` which deletes the prim spec from its **defining layer** via `RemoveNameChild()`, saves that layer, and also cleans up any override in `usd_edits.usda`. Dots refresh automatically.
+
+#### Copy transform JSON (clipboard)
+When a marker is selected and **Show Markers** is on, **Copy transform JSON** asks Kit for a JSON string the browser copies to the system clipboard.
+
+1. **Default (checkbox off)** — flat JSON for non-USD consumers: `primPath`, `primName`, `location` (world translation from `ComputeLocalToWorldTransform().ExtractTranslation()`), `rotationDegWorld` (RotateXYZ degrees from the composed world rotation matrix), and a short `units` string. **No** `rotationDegPanel` in minimal mode (avoids confusion with Markers slider values on iconGroup prims).
+2. **Include full diagnostic (checkbox on)** — nested `essential` (includes `rotationDegPanel`, long `note`) plus `full` (`matrix4RowMajor`, `rotationQuaternion`, `scale`, `localXformPanel`, field notes). Use for debugging / comparing panel vs composed world.
+3. **Web state** — `markerCopyIncludeFullDiagnostic` in `useControlHandlers` (default `false`); reset to `false` when exiting USD edit mode.
+4. **Kit details** — `MarkerService.get_selected_marker_world_transform_json(include_full_diagnostic)`. World Euler uses `ExtractRotationMatrix` → quaternion (Shepperd/trace; `Gf.Rotation(Matrix3d)` is not bound in some Kit builds) → `Gf.Rotation(Quatd).Decompose` for X,Y,Z. Near-zero floats normalized via `_jf()` for clean JSON.
+
+#### Tab-switch cleanup
+Switching away from Markers sends `usdEdit.exitMarkerMode` → `MarkerService.exit_mode()` removes dots, clears selection and armed state.
+
+## Edit sublayer (`usd_edits.usda`)
+
+`EditLayerManager` manages a single file `sublayers/usd_edits.usda` relative to the root scene USD:
+
+- **Location** — stored in the `sublayers/` directory alongside other scene sublayers. Path constants: `EDIT_LAYER_SUBDIR = "sublayers"`, `EDIT_LAYER_FILENAME = "usd_edits.usda"`.
+- **No static sublayer reference** — the file is **not** listed in `main_scene.usda`'s `subLayers`. The extension loads it dynamically at runtime, keeping the scene file clean.
+- **`ensure_edit_layer()`** — find-or-create; inserts as the strongest sublayer (`subLayerPaths[0]`) with relative path `./sublayers/usd_edits.usda`.
+- **Auto-load** — on startup, a deferred-init observer checks for an existing file on disk and loads it via `ensure_edit_layer()`.
+- **Save** — copies session-layer overrides (points / xformOps / `xformOpOrder`) into the edit layer, then removes the session-layer opinions so composed state comes from the sublayer.
+- **`xformOpOrder` persistence** — `save_edits()` saves the composed `xformOpOrder` alongside xform value attributes. Without this, newly added ops (e.g. `AddTranslateOp()` on a prim that didn't originally have translate) would be lost after relaunch because the session-layer `xformOpOrder` is transient.
+- **Reset Session** — removes session-layer overrides (including `xformOpOrder`) only, restoring values from the edit sublayer or original files. Vertex dots are refreshed to match the reverted positions.
+- **Hard Reset** — clears the entire edit layer (`Layer.Clear()`) and removes session overrides.
+
+## Events (Kit → web)
+
+| Event | Payload | When |
+|---|---|---|
+| `usdEditStateUpdate` | `{ phase }` — `meshSelected`, `primSelected`, `idle`, `error` | Mode/selection changes |
+| `usdEditVertexSelected` | `{ vertexIndex, x, y, z, distance }` | Vertex selected or nudged |
+| `usdEditTransformUpdate` | `{ primPath, primName, x, y, z, rotX, rotY, rotZ }` | Prim selected or nudged |
+| `usdEditSaveStatus` | `{ status, message }` — `saved`, `reset`, `hard_reset`, `nothing`, `removed` | After save/reset/remove actions |
+| `usdEditSublayerList` | `{ sublayers: [{ identifier, displayName }] }` | Active sublayers for marker creation target |
+| `usdEditMarkerCreated` | `{ primPath, x, y, z, sublayer }` | Marker placed successfully |
+| `usdEditMarkerList` | `{ markers: [...], visible }` | After show/hide markers |
+| `usdEditMarkerSelected` | `{ primPath, primName, x, y, z, rotX, rotY, rotZ, layerIdentifier, layerDisplayName }` | Marker selected or nudged |
+| `usdEditMarkerRemoved` | `{ primPath, primName, layerDisplayName }` | Marker deleted from its layer |
+| `usdEditMarkerWorldTransform` | `{ clipboardJson, clipKind }` or `{ error }` | After `usdEdit.copyMarkerWorldTransform`; web copies `clipboardJson` to clipboard. `clipKind` is `essential` or `full` (toast only). |
+
+## Messages (web → Kit)
+
+| Message | Payload | Purpose |
+|---|---|---|
+| `usdEdit.moveVertex` | `{ vertexIndex, dx, dy, dz }` | Nudge vertex by delta |
+| `usdEdit.setVertex` | `{ vertexIndex, x, y, z }` | Set vertex absolute position |
+| `usdEdit.dragVertex` | `{ dx, dy }` | Drag selected vertex (pixel deltas → world-space via camera) |
+| `usdEdit.nudgeTranslate` | `{ dx, dy, dz }` | Nudge prim position |
+| `usdEdit.nudgeRotate` | `{ dx, dy, dz }` | Nudge prim rotation (degrees) |
+| `usdEdit.requestSublayers` | `{}` | Request active sublayer list for marker creation |
+| `usdEdit.armMarkerPlacement` | `{ sublayerIdentifier, markerName }` | Arm next click to create a marker |
+| `usdEdit.showMarkers` | `{ visible }` | Toggle marker dot visualization |
+| `usdEdit.nudgeMarkerTranslate` | `{ dx, dy, dz, editOriginal }` | Nudge marker position; `editOriginal` controls target layer |
+| `usdEdit.nudgeMarkerRotate` | `{ dx, dy, dz, editOriginal }` | Nudge marker rotation (degrees) |
+| `usdEdit.copyMarkerWorldTransform` | `{ includeFullDiagnostic: bool }` | Build JSON for clipboard; default `false` = minimal flat pose |
+| `usdEdit.removeMarker` | `{}` | Delete selected marker from its defining layer |
+| `usdEdit.exitMarkerMode` | `{}` | Clean up marker dots (tab switch) |
+| `usdEdit.save` | `{}` | Persist session edits to sublayer |
+| `usdEdit.resetSession` | `{}` | Revert session-only edits |
+| `usdEdit.hardReset` | `{}` | Clear entire edit sublayer |
+| `usdEdit.exitEditMode` | `{}` | Full exit (clears dots + dispatches idle) |
+| `usdEdit.exitVertexDots` | `{}` | Clean up dots only (tab switch, no idle dispatch) |
+
+## Key implementation details
+
+### Lazy `pxr` imports
+All `from pxr import ...` statements are inside methods (not at module level) to avoid silent import failures that prevent extension startup.
+
+### Session-layer editing pattern
+All transient edits use `Usd.EditContext(stage, Usd.EditTarget(session_layer))`. Saving copies values **and `xformOpOrder`** to the edit sublayer and removes session opinions via `prim.RemoveProperty(attr_name)`. Always save `xformOpOrder` together with xform value attributes — without it, ops added via `AddTranslateOp()` / `AddRotateXYZOp()` on prims that lacked them originally will be silently ignored after relaunch (USD only applies xform ops listed in `xformOpOrder`).
+
+### PointInstancer dots
+- **Vertex dots** (`/World/VertexEditDots`): `NormalDot` (blue, radius 3) and `SelectedDot` (red, radius 5) with `UsdPreviewSurface` materials. Positions are world-space (transformed via `XformCache`). After `reset_session`, dots are rebuilt from the reverted mesh points.
+- **Marker dots** (`/World/MarkerEditDots`): `NormalDot` (green, radius 5) and `SelectedDot` (red, radius 7). Positions come from each marker's `xformOp:translate`. Refreshed after create, nudge, or remove.
+- **Cleanup** calls `MakeInvisible()` on both the root prim and instancer prim **before** clearing positions and calling `stage.RemovePrim(ROOT)`. This forces Hydra to stop rendering cached geometry, avoiding the known PointInstancer ghost issue where dots remain visually after USD data is removed.
+
+### Tab-switch cleanup
+Switching from Vertices sends `usdEdit.exitVertexDots`; switching from Markers sends `usdEdit.exitMarkerMode`. Both clean up their dots without dispatching `idle` phase, avoiding a race condition where a Kit-dispatched `idle` would hide the panel.
+
+### Ancestor walking
+- **Vertex mode**: walks up from hit prim until finding a `UsdGeom.Mesh`.
+- **Transform mode**: walks up until finding any `UsdGeom.Xformable`, stops at `/World`.
+
+## Adding new edit services
+
+To add a new editing capability (e.g. material editing, scale, etc.):
+
+1. Create a new service file under `younite/usd_edit_extension/` following the pattern of `prim_transform_service.py`.
+2. Accept `EditLayerManager` in the constructor; use session-layer writes for transient edits.
+3. Implement `save_edits() → int`, `reset_session() → int`, and a cleanup/exit method.
+4. In `extension.py`: instantiate the new service, register its inbound message observers, and wire its `save_edits` / `reset_session` into the combined `_on_save` / `_on_reset_session` / `_on_hard_reset` handlers.
+5. Add a new sub-mode tab in `UsdEditPanel.tsx` and corresponding intent string in `AppStream.tsx`.
+6. Register any new outbound events in the `register_outbound_events` list (`extension.py`; e.g. `usdEditMarkerWorldTransform` for clipboard).

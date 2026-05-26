@@ -1,0 +1,118 @@
+/* Below InteractionBoxesOverlay (900); above video */
+.bird-eye-route-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 898;
+  pointer-events: none;
+}
+
+.bird-eye-route-overlay__svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+/* Dotted lime track — short dashes + gaps read as individual dots */
+.bird-eye-route-overlay__track {
+  stroke: #dcff7d;
+  stroke-width: 3.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 2 12;
+  opacity: 0.95;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.15));
+}
+
+/* OSM bridge leg (outside-navmesh pins) — wider gaps + slightly pale
+   shade to differentiate from the navmesh-computed indoor leg without
+   competing with it. Reads as "this segment will be auto-walked for
+   you" since the player can't free-roam through OSM space yet. */
+.bird-eye-route-overlay__track--osm {
+  stroke: #eaffad;
+  stroke-dasharray: 2 18;
+  opacity: 0.85;
+}
+
+/* Teardrop bubble: bottom center of wrapper sits on route vertex */
+.bird-eye-route-bubble {
+  position: absolute;
+  display: flex;
+  width: 40px;
+  flex-direction: column;
+  align-items: center;
+  transform: translate(-50%, -100%);
+}
+
+.bird-eye-route-bubble img {
+  display: block;
+  flex-shrink: 0;
+  object-fit: contain;
+}
+
+.bird-eye-route-bubble--destination {
+  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.18));
+}
+
+.bird-eye-route-bubble--start {
+  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.18));
+}
+
+.bird-eye-route-bubble--destination > img,
+.bird-eye-route-bubble--start > img {
+  box-sizing: border-box;
+  width: 40px;
+  height: 40px;
+  padding: 8px;
+  border-radius: 50%;
+}
+
+.bird-eye-route-bubble--destination > img {
+  background: #dcff7d;
+}
+
+.bird-eye-route-bubble--start > img {
+  background: #ffffff;
+}
+
+/* Triangular pointer under circle */
+.bird-eye-route-bubble__pointer {
+  display: block;
+  width: 0;
+  height: 0;
+  margin-top: -2px;
+  border-left: 7px solid transparent;
+  border-right: 7px solid transparent;
+}
+
+.bird-eye-route-bubble--destination .bird-eye-route-bubble__pointer {
+  border-top: 9px solid #dcff7d;
+}
+
+.bird-eye-route-bubble--start .bird-eye-route-bubble__pointer {
+  border-top: 9px solid #ffffff;
+}
+
+/* Lime ground ring under start pin */
+.bird-eye-route-bubble__ground {
+  position: absolute;
+  bottom: -14px;
+  left: 50%;
+  display: flex;
+  width: 22px;
+  height: 22px;
+  align-items: center;
+  justify-content: center;
+  transform: translateX(-50%);
+}
+
+.bird-eye-route-bubble__ground-dot {
+  display: block;
+  width: 6px;
+  height: 6px;
+  border: 2px solid #b8e632;
+  border-radius: 50%;
+  background: #dcff7d;
+  box-shadow: 0 0 0 1px rgba(184, 230, 50, 0.4);
+}

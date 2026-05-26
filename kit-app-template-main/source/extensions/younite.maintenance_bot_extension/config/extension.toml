@@ -1,0 +1,21 @@
+[package]
+title = "Younite Maintenance Bot Extension"
+description = "Spawns maintenance bots and orchestrates them to resolve incidents by priority and proximity"
+version = "0.2.0"
+authors = ["Younite"]
+keywords = ["maintenance", "bot", "spawn", "simulation", "incident", "orchestrator"]
+category = "Feature"
+
+[dependencies]
+"younite.messaging_core_extension" = {}
+"younite.navmesh_route_extension" = {}
+"omni.usd" = {}
+
+[[python.module]]
+name = "younite.maintenance_bot_extension"
+
+[build]
+include = [
+    "younite/**/*.py",
+    "*.toml",
+]

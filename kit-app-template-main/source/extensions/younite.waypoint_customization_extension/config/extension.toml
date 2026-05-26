@@ -1,0 +1,31 @@
+[package]
+title = "Waypoint Customization Extension"
+version = "1.0.0"
+description = "Customize waypoint display with tooltips, thumbnails, and custom buttons"
+keywords = ["waypoint", "customization", "ui"]
+category = "3D"
+authors = ["Younite"]
+
+[dependencies]
+"omni.kit.waypoint.core" = {}
+
+[[python.module]]
+name = "younite.waypoint_customization_extension"
+
+[build]
+include = [
+    "younite/**/*.py",
+    "*.md",
+    "*.toml"
+]
+
+[settings.exts."younite.waypoint_customization_extension"]
+# Enable/disable tooltip display
+enable_tooltips = true
+# Enable/disable custom buttons
+enable_custom_buttons = true
+# Show thumbnail in tooltip
+show_thumbnail_in_tooltip = true
+# Show waypoint browser window by default (set to false to hide)
+show_browser_window = false
+

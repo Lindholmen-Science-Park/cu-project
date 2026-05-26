@@ -1,0 +1,21 @@
+[package]
+title = "Younite NPC Controller Extension"
+description = "Drives NPC characters along NavMesh-computed waypoint routes"
+version = "0.1.0"
+authors = ["Younite"]
+keywords = ["npc", "character", "navigation", "navmesh", "waypoint"]
+category = "Feature"
+
+[dependencies]
+"younite.messaging_core_extension" = {}
+"younite.navmesh_route_extension" = {}
+"omni.usd" = {}
+
+[[python.module]]
+name = "younite.npc_controller_extension"
+
+[build]
+include = [
+    "younite/**/*.py",
+    "*.toml",
+]

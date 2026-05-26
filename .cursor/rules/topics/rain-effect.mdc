@@ -1,0 +1,128 @@
+---
+description: Rain effect — PointInstancer-based 3D rain, per-drop collider detection, weather preset integration, wet ground side-effect, tuning constants. Read when working on rain, weather effects, or sky presets. Service lives in younite.weather_and_seasons_extension.
+---
+
+# Rain effect
+
+## Overview
+
+3D rain rendered via a `UsdGeomPointInstancer` on the session layer. Drops are real geometry in the scene — they are naturally occluded by the RTX renderer and stop at any physics collider (roof, ground, walls). No frontend UI overlay is used.
+
+## Architecture
+
+```
+Frontend (weatherPreset) → skyControlRequest → sky_control_service.py
+  → sky_service.py (applies sky + calls rain_service)
+    → rain_service.start_rain(intensity) / stop_rain()
+```
+
+### Files
+
+| File | Role |
+|------|------|
+| `sky_service.py` | `WEATHER_PRESETS` dict includes `"rain"` key (0.0–1.0). After applying sky properties, calls `rain_service.start_rain()` or `stop_rain()`. Lives in `younite.weather_and_seasons_extension`. |
+| `rain_service.py` | Creates/destroys the PointInstancer, runs per-frame animation loop, handles per-drop collider raycasts. Lives in `younite.weather_and_seasons_extension`. |
+| `_shared.py` | Common utilities (`get_stage`, `get_player_pos`, `raycast_floor_y`, `get_camera_forward_xz`) used by rain, snow, leaf services. Lives in `younite.weather_and_seasons_extension`. |
+
+## How it works
+
+### Geometry (session layer only)
+
+`start_rain()` creates under `/World/RainSystem`:
+
+- **Prototype**: a single `UsdGeom.Sphere` (radius `DROP_RADIUS`) with a translucent blue `UsdPreviewSurface` material (30% opacity).
+- **PointInstancer**: references the prototype; holds `positions`, `scales`, and `protoIndices` arrays for all drops. Each drop is Y-stretched (2–4×) to look like an elongated streak.
+
+Everything is written to the session layer via `Usd.EditContext` — nothing is saved to disk.
+
+### Per-drop floor detection
+
+When a drop spawns or respawns, a **single downward PhysX raycast** (`omni.physx.get_physx_scene_query_interface().raycast_closest`) fires from its position. The hit Y is stored in `_hit_floors[i]`. When the drop falls below that Y, it recycles to the top.
+
+This means drops naturally stop at any collider. To prevent rain inside a building, add a physics collider to the roof — drops will disappear at roof level while remaining visible from inside through windows/openings.
+
+If no collider is hit, a fallback floor (`player_y - FALLBACK_FLOOR_OFFSET`) is used.
+
+### Per-frame animation (`_on_update`)
+
+Subscribed to `omni.kit.app.GLOBAL_EVENT_UPDATE` via `carb.eventdispatcher`:
+
+1. Get player world position (rain volume follows the player).
+2. For each drop: subtract `speed × dt` from Y, add wind drift to X.
+3. If drop reached its floor → respawn at random XZ near player at top of volume, fire a new downward raycast for the new floor.
+4. Write updated `Vt.Vec3fArray` to instancer `positions` attribute on the session layer.
+
+The subscription only exists while rain is active — zero cost when rain is off.
+
+### Cleanup (`stop_rain`)
+
+1. `_active = False` immediately (prevents further `_on_update` work).
+2. Unsubscribe from update stream.
+3. Clear instancer arrays (positions, indices, scales → empty) for instant visual removal.
+4. Remove entire `/World/RainSystem` subtree from session layer in one operation.
+
+## Weather presets with rain
+
+| Preset | Rain intensity | Drops (approx) |
+|--------|---------------|-----------------|
+| `clearSky` | 0.0 | 0 |
+| `partlyCloudy` | 0.0 | 0 |
+| `cloudy` | 0.0 | 0 |
+| `overcast` | 0.0 | 0 |
+| `stormy` | 0.5 | ~700 |
+| `darkStorm` | 1.0 | ~1000 |
+
+Drop count formula: `MIN_DROPS + intensity × (MAX_DROPS − MIN_DROPS)`.
+
+## Tuning constants (in `rain_service.py`)
+
+| Constant | Current value | Purpose |
+|----------|--------------|---------|
+| `DROP_RADIUS` | 0.4 | Prototype sphere radius |
+| `MIN_DROPS` / `MAX_DROPS` | 400 / 1000 | Drop count range |
+| `VOLUME_HALF_W` | 1500 | Half-width of rain area (3000×3000 total) |
+| `VOLUME_HEIGHT` | 3000 | Height above player where drops spawn |
+| `MIN_SPEED` / `MAX_SPEED` | 80 / 140 | Fall speed variation |
+| `WIND_BIAS` | 3.0 | Lateral drift per frame |
+| `FALLBACK_FLOOR_OFFSET` | 200 | Floor Y below player when no collider hit |
+| `RAYCAST_MAX_DIST` | 8000 | Max downward raycast distance |
+
+To make rain denser: decrease `VOLUME_HALF_W` (tighter area) or increase drop counts. To make rain finer: decrease `DROP_RADIUS`. Watch performance — drop count is the main cost driver.
+
+## Indoor rain prevention
+
+Rain drops are real 3D geometry, so the approach is collider-based:
+
+1. Add a physics collider mesh to the roof/ceiling of the building.
+2. The per-drop downward raycast will detect the collider and set the drop's floor to the roof surface.
+3. Drops disappear at roof level and respawn above — no drops penetrate inside.
+4. Rain remains fully visible from indoors (you can see it through windows/openings).
+
+There is **no** indoor-detection raycast or instancer hide/show logic. The collider-based system handles everything per-drop.
+
+## Bird eye view: Canvas overlay instead of 3D particles
+
+In bird eye view, the 3D PointInstancer rain is **not started**. Instead, the frontend renders a **Canvas particle overlay** (`WeatherOverlay.tsx`) with animated streaks on top of the video stream. When the user switches to first person, the overlay is removed and 3D particles resume.
+
+**Kit side**: `sky_service.py` stores desired precipitation in module-level `_desired_rain` / `_desired_snow` and checks `/younite/camera/viewType` before calling `start_rain()`. `SeasonsExtension` subscribes to `younite.camera.viewTypeChanged` to stop/restart 3D particles on view switches. When switching to first person, particle restart is **deferred** by `_PRECIPITATION_SETTLE_FRAMES` (10 frames) via `_deferred_start_precipitation()` — this lets the camera/teleport settle so `_get_camera_forward_xz()` reads the correct first-person direction instead of the stale bird-eye one. Rain is particularly sensitive because it uses `FORWARD_BIAS` to position the volume ahead of the camera.
+
+**Frontend**: `WeatherOverlay` reads `weather` and `currentCamera` from `useEnvironment()` and activates only when `currentCamera === 'bird_eye' && weather === 'rain'`.
+
+## Weather change view transition
+
+Weather preset changes (sun/rain/fog/snow) are wrapped in the shared `ViewTransitionOverlay` — the same fade-in/fade-out mechanism used by season changes, seat teleports, and view switches. This hides the brief GPU texture-loading flash that can occur when wet ground textures are applied or cleared.
+
+The flow is frontend-only (no Kit-side completion event):
+
+1. `applyWeather(w)` calls `beginViewTransition({ message, onFadeOutComplete })`
+2. Screen fades to black (~1s), shows localized "Changing weather…" label
+3. `onFadeOutComplete` fires: updates React state (`setWeather`), sends `skyControlRequest` to Kit
+4. After 500ms (`setTimeout`), `notifyViewTransitionKitReady()` triggers fade-in (~1s)
+
+The 500ms timer gives the GPU ~15 frames at 30fps to load/swap textures. Unlike season changes (which use a Kit-dispatched `seasonChangeCompleted` after settle frames), weather preset application is synchronous in `apply_sky_control()`.
+
+Localized label: `loading.changingWeather` (EN: "Changing weather…", SV: "Byter väder…", FR: "Changement de météo…", ES: "Cambiando el clima…").
+
+## Wet ground side-effect
+
+When rain starts, `sky_service.py` calls `wet_ground_service.set_wet("weather", True)`, which darkens paved surfaces (roads, concrete, cobblestone) to simulate wet salted pavement. When rain stops (and no snow or winter season is active), the textures are cleared. See `.cursor/rules/topics/wet-ground.mdc` for details.

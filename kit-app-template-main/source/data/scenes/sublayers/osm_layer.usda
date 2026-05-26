@@ -1,0 +1,21 @@
+#usda 1.0
+
+over "World"
+{
+    def "OSM_Roads" (
+        active = false
+        payload = @../../osm/gothenburg_roads.usda@</OSM_Roads>
+    )
+    {
+        float3 xformOp:rotateXYZ = (0, 0, 0)
+        float3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (0, 0, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+}
+
+over "OmniverseKit_Top"
+{
+    custom uniform vector3d omni:kit:centerOfInterest = (0, 0, -50000.000000000015)
+}
+

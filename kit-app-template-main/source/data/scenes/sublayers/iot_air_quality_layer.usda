@@ -1,0 +1,17 @@
+#usda 1.0
+
+over "World"
+{
+    def Xform "IoT_AirQuality" (
+        kind = "group"
+    )
+    {
+        custom string younite:description = "Open-data air quality station markers; child prims authored at runtime from dev IoT menu + Kit extension."
+
+        def Scope "Stations" (
+            kind = "group"
+        )
+        {
+        }
+    }
+}

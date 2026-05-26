@@ -1,0 +1,69 @@
+# Enforce consistent line endings across all platforms.
+# Without this, teammates with different `core.autocrlf` settings keep
+# reintroducing phantom CRLF/LF "modifications" to files they didn't touch.
+#
+# After this file lands, do ONE renormalization pass on every clone:
+#   git add --renormalize .
+#   git commit -m "normalize line endings via .gitattributes"
+# After that single commit, line endings stay deterministic forever.
+
+# Default: detect text files automatically and store with LF in the repo.
+# Working-tree checkout uses LF too — Windows editors handle LF fine.
+* text=auto eol=lf
+
+# Source code — explicit LF (no auto-detection guessing).
+*.py    text eol=lf
+*.ts    text eol=lf
+*.tsx   text eol=lf
+*.js    text eol=lf
+*.jsx   text eol=lf
+*.json  text eol=lf
+*.md    text eol=lf
+*.mdc   text eol=lf
+*.usda  text eol=lf
+*.toml  text eol=lf
+*.yaml  text eol=lf
+*.yml   text eol=lf
+*.lua   text eol=lf
+*.css   text eol=lf
+*.scss  text eol=lf
+*.html  text eol=lf
+*.txt   text eol=lf
+*.sh    text eol=lf
+*.j2    text eol=lf
+
+# Windows-only scripts MUST keep CRLF — cmd.exe doesn't reliably parse LF-only.
+*.bat   text eol=crlf
+*.cmd   text eol=crlf
+*.ps1   text eol=crlf
+
+# Binary assets — never touch line endings or run any text filters.
+*.usdc  binary
+*.usdz  binary
+*.wav   binary
+*.mp3   binary
+*.ogg   binary
+*.flac  binary
+*.mp4   binary
+*.webm  binary
+*.mov   binary
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.webp  binary
+*.svg   binary
+*.pdf   binary
+*.zip   binary
+*.7z    binary
+*.tar   binary
+*.gz    binary
+*.exe   binary
+*.dll   binary
+*.so    binary
+*.dylib binary
+*.bin   binary
+*.dat   binary
+*.fbx   binary
+*.glb   binary
+*.gltf  binary

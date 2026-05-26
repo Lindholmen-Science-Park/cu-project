@@ -1,0 +1,19 @@
+[package]
+title = "Younite Geo POI Extension"
+description = "Geo-referenced POI markers feature (placeholder split)"
+version = "0.1.0"
+authors = ["Younite"]
+category = "Feature"
+
+[dependencies]
+"younite.messaging_core_extension" = {}
+"younite.payload_orchestrator_core_extension" = {}
+"younite.usd_viewer_stage_core_extension" = {}
+"omni.usd" = {}
+
+[[python.module]]
+name = "younite.geo_poi_extension"
+
+[build]
+include = ["younite/**/*.py", "*.toml"]
+

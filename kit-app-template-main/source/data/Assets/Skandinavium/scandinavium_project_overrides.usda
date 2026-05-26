@@ -1,0 +1,60 @@
+#usda 1.0
+(
+    defaultPrim = "Root"
+)
+
+def Xform "Root"
+{
+    over "SC_Landscape"
+    {
+        over "LANDSCAPE_NULL"
+        {
+            over "LS_Concrete_Plates_Light"
+            {
+                matrix4d xformOp:transform = ( (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (-3982.034424, 1521.398682, 435.086426, 1) )
+            }
+
+            over "LS_Concrete_Bricks_Light002"
+            {
+                matrix4d xformOp:transform = ( (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (-5641, 1588, 1233, 1) )
+            }
+
+            over "LS_Black_Bollards"
+            {
+                matrix4d xformOp:transform = ( (-0.11039819271012075, 3.433767948928435e-17, -0.9938874378149365, 0), (-2.0069227184421392e-17, 1, 3.677809428791632e-17, 0), (0.9938874378149365, 2.4006787925958822e-17, -0.11039819271012075, 0), (-8626.178711, 1419.6976855720645, 5211.24169900001, 1) )
+            }
+        }
+    }
+
+    over "SC_Extension"
+    {
+        over "EXTENSION_NULL"
+        {
+            over "EXTFACADE_NULL"
+            {
+                over "SC_Concrete_Extension_Stairs"
+                {
+                    matrix4d xformOp:transform = ( (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (-6296.406738, 2004.033813, 224.139648, 1) )
+                }
+            }
+        }
+    }
+
+    over "The_roof"
+    {
+        token visibility = "inherited"
+    }
+
+    def "seats_instanced" (
+        prepend payload = @../Seats/seats_instanced.usda@
+    )
+    {
+        double xformOp:rotateX:unitsResolve = -90
+        float3 xformOp:rotateXYZ = (0, 0, 0)
+        float3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:scale:unitsResolve = (0.1, 0.1, 0.1)
+        double3 xformOp:translate = (-117075.48014147727, -80227.20119547844, -16920.547191656187)
+        double3 xformOp:translate:pivot = (116887.50174175948, 81818.1012191847, 17155.2002556324)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:translate:pivot", "xformOp:rotateXYZ", "xformOp:scale", "xformOp:rotateX:unitsResolve", "xformOp:scale:unitsResolve", "!invert!xformOp:translate:pivot"]
+    }
+}

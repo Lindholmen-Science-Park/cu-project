@@ -1,0 +1,71 @@
+---
+description: NavMesh areas, cost modifiers, pathfinding — read when working on navigation or path costs
+---
+
+# NavMesh Areas (Cost Modifiers)
+
+NavMesh areas assign cost multipliers to regions so the pathfinder avoids or prefers them. The baker has strict layer requirements.
+
+## Critical constraint: baker reads areas at stage load only
+
+`omni.anim.navigation.core` reads `customLayerData.navmeshSettings.areas` **once at stage load**. Runtime modifications to `customLayerData` (or to carb settings) are **ignored** by the baker — newly added area definitions only take effect after saving the scene and reloading.
+
+This means **every area name referenced by a `nav:area` attribute must already be listed in `main_scene.usda`'s `customLayerData.navmeshSettings.areas` block** before the session starts.
+
+## How it works
+
+1. **Area definitions** live in `main_scene.usda` → `customLayerData.navmeshSettings.areas`. All 12 current areas (4 base + 4 camera + 4 sound) are pre-registered there. This is the **single source of truth**.
+2. The bake orchestrator uses provider `get_area_definitions()` to detect any missing entries and warns if a new camera/sound area needs to be added to `main_scene.usda`.
+3. **Area mesh prims** must live on the **navigation sublayer** (`source/data/scenes/sublayers/navigation_layer.usda`). The NavMesh baker reads only from the root layer stack (sublayers included), **not** the session layer.
+4. **Mesh prims** need `prepend apiSchemas = ["MaterialBindingAPI", "NavMeshAreaAPI"]` and `string nav:area = "<area_name>"` matching a registered definition.
+5. **Cost overrides** are applied at query time via `query_shortest_path(area_costs=[...])` — no rebake needed for cost changes. Rebake **is** required when adding/removing area meshes.
+
+## Cost-list contract: preserve negative defaults
+
+When you build an `area_costs` list to pass to `query_shortest_path`, the value at each index **overrides** the area's bake-time `defaultCost`. The navmesh treats negative entries (typically `-1`) as **non-walkable**, identical to how it treats negative `defaultCost`.
+
+This means any helper that constructs an `area_costs` list **must pass negative defaults through unchanged**. The canonical reference is `_build_area_costs` in `younite.navmesh_route_extension/scripts/navmesh_shortest_path.py`:
+
+```python
+default_cost = inav.get_area_default_cost(i)
+area_costs.append(float(default_cost))   # ← preserve the sign; do NOT clamp to 1.0
+```
+
+Clamping negative costs to a positive value (e.g. `1.0`) silently re-enables walking through every non-walkable area (`incident_blocked`, `camera_depth_obstacle`, …) the moment any caller passes a non-empty `area_costs` list — the navmesh still bakes them as blocked, but the query overrides the block. This was the cause of a regression where incidents stopped being avoided after the dual-mode bake refactor (because every route now goes through `calculate_path_points` with a populated `area_costs`).
+
+If you ever add a new helper that builds an `area_costs` list (or a new override dict like `camera_area_costs` / `sound_area_costs`), make sure negative defaults survive the merge.
+
+## Shared vs per-instance area names
+
+- **Incidents**: all use shared `incident_blocked` area name (cost = -1, non-walkable). No slot limit.
+- **Camera depth obstacles**: all use shared `camera_depth_obstacle` area name (cost = -1). No slot limit.
+- **Camera frustum areas**: each camera gets a unique `{cam_name}_area` name (cost = 1, individually adjustable via sliders).
+- **Sound areas**: each sound location gets a unique `{loc_name}_area` name (cost = 1, individually adjustable).
+
+## Adding a new camera / sound location / area type
+
+Because the baker only reads definitions at stage load, adding a new area requires:
+
+1. Add a dictionary entry to `main_scene.usda` → `customLayerData.navmeshSettings.areas` with the next sequential ID.
+2. If the area type has **uniform behavior** (all instances same cost, e.g. incidents), all prims share one `nav:area` name — a single entry suffices.
+3. If each instance needs **individual cost control**, each gets its own area name and entry.
+5. **Create the mesh prim** on the navigation sublayer using `Usd.EditContext(stage, nav_layer)` with `NavMeshAreaAPI` and matching `nav:area`.
+6. **Rebake** via the bake orchestrator (see `.cursor/rules/topics/bake-orchestrator.mdc`).
+
+> The bake orchestrator's `ensure_areas_registered()` will auto-detect missing entries from the JSON config + providers and write them to `customLayerData`, but a save + reload is needed for the baker to see them.
+
+## Key constraints
+
+- Session layer prims are **invisible** to the NavMesh baker — use sublayer or root layer only.
+- `customLayerData` is per-layer metadata and does **not** compose across sublayers — area definitions must be on the root layer.
+- Use `prepend` (not `explicit`) for `apiSchemas` metadata to match USD conventions.
+- Flat polygons with `subdivisionScheme = "none"` and upward normals work best as walkable areas.
+
+## Related
+
+- **Bake orchestrator** (provider protocol, rebake lifecycle): `.cursor/rules/topics/bake-orchestrator.mdc`
+- **Path refinement** (`query_shortest_path` costs vs validation sub-queries): `.cursor/rules/topics/navmesh-path-refinement.mdc`
+- **Camera areas** (frustum ground footprints): `.cursor/rules/topics/camera_navmesh_areas.mdc`
+- **Sound areas** (radial ground zones): `.cursor/rules/topics/sound-areas.mdc`
+- **Incidents** (NavMesh-blocking obstacles): `.cursor/rules/topics/incidents.mdc`
+- **Avatar NPC cutout** (runtime `NavMeshVolume` Exclude on `navigation_layer.usda`, POI-style box): `.cursor/rules/topics/avatar-red-asset.mdc` § NavMesh exclusion

@@ -1,0 +1,220 @@
+---
+description: NPC avatar interactions — single-entry config, auto-expansion, nearest-NPC bubble, collider-box visibility, face-player rotation, chat overlay, avatar image serving, adding new NPCs
+---
+
+# NPC Avatar Interactions
+
+NPC-specific features built on the interactions extension. Covers the single-entry NPC config pattern, auto-expansion into pointer + click + proximity tracking, nearest-NPC bubble overlay, collider-box visibility, avatar chat, face-player rotation, skeletal mesh gotchas, and the data-driven workflow for adding new NPCs.
+
+**Builds on**: `.cursor/rules/topics/interactions.mdc` (general interaction framework)
+**Frontend components**: `AvatarChatOverlay.tsx` + `.css` (chat panel), `NpcBubbleOverlay.tsx` + `.css` (proximity bubble)
+**Avatar assets**: `source/data/Assets/Avatars/` (portrait images, `.usda` payloads)
+
+## Single-entry NPC config
+
+Each NPC avatar requires only **one entry** in `interactions.json` with `"interactionType": "npc"` and a `"npcConfig"` block. The interactions extension auto-expands this into:
+
+- **Pointer overlay** (`interactivePointer` style) — 3D-projected green triangle above the avatar, uses collider-box visibility
+- **Click handler** — dispatches `avatarChat.open` with the `npcConfig` payload, with optional `approach` before action
+- **NPC registry entry** — tracked for nearest-NPC proximity system
+
+## interactionType: "npc"
+
+Setting `"interactionType": "npc"` in `interactions.json` enables NPC-specific behavior:
+
+- **Auto-expansion**: entries with `npcConfig` are expanded into pointer + click synthetic points at config load time (`expand_npc_entry` in `services/kit_services/config_loader/expansion.py`)
+- **Face-player on click**: when clicked, the prim smoothly rotates to face the player
+- **Approach before action**: when `"approach"` is set, the player walks to the NPC first; the NPC re-rotates on arrival, then actions fire (see general topic § Approach before action)
+- **Collider-box visibility**: the pointer overlay uses `is_collider_visible()` — projects 8 corners of the `Collider` child to NDC, shows the overlay if **any** corner is in the camera frustum (short-circuits on first visible corner)
+- **Nearest-NPC proximity**: Kit computes distance from player to all registered NPCs each frame, dispatches `npcNearestUpdate` event with the closest NPC's config (only on change)
+- Future: animation triggers, dialogue state, etc.
+
+## Nearest-NPC bubble overlay
+
+The bottom-sheet speech bubble (greeting + TTS) is driven by the **nearest-NPC proximity system**, not by 3D projection:
+
+- **Kit-side**: `_update_nearest_npc()` iterates `_npc_registry`, computes player distance to each NPC, picks the nearest one within its `radiusMeters`, dispatches `npcNearestUpdate` only when the nearest NPC changes (different id or in/out of range)
+- **Web-side**: `NpcBubbleOverlay` component renders a fixed bottom bubble with the nearest NPC's greeting, TTS speaker button, and click-to-open-chat action
+- **Greeting localization**: the `greeting` field in `npcConfig` is an i18n key reference (e.g. `"interactions.avatar_red.greeting"`). `NpcBubbleOverlay` resolves it via `t(cfg.greeting)` — i18next handles language selection automatically. No per-language `greeting_<lang>` fields are needed.
+- **Only one bubble at a time**: when multiple NPCs are in range, only the closest one's bubble is shown
+- **Hidden when**: avatar chat is open, scene is loading, seat arrival celebration is active
+
+## Face-player rotation
+
+When a clickable with `interactionType: "npc"` is clicked, the prim smoothly rotates around the Y axis to face the player:
+
+- `_start_rotation_toward(prim_path, target_pos, duration=0.6)` — computes shortest-arc Y rotation from current `xformOp:orient`, stores start angle + delta + timestamp in `_active_rotations` dict
+- `_tick_rotations()` — runs every frame in `_on_update`, interpolates each active rotation with smoothstep easing: `t * t * (3.0 - 2.0 * t)`
+- Sets `xformOp:orient` as `Quatf(cos(half), 0, sin(half), 0)` — Y-axis only
+- Completed rotations (t >= 1.0) are removed from the dict
+
+The prim **must** have an `xformOp:orient` attribute for rotation to work.
+
+## Avatar-attached NPC spawn point
+
+When `npcConfig.avatarAsset` is set, Kit authors a `PlayerSpawnPoint_<Name>` Xform on the **session layer** as a **child of the avatar prim** (e.g. `/World/Red/PlayerSpawnPoint_Red`). This makes the spawn part of the avatar's transform subtree, so when `RotationService` rewrites the avatar's `xformOp:orient` (face-player on click), USD composition automatically updates the spawn's world pose — no per-frame bookkeeping needed.
+
+**Local transform (child of avatar)**:
+- Translate: `(0, 0, z_sign * step)` where `step = npcSpawnMeters / metersPerUnit`. Default `npcSpawnMeters = 1.0`; override per-NPC via `npcConfig.npcSpawnMeters`.
+- **No local rotate.** The player rig's default forward is **−Z**, so inheriting the avatar's orientation makes the player at the spawn face `-spawn_fwd = -avatar_fwd` — i.e. *back at the avatar*. Authoring a 180° here would double-flip and make the player face away.
+- `npcSpawnForwardLocalZ` (default `1`, RPM-style local **+Z** body forward; use `-1` for camera-style rigs facing **−Z**) controls only the **sign of the translate**, not rotation.
+
+**Authoring details** (`create_or_update_npc_spawn_point` in `services/kit_services/config_loader/session_authoring.py`, invoked from `attach_npc_payload` while parsing NPCs with `avatarAsset`):
+- Created as `Sdf.SpecifierDef` with `typeName = "Xform"` — an *over* with no underlying def would not materialize on the composed stage and `find_spawn_point_prim` would fail to resolve it.
+- Any legacy flat `/World/PlayerSpawnPoint_<Name>` from earlier code paths is removed from the session layer to avoid stale siblings.
+- `skipNpcSpawn: true` opts an NPC out entirely; `spawnPointPrimName` overrides the leaf name.
+
+**Teleport read path** (`teleport_service._read_spawn_point_transform`) splits by parent:
+- **Spawns directly under `/World`** (e.g. `PlayerSpawnPoint_02` for bird-eye, `PlayerSpawnPoint_Foyer`): use the existing **local-op read** that preserves authored `rotateXYZ` / `rotateYXZ` triples exactly. This avoids Euler-decomposition ambiguity for hand-tuned overview cameras.
+- **Nested spawns** (any spawn whose parent is not `/World`, including all NPC spawns): use `_read_spawn_point_transform_world`, which calls `UsdGeom.XformCache.GetLocalToWorldTransform(spawn)`, then extracts world position from the matrix and **yaw only** via `math.atan2(fx, fz)` on `m.TransformDir(Gf.Vec3d(0,0,1))`. Yaw-only is intentional — the player body should never inherit pitch/roll from the avatar's quaternion.
+
+**Bird-eye pin discovery** (`bird_eye_pin_service.magnets.iter_named_spawn_points`; also re-exported as `bird_eye_pin_service._iter_named_spawn_points`) uses `Usd.PrimRange(world)` rather than `world.GetChildren()` so nested spawns under avatar prims are found alongside flat `/World/PlayerSpawnPoint_*` ones.
+
+**Composition timing — `scene.loaded` retry**: NPC spawn authoring requires the avatar prim to exist on the composed stage. The interactions extension subscribes to `scene.loaded` and runs a one-shot `_on_scene_loaded_retry_config` that calls `ConfigLoader.reset()` + `_force_reload_config()` — re-parsing `interactions.json` after composition guarantees `/World/Red` etc. are present when spawn authoring runs. This is the only path that bypasses the loader's "same file/scene" guard.
+
+**Runtime invariant — `interactions.json` is never reloaded mid-session.** The per-tick `ConfigLoader.maybe_reload(...)` mtime check is effectively a no-op after the first parse, and the click router does **not** trigger a reload on pick — that path was removed because forcing a re-parse on every click caused multi-second freezes (full session-layer re-author of all NPC spawns + payloads). If you ever need a hot-reload dev tool, gate it explicitly behind a debug command, not behind user input.
+
+## Skeletal mesh gotchas
+
+Avatar prims (e.g. Ready Player Me models) use skeletal/skinned meshes:
+
+- **`ComputeWorldBound` returns empty/zero bounds** for skeletal meshes — do NOT use AABB-based approaches for avatar positioning
+- **Mesh colliders on individual body parts don't work reliably** — use the invisible `Cube "Collider"` convention instead (see general interactions topic)
+- The Collider child's transform is the only reliable way to compute the overlay anchor point
+
+## Avatar chat overlay
+
+`AvatarChatOverlay.tsx` — reusable chat panel for NPC conversations, configured via `AvatarChatConfig`:
+
+```typescript
+interface AvatarChatConfig {
+  avatarId: string;
+  avatarName: string;
+  avatarImage: string;            // portrait filename, e.g. "red_image.png" (from @kit-avatars)
+  chatBackgroundImage?: string;   // full-body background filename, e.g. "red.svg" (from avatarChat/backgrounds/)
+  greeting: string;
+  quickActions: Array<{ id: string; label: string }>;
+  primPath?: string;              // USD prim path, e.g. "/World/Red" — derived from avatarName
+}
+```
+
+Dispatched from Kit via `"action": "avatarChat.open"` behavior in `interactions.json`. The action payload contains the full config including `chatBackgroundImage`. Web-side handler in `StreamOnlyWindow.tsx` sets the overlay state.
+
+**Closing**: chat closes when clicking outside the chat panel / avatar (handled by the `avatarChat.close` action dispatched on off-target picks).
+
+### Full-body character background image
+
+When the chat is opened by clicking an NPC (`chatOpenSource === 'npc'`), a full-body character image is displayed behind the chat bubbles. This does **not** apply when the chat is opened from the search view.
+
+- **Assets**: `src/features/streaming/overlays/avatarChat/backgrounds/` — co-located with the chat component
+- **Naming**: filename matches the `chatBackgroundImage` field in the config (e.g. `red.svg`)
+- **Resolution**: `import.meta.glob('./backgrounds/*.{png,jpg,webp,svg}')` discovers available images; `resolveChatBackgroundImage()` maps filename → Vite URL
+- **Rendering**: a `position: fixed; inset: 0` container with `z-index: 1995` (below the chat at 2001, above the backdrop at 1990); `object-fit: contain; object-position: bottom center` anchors the character to the bottom
+- **Sizing**: `height: 91%` of the container — positions the character's head roughly at the hamburger menu level
+- **Gradient mask**: subtle top fade (`transparent 0% → opaque 7%`) to soften the top edge without blurring the head
+- **Animation**: fade-in with `translateY(24px) scale(0.96)` → normal over 0.5s
+- **Props**: `showCharacterBackground` on `AvatarChatOverlay` controls rendering; set to `chatOpenSource === 'npc'` in `StreamOnlyWindow.tsx`
+
+**SVG vs PNG**: prefer portrait-oriented SVGs (e.g. 328×731 viewBox) over square PNGs — the portrait aspect ratio fills mobile screens naturally with `object-fit: contain`. Note: Figma-exported SVGs with embedded raster images (`<pattern>` + `<image>`) don't scale better than PNG — the advantage is purely the aspect ratio.
+
+**Adding a background for a new NPC**: place the image in `src/features/streaming/overlays/avatarChat/backgrounds/` and set `chatBackgroundImage` in the `interactions.json` payload (and `WELCOME_AVATAR_CHAT_CONFIG` if the NPC has a welcome config).
+
+### Avatar image serving
+
+Avatar portrait images live in `source/data/Assets/Avatars/` (Kit-side, single source of truth).
+
+Vite serves them to the web frontend via alias:
+- `vite.config.ts`: `resolve.alias['@kit-avatars']` → Kit avatars directory
+- `vite.config.ts`: `server.fs.allow` includes the Kit data path
+- Frontend uses `import.meta.glob('@kit-avatars/*.{png,jpg,webp}')` to dynamically discover available images
+
+**Do NOT copy images into the web app.** Always reference from the Kit data directory.
+
+### Chat UI structure
+
+- Portrait circle with lime-green border/background (`#DCFF7D`)
+- Avatar name as speaker label
+- Greeting as first assistant message (off-white bubble `#f6f6f6`, dark purple text, `12px` border-radius)
+- Quick action buttons: white bg, indigo border (`#312e81`), font-size `12px`
+- Close button: circular `40px` button with dark purple `X.svg` icon, positioned `fixed` at `top: 40px; right: var(--page-edge-right)` (aligned with mic icon); rendered inside `AvatarChatOverlay` (only when not opened from search)
+- User messages: light purple bubble (`--Lighter-Purple` / `#D8CFFF`), `8px` border-radius, `display: block`, right-aligned with dynamic width (`width: fit-content`)
+- Drop shadows: `box-shadow: 0 2px 4px 0 rgba(0,0,0,0.2)` on both bubble types
+- Assistant bubble right edge aligns with the microphone button's left edge (`margin-right: 40px` on `.avatar-chat-msg-body`)
+- User bubble `max-width: min(calc(390px - 78px), calc(var(--page-max-width-gutter) - 78px))` — uses absolute values matching the panel's own constraints instead of percentages (percentage-based `max-width` fails to resolve correctly through the flex chain)
+- **Shrink-wrap**: a `useLayoutEffect` in `AvatarChatOverlay.tsx` measures each user bubble's wrapped text lines via `Range.getClientRects()` and sets the bubble width to the longest line + padding, preventing multi-line bubbles from stretching to full `max-width`
+- **Long word truncation**: `truncateLongWords()` at render time truncates any single word over `MAX_WORD_LENGTH` (60) characters with "…" — prevents pasted URLs or random strings from flooding the chat with wrapped lines
+- **Overflow safety**: `overflow-wrap: break-word` on the bubble handles edge cases; `.avatar-chat-messages` has `overflow-x: hidden`; `.avatar-chat-msg` and `.avatar-chat-msg-body` have `min-width: 0` to allow flex shrinking
+- Avatar head visibility: `.avatar-chat-panel--with-character` adds `padding-top: max(180px, 25vh)`; reduced to `max(80px, 12vh)` via `@media (max-height: 600px)` for landscape/short viewports
+
+## Adding a new interactive NPC
+
+Fully data-driven — no code changes needed:
+
+1. **Avatar asset**: place `.usda` model in `source/data/Assets/Avatars/` (path referenced from data root).
+2. **Avatar layer** (`avatars_layer.usda`): define **only** an Xform prim at the desired location (translate / orient / scale). Do **not** author `prepend payload` or `Collider` here — the interactions extension attaches both on the **session layer** when `interactions.json` loads (same mechanism as `iconGroup` + `iconAsset`).
+3. **interactions.json**: add a single entry with `npcConfig` that includes **`avatarAsset`**: a path relative to `source/data/` (e.g. `Assets/Avatars/Red.usda`). Optional **`collider`**: `{ "translate": [x,y,z], "scale": [x,y,z] }` in **stage units**; if omitted, humanoid defaults match the former authored Red box (`translate` `[0, 90, 0]`, `scale` `[30, 90, 20]`). Kit-only keys (`avatarAsset`, `collider`, `npcSpawnMeters`, `spawnPointPrimName`, `skipNpcSpawn`, `npcSpawnForwardLocalZ`) are **not** sent to the web (`avatarChat.open`, `npcNearestUpdate`).
+4. **Portrait image**: place in `source/data/Assets/Avatars/` — frontend discovers it automatically via glob
+5. **NPC spawn (teleport / bird-eye magnet)** — see § Avatar-attached NPC spawn point below. Map markers / `teleportToSpawnpoint` can target the spawn either by its **prim name** (`PlayerSpawnPoint_Red`) or its **full prim path** (`/World/Red/PlayerSpawnPoint_Red`).
+6. **NavMesh exclusion** — automatic for NPCs with `avatarAsset`: `register_avatar_nav_exclusion` + `ensure_avatar_nav_exclusion(primPath)` place one POI-style `NavMeshVolume` `Exclude` on `navigation_layer.usda` (rectangular cutout, not a disc mesh). See `avatar-red-asset.mdc` § NavMesh exclusion for lifecycle, tuning, and pitfalls.
+7. **Chat background** (optional): place SVG/PNG in `src/features/streaming/overlays/avatarChat/backgrounds/`
+
+### Example interactions.json entry for an NPC
+
+```json
+{
+  "id": "avatar_blue",
+  "interactionType": "npc",
+  "scene": ["main_scene", "main_scene_light"],
+  "position": { "type": "xform", "primName": "Blue", "positionOffset": [0, 170, 0] },
+  "trigger": { "type": "proximity", "radiusMeters": 10, "activation": "always" },
+  "approach": { "distanceMeters": 3.0 },
+  "npcConfig": {
+    "avatarId": "blue",
+    "avatarName": "Blue",
+    "avatarAsset": "Assets/Avatars/Blue.usda",
+    "avatarImage": "blue_image.png",
+    "chatBackgroundImage": "blue.svg",
+    "greeting": "interactions.avatar_blue.greeting",
+    "quickActions": [
+      { "id": "info", "label": "interactions.avatar_blue.quickAction_info" }
+    ]
+  }
+}
+```
+
+All user-facing text fields (`greeting`, quick action `label`) are **i18n key references** resolved via `t()` on the frontend. Translations live in the `"interactions"` section of each locale file (`en.json`, `sv.json`, `fr.json`, `es.json`). See `.cursor/rules/topics/localization.mdc` § Interaction locale keys.
+
+The extension auto-expands this into:
+- `avatar_blue__pointer` — projectable `interactivePointer` with collider-box visibility
+- `avatar_blue__chat` — click handler with `avatarChat.open` action + approach
+- NPC registry entry for nearest-NPC proximity tracking
+
+### NPC approach behavior in detail
+
+When a click entry has `"approach"`, the full NPC click sequence becomes:
+
+1. Player clicks NPC from a distance
+2. NPC immediately rotates to face the player (visual feedback)
+3. Player auto-walks along the navmesh to a position `distanceMeters` from the NPC
+4. On arrival: NPC **re-rotates** to face the player's new (closer) position, then actions fire (e.g. chat overlay opens)
+5. If the player is already close enough, the walk is skipped and actions fire immediately
+
+This is handled by `ApproachService` in the interactions extension — see `.cursor/rules/topics/interactions.mdc` § Approach before action.
+
+## Key files (NPC-specific)
+
+| File | Purpose |
+|------|---------|
+| `AvatarChatOverlay.tsx` + `.css` | Chat panel UI component + styling |
+| `NpcBubbleOverlay.tsx` + `.css` | Nearest-NPC proximity bubble (fixed bottom sheet) |
+| `src/features/streaming/overlays/avatarChat/backgrounds/` | Full-body character background images (`.svg`, `.png`) |
+| `avatars_layer.usda` | Avatar Xform placements (payload + Collider from `npcConfig.avatarAsset` at runtime) |
+| `source/data/Assets/Avatars/` | Avatar models (`.usda`) and portrait images |
+| `vite.config.ts` | `@kit-avatars` alias for image serving |
+| `projection_service.py` | `is_collider_visible()` — 8-corner NDC frustum check for pointer visibility |
+
+## Related
+
+- General interactions framework: `.cursor/rules/topics/interactions.mdc`
+- Collider convention + click detection: `.cursor/rules/topics/interactions.mdc` § Collider convention
+- Picking extension: `younite.picking_extension`

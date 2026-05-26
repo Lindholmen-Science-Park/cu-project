@@ -1,0 +1,99 @@
+---
+description: Topic index — grouped directory of all deep-dive topic files in .cursor/rules/topics/. Read this to find the right topic file for any feature area.
+alwaysApply: false
+---
+
+# Topic Index
+
+All topic files live in `.cursor/rules/topics/`. Read the relevant file before working on a feature area.
+
+---
+
+## Navigation & Pathfinding
+
+- **NavMesh areas** (pathfinding, cost modifiers, area types) → `navmesh-areas.mdc`
+- **NavMesh Bake Orchestrator** (provider protocol, rebake lifecycle, registered providers) → `bake-orchestrator.mdc`
+- **Dual-mode NavMesh** (walking + wheelchair cached handles, instant mode switch, `navmesh_override` threading, orchestrator fan-out) → `navmesh-dual-mode.mdc`
+- **NavMesh dev overlays** (`younite.navmesh_dev_overlays_extension`, dev stream only: full active mesh USD overlay + walking/wheelchair stair diff; Dev Tools toggles, `navmeshDebug*` / `accessibilityDiff*` events, world-state keys, `navmesh_route_bridge`, `navmeshDualBakeComplete`) → `navmesh-dev-overlays.mdc`
+- **NavMesh shortest path package** (split Python modules under `scripts/navmesh_shortest_path/`: pathfinding, metrics, FP visualization; unchanged import path) → `navmesh-shortest-path-package.mdc`
+- **NavMesh path refinement** (XZ straightening, Laplacian smoothing, threaded pipeline, ground snap) → `navmesh-path-refinement.mdc`
+- **Route end flag** (cosmetic flag marker placed 50 cm before the polyline endpoint on every drawn FP sphere-trail route, asset-agnostic single-shot session-layer authoring, replaceable asset under `data/Assets/Flag/`, fallback green sphere when cache empty) → `route-end-flag.mdc`
+- **RouteComposer** (unified A→B planner across NavMesh islands + OSM, ComposedRoute with polyline + per-segment speeds, used by directions panel and bird-eye preview) → `route-composer.mdc`
+- **Waypoint routing** (corridor `nav_waypoint_*` graph, ring + branches, `plan_route()`, `plan_route_to_position` for POIs, via-points, `_best_ring_index` wall-ratio heuristic) → `waypoint-routing.mdc`
+- **Turn-by-turn navigation** (polyline guide, RDP simplification, turn detection, seat pill) → `navigation-turn-by-turn.mdc`
+- **Route measurement** (distance/time, move-to-x, routes to exits) → `route-measurement.mdc`
+- **Bird's-eye route overlay** (NavMesh path → RDP → per-frame projection → SVG polyline, corridor waypoint support) → `bird-eye-route.mdc`
+- **Bird-eye map controls** (drag-pan "grab the world", cinematic camera tilt while panels are open, endpoint icon swap, inert-backdrop rule, `birdEyePanFocusWorld` pan-to-target) → `bird-eye-map-controls.mdc`
+- **Live transit overlay** (Västtrafik Planera Resa v4 `/positions`, USD cubes, `transitLiveOverlayStatus` + dev vehicle list, `TRANSIT_LIVE_*` env; Kit: `younite.open_data_live_extension`) → `transit-live-overlay.mdc`
+- **OSM POI overlay (baked)** (`export_osm_pois.py`, `osm_pois_gbg.json`, dev IoT category toggle + `iotOsmPois*` markers; web uses shared `iotShared` list shell on mobile; complements live transit with static stops) → `osm-poi-overlay.mdc`
+- **Bird-eye pin anywhere** (focalLength zoom, click-anywhere pin with magnet snap inside NavMesh / OSM node outside, directions hand-off to RouteComposer for unified multi-leg planning, cached polyline replayed for Play/Pause) → `bird-eye-pin-anywhere.mdc`
+- **Seat navigation** (seat pipeline: `extract_cad_seats.py`, optional `postprocess_wheelchair_wc_to_row6.py`, instancer, lookup, `build_seat_hierarchy.py` / web `seat_hierarchy.json`; walking + wheelchair CU cascade; auto-move; highlighting; layout variants; arrival) → `seat-navigation.mdc`
+- **OSM city navigation** (Dijkstra over baked graph: roads + railway, `generate_roads` + Kit terrain bake, `tram`/`train` modes for transit) → `osm-navigation.mdc`
+- **OSM route overlay (dev)** (translucent glass-tinted walk-graph mesh on the session layer, click-to-walk along visible routes via direct `navmeshRouteWaypoints` dispatch bypassing the route composer, Play/Pause floating button auto-advances to the next junction or dead-end using camera yaw as the straightest tie-breaker, `osmRouteOverlayAttached` event mirrors the player↔route binding to gate FAB visibility + provide click-landed-on-route visual feedback) → `osm-route-overlay.mdc`
+- **Sound NavMesh areas** (fixed-size radial zones, raycasting, cost sliders) → `sound-areas.mdc`
+- **Navigation shortcuts** (elevators v1, dev-gated cross-floor hops; **two dev toggles**: "Use shortcuts" (gates everything) + "Prefer elevators" (always-lift-if-valid); strict-shortest by default, no slack; seat post-hop uses same `plan_route(section)` + `corridor_section` as non-shortcut seat nav with `floor_hint_y` / `branch_join_pos` branch rejoin; POI routes stay `plan_route_to_position` unless `corridorSection` added; USD `nav_shortcuts_layer.usda` + `shortcuts.json`, `ShortcutRouter`, `ShortcutTraversalService`, single-hop, known limitations) → `shortcuts.mdc`
+
+## Camera, Rendering & Visuals
+
+- **Globe space view** (CesiumJS globe overlay, cinematic fly-in, cloud layer, waypoint flight, adding locations) → `globe-space-view.mdc`
+- **Camera NavMesh areas** (frustum scanning, ground footprint polygons, cost areas) → `camera_navmesh_areas.mdc`
+- **Camera depth capture** (point cloud, ghost detection, convex-hull obstacles) → `camera_depth_capture.mdc`
+- **Camera data visualization** (heatmap, sphere tracker, web UI toggles) → `camera_data_visualization.mdc`
+- **Camera placement** (runtime camera creation, FPS free-look, lens presets) → `camera-placement.mdc`
+- **Camera teleport** (view switching, spawnpoint teleport, view transitions, CU toggle, FP state capture/restore, user location marker) → `camera-teleport.mdc`
+- **Viewport capture** (web snapshot vs Kit-rendered, HTTP sidecar, camera bar popup) → `viewport-capture.mdc`
+- **LOD management** (variant-set switching, light/full, PointInstancer ghost issue) → `lod-management.mdc`
+- **Hydra rendering** (change processing, caching, PointInstancer issues) → `hydra-rendering.mdc`
+- **Lighting init** (MDL race condition, session-layer visibility, MakeVisible pattern) → `lighting-init.mdc`
+- **Light culling** (distance-based visibility, per-group cull distances, hysteresis) → `light-culling.mdc`
+
+## Weather & Environment
+
+- **Rain effect** (PointInstancer rain, per-drop collider, weather presets, wet ground, bird-eye Canvas overlay; service in `younite.weather_and_seasons_extension`) → `rain-effect.mdc`
+- **Snow effect** (PointInstancer flakes, snowflake USD, exclusivity with rain, ground linger, wet ground, bird-eye Canvas overlay; service in `younite.weather_and_seasons_extension`) → `snow-effect.mdc`
+- **Wet ground & terrain winter textures** (wet salted pavement on rain/snow/winter, snow-cover natural terrain on winter, multi-source reason tracking, texture generation) → `wet-ground.mdc`
+- **Seasonal tree textures** (fall/winter texture swap, session-layer overrides, season event flow, fallen leaves, ground litter, shared weather utilities) → `seasonal-trees.mdc`
+
+## Player & Movement
+
+- **PhysX CCT movement** (WASD/joystick, point-and-click auto-move, `PlayerUpdateLoop` + `payload["dt"]`, bird-eye pan, jump, face-turn profiles route/stadium, Composer UI suppression) → `cct-movement.mdc`
+- **Touch/drag look** (`touchLookDelta` + `touchLookEnd`, first-person release coast, bird-eye pan via same deltas, invert toggle) → `touch-look.mdc`
+- **POI teleportation** ("Take Me There", seats/exits/restrooms, camera_local_yaw_deg) → `poi-teleport.mdc`
+- **Red avatar asset** (Red.usda, SkelAnimation time samples, scene length alignment, runtime NavMesh Exclude cutout) → `avatar-red-asset.mdc`
+
+## Interactions & Content
+
+- **Interactions framework** (spatial triggers, click detection, Collider convention, overlays, `interactions.json`; Kit code under `services/kit_services/` + `config_loader` package) → `interactions.mdc`
+- **NPC avatar interactions** (face-player rotation, chat overlay, avatar images, data-driven NPCs) → `interactions-avatars.mdc`
+- **Map markers** (bird's eye markers, spawn point teleport, projectable style) → `map-markers.mdc`
+- **Seated crowd** (~11.5k static sitting characters as a single PointInstancer, crowd_density VariantSet, three red-character pitfalls (GeomSubset under PointInstancer, absolute MDL paths in baked `.usdc`, missing prod-kit MDL deps) with triage decision tree, NavMesh exclusion, per-seat character hide on seat-nav highlight) → `seated-crowd.mdc`
+- **Video playback** (pre-rendered overlay, Kit video catalog, trigger boxes, videobook + sidecar locale-aware WebVTT captions; shared Figma caption-size tokens with 360° and spatial) → `video-playback.mdc`
+- **Spatial audio** (ambisonic overlay via Omnitone FOA, browser-side ambient emitter engine, JSON-driven `sound_emitters.json` + matching empty Xforms, `playerPose` dispatch) → `spatial-audio.mdc`
+- **360° video** (browser-side equirectangular sphere via Three.js, iconGroup template, per-session onboarding, mount-ordering trap, optional WebVTT captions) → `360-video.mdc`
+- **AI Agent** (external API chat, per-avatar sessions, credentials, error handling) → `ai-agent.mdc`
+- **Text-to-Speech** ("Listen" buttons, `AvatarVoiceProfile`, per-avatar voice data in `interactions.json`, voice vs text language separation, AI reply lang tagging) → `text-to-speech.mdc`
+- **POI data pipeline** (data-driven restrooms/quiet zones/exits, JSON schemas, Kit enrichment, web filtering, adding new POI types) → `poi-data-pipeline.mdc`
+- **POI coins (round signs)** (3D coin tokens near POIs via `iconGroup` + `coins_loader.py`; proximity pill 3 m horizontal / 1.5 m vertical; click or pill → `PoiInfoCard`; **elevator coins** link `elevator_data.json` + `shortcuts.json` for CU **Use elevator** floor buttons → `poiTeleport` + spawn rotation + localized arrival label; distinct from dev route `ShortcutTraversalService`) → `poi-coins.mdc`
+- **Incidents** (NavMesh-blocking obstacles, shape selection, size presets) → `incidents.mdc`
+- **Maintenance bots** (incident orchestrator, bot spawning, travel time dispatch, deferred rebake) → `maintenance-bots.mdc`
+- **USD editing** (vertex nudging, prim transforms, markers, pose clipboard minimal/full, distance measurement, edit sublayer) → `usd-editing.mdc`
+- **Elevator test (Composer only)** → `elevator-test-composer.mdc`
+
+## Infrastructure & Streaming
+
+- **Stage init** (loading phases, readyForPlayer, scene.loaded, USD time range) → `stage-init.mdc`
+- **Events API** (1.0 vs 2.0, `GLOBAL_EVENT_UPDATE` `payload["dt"]`, stage-event bridge, migration rules, NVST_R_BUSY) → `events-api.mdc`
+- **Streaming profiles** (dev vs prod, extension separation, adding new extensions, MDL/material plugin chain must be explicit in prod kit deps to avoid red-material / "Unable to find SdrShaderNode" failures on prod-only fresh builds) → `streaming-profiles.mdc`
+- **Resolution streaming** (viewport sync, safeTerminateStream, NDC mapping, reconnect) → `resolution-streaming.mdc`
+- **Payload Orchestrator** (centralised visibility/payload queue, frame-budgeted execution) → `payload-orchestrator.mdc`
+- **World state sync** (Kit-side registry, reconnect snapshot, `worldStateSync` event) → `world-state-sync.mdc`
+- **React Contexts** (9 domain contexts, provider hierarchy, `VideoBookSettingsContext` for shared caption size, adding new state) → `react-contexts.mdc`
+- **Localization** (i18next, EN/SV/FR/ES, language selector, AI API fallback) → `localization.mdc`
+- **WCAG accessibility** (required patterns for CU UI: semantic HTML, ARIA, keyboard, focus, touch targets, motion, localization, TTS; checklist for new features; how to escalate design conflicts) → `wcag-accessibility.mdc`
+- **Kit SDK update** (version pins, repo tool deps, generated blocks, clean build, upstream diff checklist) → `kit-sdk-update.mdc`
+- **Platform restrictions** (vGPU limitations, CUDA interop, blocked features) → `platform-restrictions.mdc`
+- **Nucleus integration** (pull-to-local sync, local wrappers, adding Nucleus sources) → `nucleus-integration.mdc`
+- **USD sublayers** (scene composition, file conventions, existing sublayers) → `sublayers.mdc`
+- **Tile management** (distance-based culling, three-zone warmup, Payload Orchestrator integration) → `tile-management.mdc`
+- **Cesium geolocation** (GeoCoordinateService, WGS84↔USD conversion, tileset alignment) → `cesium-geolocation.mdc`
+- **Open data live — WAQI, GBFS & baked OSM POIs** (dev Kit `younite.open_data_live_extension`, USD markers, web panels with list → camera focus + selected-item details, shared `iotShared` mobile sheet for list panels, AQI/temperature toggle for air, category toggle for OSM, markers only while panel open) → `open-data-live-waqi-gbfs.mdc`

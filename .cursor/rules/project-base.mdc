@@ -1,0 +1,245 @@
+---
+description: Project base rules — always-applied constraints, services, architecture. For topic deep-dives see topic-index.mdc and .cursor/rules/topics/*.mdc.
+alwaysApply: true
+---
+
+# Goteverse — Base Rules
+
+Goteverse is a USD-based digital twin of a stadium and surrounding city, streamed from NVIDIA Omniverse Kit (Python) to a React/TypeScript web frontend via WebRTC. The two sides communicate over a WebRTC data channel. Implement features **web-side** when possible; new backend features go in modular Kit extensions wired to existing services. Composer is for world building; the viewer is for runtime.
+
+**Rule hierarchy**: This file (always-applied) → `topic-index.mdc` (domain-grouped reference) → `.cursor/rules/topics/*.mdc` (deep-dive per feature). Before starting work on a new feature area, read `topic-index.mdc` to identify which topic files are relevant, then read those topic files — that split exists so agents do **not** need every topic file for every task.
+
+---
+
+## Project Layout
+
+```
+goteverse_omniverse_study/
+├── kit-app-template-main/
+│   └── source/
+│       ├── apps/            # .kit profile files (base, dev, composer)
+│       ├── extensions/      # Kit Python extensions (younite.*)
+│       ├── data/            # USD assets, scenes, config, POI data (interactions.json, poi_index.json, *_data.json)
+│       │   ├── scenes/      # USD scene files
+│       │   ├── Assets/      # Shared USD assets (snowflake, etc.)
+│       │   ├── nucleus/     # Pulled Nucleus assets (gitignored binaries)
+│       │   └── ...
+│       ├── exts/            # Third-party / vendored extensions
+│       └── extscache/       # Build cache (gitignored)
+├── web-viewer-sample-main/
+│   └── src/
+│       ├── features/
+│       │   ├── streaming/   # Stream connection, contexts, shared widgets
+│       │   ├── cu/          # CU (Control Unit) UI — panels, controls
+│       │   └── dev/         # Dev-only UI controls
+│       ├── services/        # Frontend service modules
+│       ├── icons/           # Central SVG/asset buckets + `@icons` alias (see § Frontend icons)
+│       ├── context/         # Additional React contexts
+│       ├── i18n/            # Localization files (EN/SV/FR/ES)
+│       ├── config/          # stream.config.json, etc.
+│       └── app/             # App shell, routing
+├── scripts/                 # Build/utility scripts
+├── .cursor/rules/topics/    # Deep-dive topic documentation (46 files)
+├── startstream.bat          # Launch dev streaming (default)
+├── startstream_prod.bat     # Launch production streaming
+├── startcomposer.bat        # Launch Composer (world building)
+└── .env                     # Credentials (gitignored)
+```
+
+## Cursor indexing and pulled Nucleus assets
+
+Heavy pulled trees under `kit-app-template-main/source/data/nucleus/` (and generated seasonal textures) are listed in repo-root **`.cursorindexingignore`** so they stay **out of the index** but remain **openable** in the editor; **`.cursorignore`** holds stronger blocks (`node_modules`, build output, `.env`, etc.). See **`topics/nucleus-integration.mdc` § Cursor / AI troubleshooting** for Nucleus debugging, `@` paths, and when to relax either file.
+
+---
+
+## Existing Services (Do NOT Duplicate)
+
+Wire new features to these; never reimplement them.
+
+| Service | Location | Notes |
+|---|---|---|
+| **Teleport** | `teleport_service.py` in `younite.usd_viewer_stage_core_extension` | |
+| **Camera switch + teleport** | `camera_service.py` in `younite.usd_viewer_stage_core_extension` | |
+| **Player location** | `player_location_service.py` in `younite.usd_viewer_player_core_extension` | |
+| **Picking** (click → 3D coord + prim) | `younite.picking_extension` | Events: `younite.pick.request` / `.response` / `.result` |
+| **Web ↔ Kit messaging** | `younite.messaging_core_extension` | `IncomingMessageBridge`, `events_contracts.py` |
+| **Payload/visibility orchestrator** | `younite.payload_orchestrator_core_extension` | Use helpers: `show`, `hide`, `show_hide`, `batch_show_hide`, `load_prim`, `unload_prim`. **Never** call `MakeVisible()`/`MakeInvisible()`/`prim.Load()`/`prim.Unload()` directly. |
+| **OSM city navigation** | `younite.osm_navigation_extension` | `OsmGraphService` (Dijkstra), `osm_route_drawer` (BasisCurves). Reusable for city-scale pathfinding. |
+| **Interactions** (triggers, NPC chat, clicks) | `younite.interactions_extension` | Data-driven via `interactions.json`. Add new NPCs/objects via config only. |
+| **World state sync** | `world_state_sync_service.py` in `younite.usd_viewer_stage_core_extension` | Centralised registry; pushes snapshot on `ui.ready`. **All new world-affecting features must publish state here.** |
+| **Open data live (dev)** | `younite.open_data_live_extension` | WAQI air + GBFS bike-share docks + baked OSM POIs → USD markers (`iotAirQuality*` / `iotBikeShare*` / `iotOsmPois*` events) + Västtrafik live transit (`transitLiveOverlay*`). **Dev streaming kit only.** See `open-data-live-waqi-gbfs.mdc`, `osm-poi-overlay.mdc`, and `transit-live-overlay.mdc`. |
+
+---
+
+## Mandatory Constraints
+
+### Events API (Kit 110+)
+All new event subscriptions **must** use Events 2.0 (`carb.eventdispatcher`). Use `omni.kit.app.GLOBAL_EVENT_UPDATE` for per-frame updates and `"omni.usd@stage_event"` for stage events. **Never** add new `get_stage_event_stream()` or `get_update_event_stream()` calls — `stage_watcher.py` is the sole permitted exception (it activates the lazy Events 1.0 → 2.0 bridge). See `events-api.mdc`.
+
+### NavMesh Rebakes
+Any feature that adds/removes NavMesh area prims or needs to trigger a rebake must use the **NavMesh Bake Orchestrator**. Do not call `rebake_navmesh()` or dispatch `navmeshRebakeRequest` directly. New area sources implement `NavMeshAreaProvider` and register with the orchestrator. See `bake-orchestrator.mdc`.
+
+### Payload/Visibility Operations
+All prim visibility and payload load/unload operations **must** go through the Payload Orchestrator. Never call `MakeVisible()` / `MakeInvisible()` / `prim.Load()` / `prim.Unload()` directly. See `payload-orchestrator.mdc`.
+
+### World State Sync
+All new world-affecting features must publish their state to `WorldStateSyncService`. Never rely solely on browser-side `useState` for world state persistence. See `world-state-sync.mdc`.
+
+### Accessibility (WCAG)
+The CU mode is mobile-first and public-facing — all new CU UI **and any text Kit projects to the frontend** (via `interactions.json` etc.) must follow WCAG 2.1/2.2 AA. Before implementing UI work, consider semantic HTML, ARIA, keyboard reachability + `Escape` dismissal, `:focus-visible`, color-contrast, 44×44 px touch targets, `prefers-reduced-motion`, full localization (every string via `t()`), and TTS voice-language matching the text language.
+
+**Escalation rule**: if a proposed design conflicts with a WCAG criterion, do **not** silently ship a workaround. Stop, name the criterion + the conflict, suggest WCAG-compliant alternatives, and ask the user to discuss with the designer before implementing. Reusable patterns and the full checklist live in `wcag-accessibility.mdc`; TTS specifics in `text-to-speech.mdc`.
+
+### No Absolute Paths in Committed Files
+Anything that gets committed to the repo — USD files (`.usda`/`.usdc`), JSON configs, scripts that produce committed output — **must use relative paths only**. Absolute paths like `D:/dev/goteverse_omniverse_study/...` work on the author's machine and silently break for every teammate whose project sits at a different drive or directory (red error materials, missing references, "MDL not found" / "Unable to find SdrShaderNode" in Hydra, broken payload loads).
+
+Common offenders to watch for:
+
+- **`Usd.Stage.Flatten()` / `Export()`** — Flatten resolves every reference against the local filesystem, so the resulting layer embeds machine-specific paths in every `asset` / `asset[]` attribute (MDL `info:mdl:sourceAsset`, texture inputs, references, payloads). Any script that flattens or exports USD must relativize asset attributes before/after writing. See `bake_skinning.py`'s `_relativize_layer_assets` helper as the reference implementation, and `seated-crowd.mdc` § "Critical pitfall: baked `.usdc` files must contain relative asset paths" for the full failure-mode write-up.
+- **Hardcoded paths in Python tools** — Derive from `os.path.dirname(os.path.abspath(__file__))` and `os.path.normpath(os.path.join(...))`, never from a literal absolute string. Acceptable: `os.environ` lookups for things explicitly configured at runtime (e.g. `OV_DATA_ROOT`).
+- **`@D:/...@` references in `.usda` files** — Always author as `@./relative.usd@` or `@../sibling/foo.usd@`. If `usdcat` ever shows you a stray absolute reference in a hand-written `.usda`, fix it before committing.
+
+When unsure, run `verify_mdl_refs.py` (or the same `os.path.isabs()` + `os.path.isfile()` check it uses) on the produced files — it counts every absolute on-disk path and tells you exactly which attribute is wrong. Unreal-style metadata strings such as `info:unreal:sourceAsset = "/Game/AXYZAssets/..."` look absolute but are not file paths and must be left alone — the `os.path.isfile` filter is what distinguishes the two.
+
+---
+
+## Agent communication (token-conscious)
+
+- **Avoid play-by-play**: Do not narrate every tool call or intermediate step ("First I will…", "Now reading…") unless the user asked for running commentary, the task is long or high-risk, or a short checkpoint is needed to coordinate (e.g. ambiguous requirements).
+- **Batch work silently**: Prefer parallel tool use and uninterrupted execution; summarize once when there is a meaningful result.
+- **Final message**: When work completes, give a **brief** outcome: what changed (files or areas), how to verify, and any follow-ups — not a single word like "done" unless the user explicitly asked for minimal replies for that thread.
+- **Proportionality**: Match verbosity to task complexity; default to concise technical prose over tutorials.
+- **New chat when scope shifts**: Unrelated work on a **long** thread still resends accumulated history each turn (more input tokens). Prefer a **new chat** for a clean scope; mention this only when it clearly helps (e.g. topic pivot), not every reply.
+- **Prior context**: Do not read `agent-transcripts` or other session log folders unless the user explicitly asks for continuity from a prior run. Do not ask for full prior chat logs when a short description, error text, or `@` file reference is enough; avoid encouraging huge paste-ins unless the task truly depends on them.
+- **Scoped reading (topics + source)**: Modular extensions and topic docs are there to **focus** work. Prefer the **relevant** topic files (from the index) and **source directly tied to the task** — files the user `@`-mentions, obvious edit targets, imports, messaging/event contracts — instead of opening large unrelated subtrees “just in case.” This is **efficiency guidance**, not a prohibition: if something is unclear, follow **one** dependency level, run a **narrow** search, or read an extra file; do not skip material that is **actually** needed for a correct or safe change.
+
+---
+
+## Launch & Build
+
+Run `startstream.bat [scene]` or `startcomposer.bat [scene]` from project root. Defaults to `main_scene`. These scripts **automatically build both the Kit backend and the web frontend** — never suggest separate build steps (e.g. `npm run build`, `repo build`) unless specifically debugging a build/startup issue.
+
+**Streaming Kit profiles** (`kit-app-template-main/source/apps/`): `younite.usd_viewer_streaming_base.kit` holds **all** shared settings and the **production** extension set — launch it directly for production. `younite.usd_viewer_streaming_dev.kit` is a **thin layer** that depends on the base via `[dependencies] "younite.usd_viewer_streaming_base" = {}` and adds dev/CU-only extensions. Edit shared settings/deps **only in base**. Default `startstream.bat` launches dev; `startstream_prod.bat` launches base directly.
+
+---
+
+## New Extension Checklist
+
+Five steps required (missing any = silent failure). Full checklist with templates in `streaming-profiles.mdc`. Summary: (1) folder `source/extensions/younite.<name>/`, (2) `premake5.lua`, (3) `__init__.py` imports extension class, (4) `config/extension.toml`, (5) add to **dev** `.kit` file — never add directly to production without asking.
+
+---
+
+## Streaming (frontend ↔ backend)
+
+Frontend connects via `AppStream.tsx`; config in `web-viewer-sample-main/src/config/stream.config.json` (local: 127.0.0.1:49100). Messaging: `younite.messaging_core_extension` — outbound: `register_outbound_events()`; inbound: `IncomingMessageBridge` (wrapper event → Events 2.0). See `streaming-profiles.mdc` for Kit profile details.
+
+---
+
+## Development Workflow
+
+**Hot-reload**: Both sides hot-reload on file save. Kit reloads Python extensions automatically; Vite hot-reloads the frontend. Do **not** suggest restarting the app after code changes — only restart if changing `.kit` profile settings or debugging startup issues.
+
+**Kit Python packages**: Kit bundles many Python packages (numpy, PIL/Pillow, scipy, etc.) in its own environment. Never suggest `pip install` for these -- they are already available at runtime.
+
+---
+
+## Git Safety
+
+Agents must **never** change remote or local git history unless the user has **clearly and explicitly** asked for that specific action in the **current** message.
+
+### Commits and pushes (strict)
+
+- **Do not** run `git commit`, `git commit --amend`, `git push`, or `git push --force` unless the user explicitly requests that exact operation (e.g. “commit these changes”, “push to origin/main”).
+- **Not permission**: vague or hypothetical phrasing (“I could push”, “ready to commit?”, “should we push?”, “make a push of these fixes”) — treat those as discussion only; **propose** a commit message and ask what they want; **do not** run commit/push.
+- **Even when the user explicitly asks to commit or push**: first show a short summary (files/areas, proposed commit message, target branch/remote), then ask **“Confirm commit?”** / **“Confirm push?”** and wait for a clear yes before running the command.
+- Before a confirmed push, run read-only checks (`git status`, `git log` vs remote) and mention if `git fetch` / pull might be needed; do not push on a stale assumption of “up to date” without saying so.
+- **Never** `git config` (any subcommand). **Never** force-push to `main`/`master` unless the user explicitly requests it and understands the risk.
+
+### Other state-changing git (also require explicit request)
+
+- `git reset` (any mode), `git rebase`, `git merge`, `git checkout` / `git switch`, `git stash drop` / `git stash pop`, `git tag` (create/delete)
+
+### Allowed without asking
+
+Read-only investigation only: `git status`, `git diff`, `git log`, `git show`, `git branch` (list), `git stash list`, `git fetch` (when checking whether push is safe — still **no** push until confirmed).
+
+---
+
+## Conventions
+
+### Extension service structure
+Most extensions keep service files alongside `extension.py` in the package root:
+```
+younite.<name>/younite/<name>/
+├── extension.py            # IExt subclass, event wiring, lifecycle
+├── some_service.py         # Feature service
+└── another_helper.py
+```
+Larger extensions (e.g. `stage_core`, `navmesh_route`) organise into subfolders:
+```
+services/
+├── kit_services/       # Feature-facing services
+└── core_services/      # Infrastructure services (stage_core only)
+```
+All `from pxr import ...` statements must be **inside methods** (lazy imports), not at module level — avoids silent startup failures.
+
+### Frontend UI placement
+
+The frontend uses **React 18** with **react-bootstrap** for UI components and **Vite** for bundling. Do not install additional UI frameworks — use react-bootstrap and custom CSS.
+
+The app has two modes via `AppModeContext`: **`cu`** (production Control Unit) and **`dev`** (developer tools). `StreamOnlyWindow.tsx` is the composition root — it nests the 6 context providers and conditionally renders view layers based on app mode.
+
+| Folder | Purpose | View layer entry point | When rendered |
+|---|---|---|---|
+| `features/cu/` | Production user-facing UI (panels, overlays, menus) | `CuViewLayer.tsx` | `appMode === 'cu'` |
+| `features/dev/` | Dev-only tools and controls | `DevViewLayer.tsx` | `appMode === 'dev'` |
+| `features/streaming/widgets/` | Widgets shared between CU and dev | `SharedWidgetLayer.tsx` | Always |
+| `features/streaming/overlays/` | Shared overlays (NPC bubbles, chat, video player) | `SharedOverlayLayer.tsx` | Always |
+
+New UI components must be mounted through the appropriate view layer — don't render directly in `AppStream.tsx` or `StreamOnlyWindow.tsx`.
+
+#### Reusable, modular UI
+
+New work should be **modular and reusable** across CU, dev, and shared layers: extract shared controls (buttons, toolbars, pills, form patterns) into components that can be imported wherever needed — typically under `features/streaming/widgets/`, `features/streaming/overlays/`, or another obvious shared location — instead of reimplementing the same control separately in each view.
+
+To avoid duplicating work **without** burning tokens on wide repo searches: use **`topic-index.mdc`** and the relevant **`.cursor/rules/topics/*.mdc`** files (plus this file) as the primary references; **ask the user** whether an existing shared component should be reused or extended when requirements are ambiguous. Do **not** run extensive multi-file or whole-codebase search passes just to “find a similar button” — rely on documentation and targeted `@` file references from the user when needed.
+
+#### React context and state
+
+The streaming feature owns shared React state via **`web-viewer-sample-main/src/features/streaming/contexts/`** (e.g. `StreamContext`, `NavigationContext`, `AppUIContext`, `ControlContext`, `EnvironmentContext`, `ChatContext`, etc. — see `contexts/index.ts`). When building or extending features, **prefer consuming or extending these providers** over scattering duplicate state in local `useState` at the leaves of the tree. **Add a new context** in that folder (and register it from the appropriate composition root, e.g. `StreamOnlyWindow.tsx`) when no existing provider fits. App-wide concerns may also use **`web-viewer-sample-main/src/context/`** — follow existing patterns there instead of introducing parallel ad-hoc state.
+
+Local `useState` is still appropriate for **strictly local, ephemeral UI** (e.g. a single control’s transient open/closed flag). Anything that should **persist across sibling components, panels, or mode switches** should go through an existing or new context. This is complementary to **World State Sync** on the Kit side: world-affecting runtime truth still flows through the backend sync service; contexts orchestrate **frontend** coordination and UI state.
+
+#### Styling vs logic
+
+Keep **layout and visual styling out of component logic** for readability: use dedicated stylesheets (`.css`), CSS Modules, or clearly named co-located style files. **Avoid inline `style={{ ... }}`** except for values that are inherently dynamic (e.g. geometry from props, runtime measurements); even then, keep the inline surface minimal and prefer CSS variables or classes where possible.
+
+#### Frontend icons (SVG / assets)
+
+**Do not** scatter new `.svg` files under random feature folders. Add them under **`web-viewer-sample-main/src/icons/`** in an existing semantic subfolder (`map-markers/`, `chat/`, `navigation/`, `restrooms/`, `seat-route/`, `weather-season/`, etc.) or create a small new subfolder if none fits. Import with the Vite/TS alias **`@icons/...`** (see `vite.config.ts`) so paths stay short and agents can grep one tree.
+
+- **Kit-driven filenames** (`interactions.json` `ui.icon` basenames, bird-eye markers) live only in **`icons/map-markers/`** — never rename without updating Kit config. Bulk loading: **`icons/kitMarkersRegistry.ts`** (and **`icons/iconBubbleAvatars.ts`** for `*_avatar` globs).
+- **Reuse before inventing**: shared glyphs (e.g. media mute/volume) already live as React SVG components in **`features/cu/controls/MediaPlayerControls.tsx`** (`MediaVolumeOnIcon`, `MediaMuteIcon`, etc.).
+- **Token efficiency**: one canonical asset root + `@icons` reduces blind repo-wide `.svg` hunts; prefer extending `src/icons/` over co-locating duplicates next to a single consumer.
+
+---
+
+## USD File Tools
+
+`.usdc` and `.usdz` files are binary — cannot be read as text. Use `usdcat` (in PATH) to convert to readable `.usda`:
+```
+usdcat "path/to/file.usdc" -o "path/to/output.usda"
+```
+
+---
+
+## Post-Implementation Checklist
+
+When a feature is finished and the user has confirmed it works:
+
+1. **Ask about cleanup** — review the implementation for modularity and reusability: check for duplicate code, unnecessary fallbacks, and opportunities to consolidate. Then offer to remove any leftover debugging/development code (e.g. `console.log`, `print()` statements, commented-out blocks, temporary workarounds).
+2. **Ask about documentation** — offer to create or update topic files in `.cursor/rules/topics/`:
+   - **New feature** → create a new topic file (`.cursor/rules/topics/<feature-name>.mdc`) and add a reference to it in `topic-index.mdc`'s topic list.
+   - **Updated feature** → update the existing topic file that covers it.
+
+Do not skip this step. Always ask explicitly after the user confirms the feature is working.

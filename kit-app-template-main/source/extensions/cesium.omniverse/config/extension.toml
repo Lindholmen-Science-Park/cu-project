@@ -1,0 +1,89 @@
+[package]
+version = "0.28.0"
+category = "simulation"
+feature = false
+app = false
+title = "Cesium for Omniverse"
+description = "High-accuracy full-scale WGS84 globe for Omniverse"
+authors = "Cesium GS Inc."
+repository = "https://github.com/CesiumGS/cesium-omniverse"
+keywords = [
+    "cesium",
+    "omniverse",
+    "geospatial",
+    "3D Tiles",
+    "glTF",
+    "globe",
+    "earth",
+    "simulation",
+]
+
+# Paths are relative to the extension folder
+changelog = "doc/CHANGES.md"
+readme = "doc/README.md"
+preview_image = "doc/resources/preview.jpg"
+icon = "doc/resources/icon.png"
+
+[package.target]
+kit = ["109"]
+
+[package.writeTarget]
+kit = true
+python = false
+
+# Which extensions this extension depends on
+[dependencies]
+"cesium.usd.plugins" = { version = "0.9.0" }
+"usdrt.scenegraph" = {}
+"omni.ui" = {}
+"omni.usd" = {}
+"omni.ui.scene" = {}
+"omni.usd.libs" = {}
+"omni.kit.commands" = {}
+"omni.kit.pipapi" = {}
+"omni.kit.uiapp" = {}
+"omni.kit.viewport.utility" = {}
+"omni.kit.property.usd" = {}
+"omni.kit.menu.utils" = {}
+"omni.kit.capture.viewport" = {}
+
+# Main python module this extension provides, it will be publicly available as "import cesium.omniverse"
+[[python.module]]
+name = "cesium.omniverse"
+
+[python.pipapi]
+archiveDirs = ["vendor"]
+
+[[native.plugin]]
+path = "bin/cesium.omniverse.plugin"
+
+[settings]
+exts."cesium.omniverse".defaultAccessToken = ""
+persistent.exts."cesium.omniverse".userAccessToken = ""
+exts."cesium.omniverse".showOnStartup = true
+exts."cesium.omniverse".showCreditsOnScreen = true
+
+[[test]]
+args = [
+    "--/renderer/enabled=rtx",
+    "--/renderer/active=rtx",
+    "--/app/window/dpiScaleOverride=1.0",
+    "--/app/window/scaleToMonitor=false",
+    "--/app/file/ignoreUnsavedOnExit=true",
+]
+dependencies = [
+    "omni.hydra.pxr",
+    "omni.kit.mainwindow",
+    "omni.kit.ui_test",
+    "omni.kit.test_suite.helpers",
+    "omni.kit.window.file",
+    "omni.kit.viewport.window",
+]
+pythonTests.include = ["cesium.omniverse.*"]
+pythonTests.exclude = []
+
+pythonTests.unreliable = [
+    "*test_window_docked", # window does not dock when tests run from the empty test kit via the omniverse app
+]
+
+timeout = 180
