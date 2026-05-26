@@ -1,0 +1,254 @@
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+ *
+ * NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+ * property and proprietary rights in and to this material, related
+ * documentation and any modifications thereto. Any use, reproduction,
+ * disclosure or distribution of this material and related documentation
+ * without an express license agreement from NVIDIA CORPORATION or
+ * its affiliates is strictly prohibited.
+ */
+
+/* Figma 2026 APRIL DEMO – design tokens (sync with Figma) */
+:root {
+    /* Design tokens from Figma */
+    --Off-white: #F6F6F6;
+    --figma-purple: #351A84;
+    --figma-text: #1a1a1a;
+    --figma-text-muted: #666666;
+    --figma-shadow-sm: 0 1px 6px 0 rgba(0, 0, 0, 0.30);
+    --figma-radius-button: 80px;
+    --figma-radius-panel: 12px;
+    --figma-border: 1px solid rgba(33, 23, 64, 0.30);
+    --Dark-Purple: #351A84;
+
+    /* Figma layout: 16px horizontal gutter (mobile + global); use with safe-area */
+    --page-gutter: 16px;
+    --page-gutter-x2: 32px; /* left + right inset for max-width: calc(100vw - 32px) */
+    --page-edge-left: max(var(--page-gutter), env(safe-area-inset-left, 0px));
+    --page-edge-right: max(var(--page-gutter), env(safe-area-inset-right, 0px));
+    --page-max-width-gutter: calc(100vw - var(--page-gutter-x2));
+    --page-max-width-gutter-safe: calc(
+        100vw - var(--page-gutter-x2) - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)
+    );
+
+    /* Small_round_outlined_CTA – Figma component */
+    --cta-small-round-outlined-border: 1px solid var(--Dark-Purple, #351A84);
+    --cta-small-round-outlined-radius: 80px;
+    --cta-small-round-outlined-bg: rgba(234, 231, 229, 0.70);
+    --cta-small-round-outlined-bg-pressed: var(--Dark-Purple, #351A84);
+
+    font-family: Lexend, system-ui, sans-serif;
+    line-height: 1.5;
+    font-weight: 400;
+
+    color-scheme: light dark;
+    color: #dedede;
+    background-color: #242424;
+
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+
+    /* Settings → Visual → Size (default 1 = 16px base in browser) */
+    --cu-app-font-scale: 1;
+}
+
+html {
+    font-size: calc(16px * var(--cu-app-font-scale, 1));
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+}
+
+a {
+    font-weight: 500;
+    color: #646cff;
+    text-decoration: inherit;
+}
+a:hover {
+    color: #535bf2;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    min-width: 0;
+    width: 100%;
+    min-height: 100vh;
+    min-height: 100dvh;
+    overflow: hidden;
+    overscroll-behavior: none;
+    -webkit-overflow-scrolling: touch;
+    font-family: Lexend, system-ui, sans-serif;
+}
+
+#root {
+    font-family: Lexend, system-ui, sans-serif;
+}
+
+input,
+textarea,
+select,
+optgroup,
+option {
+    font-family: inherit;
+}
+
+/* Cesium globe UI (bundled widgets) — match app typography */
+.cesium-widget,
+.cesium-viewer,
+.cesium-infoBox,
+.cesium-widget button,
+.cesium-widget input,
+.cesium-widget select {
+    font-family: Lexend, system-ui, sans-serif;
+}
+
+h1 {
+    font-size: 3.2em;
+    line-height: 1.1;
+}
+
+button {
+    border-radius: 8px;
+    border: 1px solid transparent;
+    padding: 0.6em 1.2em;
+    font-size: 1em;
+    font-weight: 500;
+    font-family: inherit;
+    background-color: #1a1a1a;
+    cursor: pointer;
+    transition: border-color 0.25s;
+}
+button:hover {
+    border-color: #646cff;
+}
+/*
+ * Only render the focus ring for keyboard users (WCAG 2.4.7).
+ * Mouse / touch activation no longer leaves a stray outline behind.
+ */
+button:focus {
+    outline: none;
+}
+button:focus-visible {
+    outline: 4px auto -webkit-focus-ring-color;
+    outline-offset: 2px;
+}
+
+/* WCAG 2.4.11 — keep focused controls visible when sticky chrome overlaps. */
+:where(
+    a,
+    button,
+    input,
+    select,
+    textarea,
+    [tabindex]:not([tabindex="-1"])
+):focus-visible {
+    scroll-margin: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px))
+        max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+}
+
+/*
+ * Honor reduced-motion for decorative transitions and animations.
+ *
+ * Essential progress indicators (loading spinners, recording pulses, etc.)
+ * MUST keep animating even when the user prefers reduced motion — otherwise
+ * the user has no way to tell the app isn't frozen (WCAG 4.1.3 Status
+ * Messages, WCAG 2.2.1 Timing Adjustable). Mark such elements with the
+ * `essential-motion` class to opt out of the global rule.
+ */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.001ms !important;
+        scroll-behavior: auto !important;
+    }
+    /*
+     * NOTE: do NOT use `revert` here — it reverts to the user-agent default
+     * (`0s` / `1`), which kills the animation just as effectively as the
+     * kill-switch above. Restore explicit, sane defaults instead. Author
+     * styles can still override with their own `!important` if needed.
+     */
+    .essential-motion,
+    .essential-motion::before,
+    .essential-motion::after {
+        animation-duration: 1s !important;
+        animation-iteration-count: infinite !important;
+    }
+}
+
+@media (prefers-color-scheme: light) {
+    :root {
+        color: #213547;
+        background-color: #ffffff;
+    }
+    a:hover {
+        color: #747bff;
+    }
+    button {
+        background-color: #f9f9f9;
+    }
+}
+
+/*
+ * Skip-to-content link (WCAG 2.4.1 — Bypass Blocks).
+ * Visually hidden but kept in sequential focus order (clip, not off-screen translate).
+ */
+.skip-to-content {
+    position: fixed;
+    top: max(0.5rem, env(safe-area-inset-top, 0px));
+    left: max(0.5rem, env(safe-area-inset-left, 0px));
+    z-index: 2147483647;
+    padding: 0.75rem 1rem;
+    background: var(--Dark-Purple, #351A84);
+    color: #ffffff;
+    border-radius: 0 0 8px 0;
+    text-decoration: none;
+    font-weight: 600;
+    outline: 4px auto transparent;
+    outline-offset: 2px;
+}
+.skip-to-content:not(:focus):not(:focus-visible) {
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    white-space: nowrap;
+    clip: rect(0, 0, 0, 0);
+    clip-path: inset(50%);
+}
+.skip-to-content:focus,
+.skip-to-content:focus-visible {
+    width: auto;
+    height: auto;
+    padding: 0.75rem 1rem;
+    margin: 0;
+    overflow: visible;
+    clip: auto;
+    clip-path: none;
+    outline-color: -webkit-focus-ring-color;
+}
+
+/* Visually hidden but available to screen readers. */
+.sr-only {
+    position: absolute !important;
+    width: 1px !important;
+    height: 1px !important;
+    padding: 0 !important;
+    margin: -1px !important;
+    overflow: hidden !important;
+    clip: rect(0, 0, 0, 0) !important;
+    white-space: nowrap !important;
+    border: 0 !important;
+}
+
+

@@ -1,0 +1,460 @@
+---
+description: Spatial audio — ambisonic overlay via Omnitone FOA, optional WebVTT captions, browser-side ambient emitter engine, JSON-driven sound_emitters.json + matching empty Xforms, playerPose dispatch. Read when working on the Spatial Sound Overlay, ambient sound, adding new sound assets, captions, or wiring new emitters.
+alwaysApply: false
+---
+
+# Spatial Audio
+
+Two sibling systems, both running in the browser against a single shared `AudioContext`:
+
+1. **Spatial Sound Overlay** — renders "recorded on spot" **ambisonic** (AmbiX FOA, 4-channel) experiences. Triggered from interactions (`spatialSound.open`), fills the screen, plays one ambisonic file at a time, and rotates the sound field with the camera.
+2. **Ambient Sound Engine** — a global pool of `PannerNode` voices driven by world-placed `sound_emitter_*` USD prims. Plays point-source ambient loops attenuated by distance with HRTF binaural panning.
+
+Everything is free and runs locally in Web Audio. Kit does **not** stream audio over WebRTC — keeping audio browser-side gives us <10 ms latency, full HRTF, and no GPU cost.
+
+---
+
+## Shared AudioContext
+
+One instance for the whole app lives in `web-viewer-sample-main/src/features/streaming/audio/sharedAudioContext.ts`. Both the overlay and the ambient engine call `getSharedAudioContext()` so we drive a single hardware output and can cross-duck between sources.
+
+Browsers start the context in `suspended` state; `unlockSharedAudioContext()` must be called inside a user gesture. `useAmbientSoundEngine` attaches pointer / key / touch listeners to `window` and unlocks on the first gesture in the session.
+
+---
+
+## 1 — Spatial Sound Overlay (ambisonic)
+
+**Component**: `features/streaming/overlays/spatialSound/SpatialSoundOverlay.tsx`
+**Hook**: `features/streaming/overlays/spatialSound/useAmbisonicPlayer.ts`
+**Library**: [Omnitone](https://github.com/GoogleChrome/omnitone) (Apache-2.0)
+
+### Pipeline
+
+```
+fetch(url) → ArrayBuffer → ctx.decodeAudioData → AudioBuffer
+              │
+              ├─ 4 channels → AudioBufferSourceNode → FOARenderer → destination
+              └─ 1 / 2 ch   → AudioBufferSourceNode → destination (no spatialization)
+```
+
+`useAmbisonicPlayer` owns the audio graph entirely — `SpatialSoundOverlay` is pure UI + gesture/orientation wiring. Channel-count detection drives the branch automatically: drop a stereo or mono file into the same `spatialSoundEntry.soundUrl` slot and it will just play.
+
+### Autoplay-when-ready
+
+Ambisonic wavs are large (typically 80–300 MB). The overlay calls `load()` immediately on mount and the user can reach the onboarding "Start" button before the fetch + `decodeAudioData` finish. To keep the start button reliable, `useAmbisonicPlayer.load()` records the in-flight task in `loadPromiseRef`, and `play()` awaits it before touching the buffer:
+
+```
+load(url) → stash promise in loadPromiseRef → resolves when buffer + FOA ready
+play()   → await loadPromiseRef → start buffer source
+```
+
+This means clicking Start (or reopening the overlay via the bubble) reliably begins playback in one click — no second click on the play button required, even when the load is still in progress.
+
+### Context — where state lives
+
+Spatial-sound overlay state lives in `SpatialSoundContext`, not `ControlContext`:
+
+```
+useSpatialSound() returns:
+  entry:         SpatialSoundEntry | null   ← the current spot's payload
+  isOpen:        boolean                    ← derived (entry !== null)
+  hasOnboarded:  boolean                    ← per-session onboarding flag
+  open(entry):   void                       ← called from bubble click + Kit interaction
+  close():       void                       ← called from overlay close button
+  markOnboarded(): void                     ← called when user clicks "Start"
+```
+
+`SpatialSoundProvider` is nested between `ControlProvider` and `ChatProvider` in `StreamOnlyWindow`'s provider stack — see `react-contexts.mdc`. Consumers reading `useSpatialSound().isOpen`: `useAmbientSoundEngine` (ducking), `CuViewLayer` (CU chrome hiding), `IconBubbleOverlay` (suppression), `ChatContext` (icon-prim hide side-effect).
+
+The Kit-side `spatialSound.open` interaction action is registered in `ChatContext` and dispatches into `useSpatialSound().open(entry)`.
+
+### Per-session onboarding
+
+`hasOnboarded` is React state on the provider — starts `false` when the provider mounts (once per streaming session), flips `true` the first time the user clicks "Start the experience". Subsequent opens skip the onboarding card:
+
+```ts
+const [phase, setPhase] = useState<'onboarding' | 'player'>(() =>
+    spatialSound.hasOnboarded ? 'player' : 'onboarding',
+);
+```
+
+- Survives overlay close → reopen (the provider stays mounted).
+- Resets on a full page reload (the provider re-mounts).
+- Not synced through `worldStateSync`. For cross-reload persistence use `sessionStorage`/`localStorage`.
+
+`Video360Context.hasOnboarded` follows the same pattern independently — onboarding one overlay does not skip the other.
+
+### Rotation
+
+Drag-to-look deltas and `useDeviceOrientation` call `player.setRotation(yawDeg, pitchDeg)`, which builds a 3×3 rotation matrix (`buildRotationMatrix3`) and forwards it to `FOARenderer.setRotationMatrix3`. The *same* deltas also go to Kit via `touchLookDelta`, so the in-viewport camera and the audio listener stay in lockstep without any extra Kit-side work.
+
+### Player teleport to the trigger Xform pose
+
+The moment the overlay enters its `player` phase (either after onboarding "Start" or on direct mount when already onboarded), the Kit player is **teleported** to the trigger Xform's authored pose — translate **and** body yaw — so the user watches the experience from the spot it was recorded at, regardless of where their avatar happened to be standing when they clicked the marker. When they close the overlay, the player's original pose (translate + body yaw + camera local yaw + camera local pitch) is restored verbatim.
+
+This means:
+
+- The ambisonic recording's "front" lines up with the world direction the marker points in (authoring convention: rotate `spatial_sound_NN` so its local **−Z** points where the recording's front-of-mic was). The listener's reference yaw 0 corresponds to that same direction.
+- The user can drag-to-look inside the overlay; that rotation is browser-side only (rotates the Omnitone listener, not the Kit camera) so closing the overlay snaps back to the *exact* original head orientation rather than wherever their drag had ended up.
+- On close, the round-trip is invisible — the player avatar lands back at the original location with the original camera direction.
+
+**Pipeline (overlay open)**:
+
+```
+SpatialSoundOverlay or SpatialSoundContext (skip-onboarding fast path)
+  → sendMessage('playerEnterXformView', { primPath })
+    → Kit IncomingMessageBridge → Events 2.0 'playerEnterXformView'
+      → CameraService.enter_xform_view(primPath)
+          read_authored_world_transform(stage, prim)
+              walks PropertyStack, skips session-layer opinions,
+              returns (translate_world, world_yaw_deg)
+          self._xform_view_saved_pose = _capture_player_pose()
+              snapshots translate + body yaw + camera local yaw/pitch
+          teleport_service.teleport_to_coordinates(tx, ty, tz, world_body_yaw_deg=yaw)
+          dispatch_to_events2('xformViewCameraReady', { primPath, ok: True })
+            → web `xformViewCameraChannel` → context resolves its prepare promise
+              → entry state flips → overlay mounts on top of new view
+```
+
+**Pipeline (overlay close)**:
+
+```
+SpatialSoundOverlay unmount cleanup
+  → sendMessage('playerExitXformView', {})
+    → CameraService.exit_xform_view()
+        _restore_player_pose(saved)
+            writes translate + body yaw on the player prim
+            writes camera local yaw + pitch on the camera prim
+            cct.teleport(...) syncs the physics capsule
+            dispatch_to_events2('younite.player.immediateViewAngles', { yaw, pitch })
+                resyncs PlayerInputController so the next swipe doesn't undo the restore
+        clears self._xform_view_saved_pose
+```
+
+**Why teleport instead of switching to a per-Xform camera?** An earlier iteration baked dedicated `UsdGeom.Camera` prims under `/World/_xform_view_cameras/` and switched the viewport between them via `switch_to_fixed_camera`. That looked elegant but every renderer/input system in Kit is wired to the active camera prim, so the swap caused a long tail of side-effects: black sky on the temp camera (atmospheric scattering didn't compose against it), broken drag-to-look (touch-look was bound to the player camera), spurious `fixedCameraStatus` events, and a visible flicker as Hydra rebound the camera transform. Teleport keeps the player camera bound throughout — sky, drag-look, FOV, fog, post-processing all keep working unmodified — and just moves it where the recording was made. Same flow as `teleport_to_spawn_point` and bird-eye → first-person directions.
+
+**Why read `read_authored_world_transform` instead of `ComputeLocalToWorldTransform`?** The `interactions_extension` icon-spin loop continually overwrites `xformOp:rotateXYZ` for iconGroup markers (headphones, goggles, ...) into the **session** layer so the visible model spins. Reading the composed transform would inherit whatever spin sample happened to be live the frame the click arrived, so the player would land at a slightly different yaw on every open. The helper walks `GetPropertyStack()` and picks the strongest non-session opinion — so the user always lands at the *authored* yaw, not whichever rotation the spin happened to be at.
+
+**Forward = local −Z** is the same convention `marker_service._show_direction_line` uses to draw the dev arrow over a marker — whatever direction an author sees the arrow point in the USD-edit visualizer is exactly where the player will face after the teleport.
+
+If the spatial sound's "front" feels rotated 180° (or another fixed offset) relative to the world after authoring, fix the **Xform** rotation in `spatial_sound_locations_layer.usda` rather than adding offsets in code — the convention is intentionally that what you see in the USD-edit direction arrow is what the player will face. (For batch-fixing many existing markers, the USD-edit Markers tab nudges 90° at a time.)
+
+### Gating the overlay on `xformViewCameraReady`
+
+The overlay only paints **after** Kit confirms the player is at the new pose. Without gating, the overlay can mount on top of the previous view because the WebRTC video stream lags the data-channel "open" message. The context's `open()` (skip-onboarding fast path) and the overlay's `handleStartExperience` (first-open Start tap) both:
+
+1. Dispatch `playerEnterXformView`,
+2. Subscribe to the `xformViewCameraReady` channel for an ack matching `primPath`,
+3. Resolve their pending promise on ack arrival (or after a 1.2 s safety timeout — better to show the overlay with a brief mismatch frame than to wedge the UI),
+4. Then mount the overlay / flip phase to `player`.
+
+Hot-swap (clicking another marker while an overlay is already open) is handled entirely by the context: a fresh `open()` cancels the previous prepare and dispatches a new enter for the next marker. CameraService keeps the *first* saved pose intact across re-enters, so the eventual exit always restores the truly-original location — never the previous marker.
+
+**Matrix convention — important.** `buildRotationMatrix3` produces the **world-to-listener** rotation in Three.js Y-up convention (`Ry(yaw) * Rx(pitch)`), and the 9 elements are flattened **column-major**. Omnitone reads `setRotationMatrix3` column-major (you can verify by reading `FOARenderer.setRotationMatrixFromCamera` in `node_modules/omnitone/build/omnitone.esm.js` — it inverts a Three.js camera matrix and feeds `.elements` straight in). If this gets switched to row-major flattening the matrix is silently transposed, which is the *inverse* rotation, and the soundfield rotation feels almost imperceptible (it cancels out the head deltas instead of compensating for them).
+
+If an axis feels inverted after swapping in a different AmbiX file, flip the corresponding sign in the drag handler (`SpatialSoundOverlay.handleVisDragMove`) — keep `buildRotationMatrix3` as the canonical world-to-listener rotation.
+
+### Authoring checklist for a new ambisonic experience
+
+Spatial sound triggers use the **iconGroup template pattern** — one entry in `interactions.json` fans out across every matching Xform, with the wav file resolved by leading number prefix in the prim name. To add a new spot:
+
+1. Drop the `.wav` (4 channels, 48 kHz recommended) into `kit-app-template-main/source/data/nucleus/sounds/spatial/`. The filename **must** start with `NN_` where `NN` is a unique numeric prefix (e.g. `04_press_room.wav`). The folder is pulled from Nucleus by the existing `Sounds (CU)` sync rule (recursive, `/Projects/CU/Sounds/` → `nucleus/sounds/`); new files appear locally on the next `pullnucleus.bat` run.
+2. Add an empty `Xform` named `spatial_sound_NN` to `kit-app-template-main/source/data/scenes/sublayers/spatial_sound_locations_layer.usda` at the world position where the experience should trigger. The trailing number must match the wav prefix exactly (leading zeros preserved). This sublayer is the canonical home for spatial-sound trigger Xforms — do **not** leave them in `usd_edits.usda` (that's the dev edit-extension scratch layer).
+3. Add a per-location i18n block to all four locale files (`en.json`, `sv.json`, `fr.json`, `es.json`) under `interactions.icon_spatial_sound_NN` with `greeting`, `title`, `subtitle`, `soundTitle` strings. **`soundTitle` is the one displayed in the overlay header and inside the bubble's "Listen to spatial sound: …" label** (`title` is used as fallback). `greeting` and `subtitle` are kept on the synthesised entry for future variants but are not currently rendered for spatial-sound bubbles.
+4. **Optional** — drop a `NN_<name>.vtt` next to the wav (same `NN` prefix) to enable closed captions. See "Captions" below.
+5. Done — no `interactions.json` edit needed. The single `icon_spatial_sound` template entry there auto-discovers the new Xform, attaches the headphones model + Collider via session-layer override, and synthesises the pointer/click pair on next stage load.
+
+The wav (and the optional `.vtt`) are resolved via the Vite `@nucleus-sounds` glob on the frontend — no extra config there either.
+
+### i18n strings — fixed vs. per-location
+
+| Scope | Path | Notes |
+|---|---|---|
+| Fixed (overlay chrome) | `spatialSound.label`, `spatialSound.onboarding.{title,description,descriptionDesktop,startButton}` | Same text for every spatial-sound experience |
+| Fixed (bubble label) | `spatialSound.listenButton` | Templated string `"Listen to spatial sound: {{title}}"`. Rendered by `IconBubbleOverlay` only when `cfg.mediaType === 'spatialSound'`; the templated `{{title}}` is filled with `t(cfg.soundTitle) \|\| t(cfg.title)`. Other bubble types continue to use their `cfg.greeting`. |
+| Per-location | `interactions.icon_spatial_sound_NN.{greeting,title,subtitle,soundTitle}` | Synthesised by the iconGroup expander; `soundTitle` is the canonical display string |
+
+Keep all four locales in sync when editing — every key referenced by the synthesised entries must resolve in `en/sv/fr/es.json`.
+
+**Rendering rule (overlay header):** `SpatialSoundOverlay` displays `t(entry.soundTitle) || t(entry.title)`. Both fields arrive at the overlay as i18n keys (e.g. `interactions.icon_spatial_sound_02.soundTitle`), not as literal text — the overlay is responsible for translating them. Don't pre-resolve them in the bubble or elsewhere.
+
+### Captions (optional)
+
+Spatial-sound experiences can ship with optional **WebVTT** captions (subtitles describing dialogue, narration, ambient cues, etc.). Captions are entirely optional — most ambisonic recordings have none, and locations without a `.vtt` simply render the overlay with the CC button disabled.
+
+**Authoring** — drop a sidecar VTT next to the `.wav`, with the same `NN_` numeric prefix:
+
+```
+source/data/nucleus/sounds/spatial/
+  03_scandinavium_foyer.wav
+  03_scandinavium_foyer.vtt   ← optional sidecar; same NN_ prefix
+```
+
+The iconGroup expander (`_index_files_by_prefix`) indexes audio extensions and `.vtt` separately, then injects a `captionsUrl` field on the synthesised iconConfig only when a sidecar is found. This flows through the existing `spatialSound.open` payload → `SpatialSoundEntry.captionsUrl` and into `useAmbisonicPlayer.load(url, captionsUrl?)`.
+
+**Frontend pipeline** — `useAmbisonicPlayer` fetches the VTT in parallel with the audio decode, parses it once with `parseVtt()` (a small in-house parser; see "Why a hand-rolled parser?" below), and exposes `hasCaptions` + `activeCueText` on the hook API. The existing rAF tick that updates `currentTime` also runs `findActiveCue()` (binary search) to update the active cue text — no extra timers, and the cue is re-evaluated on pause / seek so the readout matches the visible playhead even with the rAF loop stopped.
+
+**UI behaviour** — `SpatialSoundOverlay` renders captions only while `phase === 'player' && hasCaptions && captionsOn && activeCueText`. The CC button:
+- **No `.vtt`** → button is rendered but `disabled` (greyed out, like the videobook player's CC button). No caption row appears.
+- **VTT present, captions on (default)** → button shows the active "lit" state (`ssp-ctrl-btn--active`); a black-on-white caption strip sits between the rings and the bottom controls.
+- **VTT present, captions off** → button reverts to its outline state, caption strip hidden. State is overlay-local and resets on each open.
+
+Caption strip styling lives in `SpatialSoundOverlay.css` (`.ssp-captions` / `.ssp-caption-line`) and uses `pointer-events: none` so the drag-to-look gesture passes straight through.
+
+**VTT format** — the parser supports the subset we need: `HH:MM:SS.mmm --> HH:MM:SS.mmm` (hours optional), one or more text lines per cue, blank line separator, optional cue identifiers, and inline tag stripping (`<v Speaker>`, `<i>`, etc.). Cue settings (positioning) and STYLE/REGION blocks are ignored — the overlay owns layout. Multi-line cue text is split on `\n` and each line rendered as a separate strip element. NOTE blocks and the `WEBVTT` header are skipped automatically.
+
+**Why a hand-rolled parser?** The overlay drives the audio graph directly via Web Audio (no `<audio>` / `<video>` element), so we cannot lean on the browser's native `<track>` machinery for cue scheduling. A 90-line parser + binary-search active-cue lookup (`parseVtt.ts`) is cheaper than pulling in `vtt.js` and gives us exact control over what tags are stripped vs. preserved.
+
+**Adjusting placement / styling** — edit `.ssp-captions` (position) and `.ssp-caption-line` (typography) in `SpatialSoundOverlay.css`. Caption **font size** is shared with the videobook and 360° player: `VideoBookSettingsContext.captionSizeIndex` → `data-caption-size` on the caption strip, implementing the Figma steps in `video-playback.mdc` § Caption size. The short-viewport media query adjusts padding and strip position only, not a separate type scale.
+
+**Translated captions** — for a multi-language deployment, ship one VTT per language under a per-locale subfolder (e.g. `nucleus/sounds/captions/en/03_scandinavium_foyer.vtt`) and resolve the locale at expansion time in `_expand_icon_group_entry` (read `omni.kit.app` locale or accept a query string). Out of scope for the current single-VTT-per-location convention but the indexer + `captionsUrl` plumbing are already locale-agnostic.
+
+### iconGroup template anatomy
+
+The single template entry in `interactions.json`:
+
+```json
+{
+  "id": "icon_spatial_sound",
+  "interactionType": "iconGroup",
+  "scene": ["main_scene", "main_scene_light"],
+  "primNamePattern": "spatial_sound_*",
+  "trigger": { "type": "proximity", "radiusMeters": 3, "activation": "always" },
+  "position": { "type": "xform", "positionOffset": [0, 50, 0] },
+  "iconConfig": {
+    "iconId": "headphones",
+    "iconName": "Headphones",
+    "iconImage": "headphones_avatar.svg",
+    "mediaType": "spatialSound",
+    "iconAsset": "interaction_icons/headphones.usd",
+    "soundsDir": "${NUCLEUS_SPATIAL_SOUNDS_FOLDER}",
+    "i18nKeyPattern": "interactions.{id}"
+  }
+}
+```
+
+**Where the audio path is configured:**
+
+- **Single source of truth — `.env`** — `NUCLEUS_SPATIAL_SOUNDS_FOLDER` (default `nucleus/sounds/spatial/`) is the one variable to edit when files move. `interactions.json` references it via `${NUCLEUS_SPATIAL_SOUNDS_FOLDER}` inside `iconConfig.soundsDir`; `ConfigLoader._expand_env()` in `services/kit_services/config_loader/loader.py` substitutes `os.environ` at scan time. If the var is unset (e.g. fresh clone with no `.env`), the loader falls back to a hardcoded default registered in `constants.py` (`ENV_FALLBACKS`) and prints a warning. Both `startstream.bat` and `startstream_prod.bat` forward the variable to the Kit child process via their `set X=%X%` chain — adding new env-var-driven `iconConfig` paths means appending one more `set` to both launchers and registering a fallback in `ENV_FALLBACKS`.
+- **Web side — no matching var needed** — the Vite alias `@nucleus-sounds` in `web-viewer-sample-main/vite.config.ts` points at the audio root (`nucleus/sounds/`). The three globs that consume it (`SpatialSoundOverlay.tsx`, `ambientSoundEngine.ts`, `mediaRegistryUtils.ts`) all use the **recursive** pattern `@nucleus-sounds/**/*.{ext,…}` and look files up by basename. So any subfolder layout works (`spatial/`, `ambient/`, `ui/`, …) as long as filenames stay unique across subfolders. Moving the spatial folder doesn't require a Vite restart or alias change.
+- **Nucleus pull** — the `Sounds (CU)` rule in `kit-app-template-main/nucleus_sync.json` (recursive) syncs `/Projects/CU/Sounds/` → `nucleus/sounds/`. Adding a new subfolder on the Nucleus server is picked up automatically on the next `pullnucleus.bat` run.
+
+So the **only edit needed when files move under `nucleus/sounds/`** is the `.env` variable. The web side discovers everything under the alias root automatically; the cross-reference comments in `.env`, `interactions.json` and the launcher scripts make the contract visible to future maintainers.
+
+Expansion is handled by `_expand_icon_group_entry()` in `younite.interactions_extension`:
+- `primNamePattern` — fnmatch glob applied to leaf prim names under `/World` (recursive). Warns if no matches are found, but only after the stage has children — silent during the early pre-open load pass.
+- `iconAsset` — path relative to `source/data/`; attached to each matched Xform via session-layer override (idempotent on hot-reload). Structural prim creation goes through raw `Sdf` so the parent primSpec exists before the child Cube is defined; attribute / schema authoring then runs through `UsdGeom` + `UsdPhysics` under an `EditContext`. The bare `spatial_sound_NN` Xforms in the sublayer thus stay free of payload boilerplate; the headphones mesh + invisible Collider appear at runtime.
+- `soundsDir` — directory (relative to `source/data/`) scanned for `NN_*` audio files (`.wav/.mp3/.ogg/.flac/...`); the file whose `NN` matches the trailing digits of the prim name is bound to that spot. The indexer filters by extension, so sidecar `.vtt` captions in the same folder don't collide with the audio match.
+- `captionsDir` — *optional*; defaults to `soundsDir`. Directory scanned for sidecar `.vtt` captions with the same `NN_` prefix as the audio file. When a match is found, `captionsUrl` is added to the synthesised iconConfig; otherwise the field is omitted and the overlay's CC button stays disabled.
+- `i18nKeyPattern` — `{id}` placeholder is replaced with `icon_<primName>`, so e.g. `spatial_sound_02` → `interactions.icon_spatial_sound_02.{greeting,title,subtitle,soundTitle}`.
+
+The same template will serve videobooks later by switching `mediaType` to `"videobook"`, swapping `soundsDir` for `videosDir`, and using a video icon asset.
+
+**Layer hygiene:** A given `spatial_sound_NN` Xform must be defined in **exactly one** layer — `spatial_sound_locations_layer.usda`. Authoring the same prim in `usd_edits.usda` (or any other stronger sublayer) will silently win composition and override the position you set in the canonical layer. Symptom: the headphones model spawns at one elevation while the projectable arrows render at another, because the marker service caches the "wrong" composed value at register time. If you see this divergence, search every sublayer for the prim name first.
+
+### Performance
+
+Omnitone FOA decoding uses two small HRIR buffers (baked into the library, ~50 KB). Decode happens once on first load. Each playback instantiates a single `AudioBufferSourceNode` — GC is bounded.
+
+---
+
+## 2 — Ambient Sound Engine (emitter pool)
+
+**Engine**: `features/streaming/audio/ambientSoundEngine.ts` (module-level singleton)
+**Hook**: `features/streaming/hooks/useAmbientSoundEngine.ts` (mounted in `StreamOnlyWindowInner`)
+**Kit extension**: `younite.sound_emitter_extension`
+
+### Dormant by default
+
+With no entries in `source/data/sound_emitters.json` (or the file missing entirely), the system:
+
+- publishes `worldStateSync.soundEmitters: []`
+- dispatches no `playerPose` events (gated on non-empty emitter list inside `PlayerLocationService`)
+- builds no `PannerNode` voices
+- does not touch the `AudioContext` beyond the shared singleton
+
+Adding the first JSON entry **plus its matching Xform** activates the whole pipeline on the next scene reload.
+
+### Data flow
+
+```
+Kit                                              Web
+────                                             ────
+sound_emitters.json (config)                     worldStateHandlers.ts
+  + matching Xforms in /World                      └─ on soundEmitters → AmbientSoundEngine.setEmitters()
+sound_emitter_extension on stage.opened          ambientSoundEngine.ts
+  / player.ready / soundEmitters.request:          ├─ diff emitter ids → add / dispose voices
+  loads JSON, looks up each Xform by name,         ├─ decode file once, cache AudioBuffer
+  reads world transform + positionOffset           ├─ PannerNode per voice (HRTF, inverse attenuation)
+  → soundEmittersStatus(emitters: [...])         └─ masterGain (ducked by spatial overlay)
+WorldStateSyncService observes
+  → worldStateSync.soundEmitters                 worldStateHandlers.ts
+PlayerLocationService.update (~every frame)        └─ on playerPose → updateListener(pos, forward, up)
+  if has emitters and throttle + threshold pass:
+  → playerPose({ pos, forward, up })
+```
+
+### Authoring — JSON entry + matching empty Xform
+
+The JSON file at `kit-app-template-main/source/data/sound_emitters.json` is the source of truth for **which** emitters exist and **how** they sound. The USD scene only owns **where** they are — every JSON entry must have a matching empty Xform whose **leaf name equals the entry's `id`** (recursive search under `/World`, so the Xform can be parented anywhere).
+
+JSON schema:
+
+| Field            | Required | Default | Meaning |
+|------------------|----------|---------|---------|
+| `id`             | yes      | —       | Unique id; **also the Xform name** the loader searches for under `/World`. Any name works — pick something descriptive (`fountain_main`, `npc_radio_guard_walking`, etc.). Xforms with no matching JSON entry are simply ignored, the same as every other JSON-referenced Xform feature in the project. |
+| `file`           | yes      | —       | Filename inside `source/data/nucleus/sounds/` (resolved via Vite's `@nucleus-sounds` glob). |
+| `scene`          | no       | all     | Array of scene stems where this emitter is active (matches the same shape as `interactions.json`). Omit or set `null` for "all scenes". |
+| `radius`         | no       | 2000    | Max audible distance (scene units = cm). |
+| `refDistance`    | no       | 200     | Distance where attenuation starts. |
+| `volume`         | no       | 1.0     | Per-emitter gain (clamped 0..1 web-side). |
+| `loop`           | no       | true    | Loop the clip. |
+| `startDelaySec`  | no       | 0.0     | Stagger multiple emitters so they don't all start in phase. |
+| `positionOffset` | no       | [0,0,0] | Optional `[x, y, z]` cm offset added to the prim's world transform — handy when the Xform is parented to a tall NPC and you want the source at chest height. |
+
+Example `sound_emitters.json`:
+
+```json
+{
+  "version": 1,
+  "emitters": [
+    {
+      "id": "fountain_main",
+      "file": "fountain_loop.wav",
+      "scene": ["main_scene", "main_scene_light"],
+      "radius": 1500,
+      "refDistance": 300,
+      "volume": 0.8
+    },
+    {
+      "id": "npc_radio_guard_walking",
+      "file": "radio_chatter_loop.wav",
+      "radius": 600,
+      "refDistance": 100,
+      "volume": 0.5,
+      "positionOffset": [0, 100, 0]
+    }
+  ]
+}
+```
+
+Matching Xforms (in any sublayer, anywhere under `/World`):
+
+```usda
+# Static fountain — sits in /World/Foyer/fountain_main
+def Xform "fountain_main"
+{
+    double3 xformOp:translate = (-1200, 150, -3400)
+    uniform token[] xformOpOrder = ["xformOp:translate"]
+}
+
+# Walking-guard radio — parented under the NPC so it follows automatically:
+# /World/NPCs/Guard_01/npc_radio_guard_walking
+over "Guard_01"
+{
+    def Xform "npc_radio_guard_walking"
+    {
+        double3 xformOp:translate = (0, 0, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+}
+```
+
+**Lookup direction is one-way:** the loader walks JSON entries and looks for a matching Xform — Xforms not mentioned in JSON are silently ignored (same convention as every other JSON-referenced Xform feature in the project). The reverse is warned: a JSON entry whose `id` matches no Xform logs `[sound_emitter] no Xform named '<id>' found under /World — skipping`, so authoring typos surface immediately.
+
+### Ducking
+
+When the Spatial Sound Overlay opens (`useSpatialSound().isOpen === true`), `useAmbientSoundEngine` calls `setMasterGain(0.15)` to get out of the way of the ambisonic experience, and restores `1.0` on close. `setMasterGain` uses `setTargetAtTime` for a short smooth ramp.
+
+### `playerPose` dispatch — rate limiting
+
+`PlayerLocationService` dispatches `playerPose` at most every 50 ms (20 Hz) and only when either:
+
+- position moved ≥ 2 cm, or
+- forward vector rotated ≥ 0.5° (dot-product threshold)
+
+The gate is **off by default** and flips on when `PlayerLocationService` observes a non-empty `soundEmittersStatus` payload. This keeps the data channel quiet on scenes without emitters.
+
+### Voice lifecycle
+
+`ambientSoundEngine` diffs the incoming emitter list by `id`:
+
+- new id → `PannerNode` + `GainNode` created, buffer fetched/decoded (cached), `AudioBufferSourceNode.start()` when the shared context is unlocked
+- updated id → position / radius / volume applied with `setTargetAtTime` (no buffer reload)
+- removed id → `source.stop()`, all nodes disconnected
+
+Failed decodes mark the voice `failed = true` so we don't spam the console every `worldStateSync`.
+
+---
+
+## Extending
+
+### New ambisonic assets
+
+No code changes — just drop the `.wav` in `source/data/nucleus/sounds/` (filename prefixed `NN_`), add the matching `spatial_sound_NN` Xform to `spatial_sound_locations_layer.usda`, and add the `interactions.icon_spatial_sound_NN` block to all four locales. The iconGroup template auto-discovers it on the next stage load. Drop a `NN_<name>.vtt` next to the wav (same `NN`) for optional captions.
+
+### New ambient emitter
+
+Two steps:
+
+1. Add a JSON entry to `kit-app-template-main/source/data/sound_emitters.json` with the chosen `id`, `file`, and any tuning.
+2. Add a matching empty `Xform` in any sublayer (or parented under an NPC) whose **leaf name equals the JSON `id`**. A dedicated `sounds_layer.usda` sublayer works well for static emitters; for dynamic emitters parent under whatever should drive their position. The Xform name is free-form — only the match between JSON `id` and prim leaf name matters.
+
+Reload the scene. The extension logs `[sound_emitter] published N emitter(s)`. If you see `no Xform named '<id>' found under /World — skipping`, the JSON id and the Xform name don't match.
+
+To re-trigger a publish without reopening the scene, dispatch the `soundEmitters.request` event (handy after editing the JSON).
+
+### Adjust ambisonic rotation axes
+
+Flip the relevant `dx` / `dy` sign in `SpatialSoundOverlay.handleVisDragMove` (and the matching device-orientation deltas in `useDeviceOrientation`). Treat `buildRotationMatrix3` as fixed — it's the canonical Three.js world-to-listener matrix and changing it almost always means re-deriving the column-major flatten too.
+
+### Different attenuation model
+
+`ambientSoundEngine._spawnVoice` / `_applyEmitterSettings`. All six `PannerNode` parameters (`panningModel`, `distanceModel`, `refDistance`, `maxDistance`, `rolloffFactor`, cone angles) are set in one place.
+
+### Make ambient emitters orient-aware
+
+`PannerNode` supports directional cones (`orientationX/Y/Z`, `coneInnerAngle`, `coneOuterAngle`). Read the emitter prim's rotation from the local-to-world matrix in `emitter_service._world_position` (split into a position+forward helper), thread it through the JSON schema (e.g. `coneInnerAngle`, `coneOuterAngle`) and the browser engine.
+
+---
+
+## Key files
+
+| File | Purpose |
+|---|---|
+| `web-viewer-sample-main/src/features/streaming/audio/sharedAudioContext.ts` | Single `AudioContext` + unlock helper |
+| `web-viewer-sample-main/src/features/streaming/overlays/spatialSound/useAmbisonicPlayer.ts` | Ambisonic player (Omnitone FOA + fallback); `loadPromiseRef` keeps `play()` reliable while large wavs are still decoding; loads + active-cue tracks optional VTT captions and exposes `hasCaptions` / `activeCueText` |
+| `web-viewer-sample-main/src/features/streaming/overlays/spatialSound/SpatialSoundOverlay.tsx` | Overlay UI + drag / orientation → `setRotation`; renders `t(entry.soundTitle) \|\| t(entry.title)` in the header; renders the caption strip and wires the CC toggle |
+| `web-viewer-sample-main/src/features/streaming/overlays/spatialSound/SpatialSoundOverlay.css` | Overlay styling, including `.ssp-captions` / `.ssp-caption-line` and the CC button's active / disabled states |
+| `web-viewer-sample-main/src/features/streaming/overlays/spatialSound/parseVtt.ts` | Minimal WebVTT parser + `findActiveCue` binary search; the overlay drives audio via Web Audio so we can't lean on the browser's native `<track>` machinery |
+| `web-viewer-sample-main/src/features/streaming/overlays/iconBubble/IconBubbleOverlay.tsx` | Renders the "Listen to spatial sound: …" bubble for `mediaType === 'spatialSound'` (uses `spatialSound.listenButton` i18n key); forwards `captionsUrl` into the spatial-sound entry |
+| `web-viewer-sample-main/src/features/streaming/audio/ambientSoundEngine.ts` | Emitter voice pool, decode cache, listener update |
+| `web-viewer-sample-main/src/features/streaming/hooks/useAmbientSoundEngine.ts` | Engine lifecycle, gesture unlock, overlay ducking |
+| `web-viewer-sample-main/src/features/streaming/hooks/eventHandlers/worldStateHandlers.ts` | Routes `soundEmitters` + `playerPose` into the engine |
+| `web-viewer-sample-main/src/types/omnitone.d.ts` | Ambient type declarations for the untyped `omnitone` package |
+| `kit-app-template-main/source/data/sound_emitters.json` | Authoring source of truth — defines which emitters exist and how they sound |
+| `kit-app-template-main/source/extensions/younite.sound_emitter_extension/**` | Loads JSON, resolves world position from matching Xforms, dispatches `soundEmittersStatus` |
+| `kit-app-template-main/source/extensions/younite.usd_viewer_stage_core_extension/.../world_state_sync_service.py` | Folds `soundEmitters` into the `worldStateSync` snapshot |
+| `kit-app-template-main/source/extensions/younite.usd_viewer_player_core_extension/.../player_location_service.py` | Throttled `playerPose` dispatch, gated on emitter count |
+| `kit-app-template-main/source/extensions/younite.usd_viewer_stage_core_extension/.../services/kit_services/camera_service.py` | `enter_xform_view()` / `exit_xform_view()` + `_capture_player_pose()` / `_restore_player_pose()` — teleports player to the marker pose for the overlay session and restores their original pose on close. Dispatches `xformViewCameraReady` ack on enter so the web side can gate overlay mount on the teleport completing. |
+| `kit-app-template-main/source/extensions/younite.usd_viewer_stage_core_extension/.../services/core_services/usd_xform_helpers.py` | `read_authored_world_transform()` — returns `(translate_world, yaw_deg)` from the strongest **non-session** opinions in the property stack, so the iconGroup spin loop's session-layer rotation overrides don't corrupt the teleport target yaw. |
+| `kit-app-template-main/source/extensions/younite.usd_viewer_stage_core_extension/.../services/core_services/feature_commands_service/service.py` | `_on_player_enter_xform_view` / `_on_player_exit_xform_view` — IncomingMessageBridge → CameraService wiring. |
+| `web-viewer-sample-main/src/features/streaming/overlays/xformViewCameraChannel.ts` | Pub/sub channel for the Kit→web `xformViewCameraReady` ack; subscribed by both contexts and by `SpatialSoundOverlay.handleStartExperience` to gate the overlay mount on the teleport landing. |
+| `kit-app-template-main/source/extensions/younite.messaging_core_extension/.../extension.py` | Registers `soundEmittersStatus` + `playerPose` + `xformViewCameraReady` outbound |
+| `kit-app-template-main/source/apps/younite.usd_viewer_streaming_base.kit` | Loads both `younite.interactions_extension` (spatial sound overlay trigger) and `younite.sound_emitter_extension` (ambient emitters) — both ship in production |
+
+Both spatial-audio systems are live in production:
+
+- **Spatial Sound Overlay** — `interactions_extension` reads the shared `interactions.json` (which contains the `icon_spatial_sound` iconGroup template), attaches headphones + Colliders to every `spatial_sound_*` Xform from `spatial_sound_locations_layer.usda` (a sublayer of `main_scene.usda`), and dispatches `spatial_sound.open` on click. Launching `startstream_prod.bat` gives a fully working ambisonic overlay with captions.
+- **Ambient Sound Engine** — `sound_emitter_extension` is active but dormant: `sound_emitters.json` starts empty, so no `PannerNode` voices spin up and no `playerPose` dispatch fires. Adding the first JSON entry plus its matching Xform activates the pipeline automatically on the next scene load.
+
+---
+
+## Related topics
+
+- **360° video** (sibling overlay; same iconGroup template, same per-session onboarding pattern, same caption pipeline — different render path) → `360-video.mdc`
+- **React Contexts** (where `SpatialSoundProvider` sits in the provider hierarchy, when to create dedicated narrow contexts) → `react-contexts.mdc`
+- **Interactions framework** (iconGroup expansion, projectable overlays, action registry) → `interactions.mdc`
+- **Localization** (i18n key conventions for interactions) → `localization.mdc`
+- **USD sublayers** (where `spatial_sound_locations_layer.usda` slots in) → `sublayers.mdc`
+- **World state sync** (why `hasOnboarded` is **not** synced through Kit) → `world-state-sync.mdc`

@@ -1,0 +1,414 @@
+---
+description: RouteComposer — single A-to-B walkable pathfinder for every route in the engine; spans NavMesh islands and the OSM city graph; threads cost dicts (camera/sound), via-points, and stale cancellation through one compose() entry point; route engine has no separate raw-NavMesh / multi-segment / measure branches
+globs:
+  - "**/route_composer*"
+  - "**/route_composer/**"
+  - "**/route_engine*"
+  - "**/feature_commands_service*"
+  - "**/feature_commands_service/**"
+  - "**/navmesh_route_extension/extension*"
+alwaysApply: false
+---
+
+# RouteComposer
+
+Single A → B walkable pathfinder used by **every** route in the engine — `player`, `default`, `seat_nav`, `find_my_seat`, `find_toilets`, `quiet_zone_nav`, `poi_nav` (bird-eye). Given two world positions, produces one `ComposedRoute` covering any combination of NavMesh "islands" and the OSM city graph: same-island NavMesh, NavMesh → OSM, OSM → NavMesh, OSM → OSM, or cross-island NavMesh → OSM → NavMesh.
+
+The route engine no longer has separate "raw NavMesh", "multi-segment via-points", or "measure breakdown" branches — those behaviours are now selected by passing the right keyword arguments to `compose()`:
+
+| Behaviour | How |
+|---|---|
+| Crowd / quiet-zone cost-aware NavMesh leg | `camera_area_costs={...}`, `sound_area_costs={...}` |
+| Multi-segment via-point legs (POI, search) | `via_points=[(x,y,z), …]` |
+| Auto corridor routing for intra-island routes | `enable_corridor_routing=True` (bird-eye opt-in) |
+| Cancel mid-compose (point-and-click thread) | `is_stale=lambda: my_gen != self._gen` |
+| Base / actual / crowd-delta / sound-delta UI | `compose_with_measure(...)` wrapper in `measure.py` |
+
+There is no `_compute_via_composer` / `_compute_multi_segment` / `compute_route_measure` engine branch. One pathfinder, one configurable surface.
+
+**Home**: `kit-app-template-main/source/extensions/younite.navmesh_route_extension/younite/navmesh_route_extension/services/kit_services/route_composer/`
+
+| Submodule | Role |
+|---|---|
+| `composer.py` | `RouteComposer` class + private case handlers (`_same_navmesh`, `_navmesh_to_osm`, `_osm_to_navmesh`, `_osm_to_osm`, `_cross_navmesh`, `_finalize`) and the per-call `_ComposeContext` options bundle |
+| `osm.py` | `OsmLegPlanner` — `OsmGraphService` wrapper + cached `/World/OSM_Roads` offset + Dijkstra leg + forward-bias probe |
+| `measure.py` | `compose_with_measure()` — runs `compose()` 1-3 times to build the base / actual / crowd-delta / sound-delta breakdown the seat / find-toilets / quiet-zone UI consumes |
+| `types.py` | `ComposedLeg` / `ComposedRoute` dataclasses + tunable constants |
+| `geometry.py` | Shared math helpers (`xz_dist2`, `is_segment_on_navmesh`, `dedupe_close`, `trim_leading_backtrack`, `trim_trailing_backtrack`) |
+| `registry.py` | Process-wide singleton: `get_route_composer()` / `set_route_composer()` / `set_route_service()` |
+| `__init__.py` | Re-exports the public API |
+
+---
+
+## Why a single pathfinder
+
+Earlier the route engine had four parallel branches doing roughly the same job (raw `calculate_path_points`, multi-segment via-points, `compute_route_measure`, and the composer fast-path) — every bird-eye bug had to be re-fixed in the "normal" code paths and vice versa. The user explicitly called this out: "we are STILL using separate solutions and building duplicate code." The unification collapses those four into one entry point so a fix in `RouteComposer` benefits every route type.
+
+Behavioural mapping after the unification:
+
+| Route id | `via_points` | `enable_corridor_routing` | `is_stale` | Costs | Measure |
+|---|---|---|---|---|---|
+| `player` (point-click) | None | False | yes (worker thread) | merged | None |
+| `default` | None | False | None | merged | base/actual |
+| `seat_nav` / `find_my_seat` | corridor pts (extension.py) | False | None | merged | base/actual/delta |
+| `find_toilets` / `quiet_zone_nav` | corridor pts | False | None | merged | base/actual/delta |
+| `poi_nav` (bird-eye) | None (composer auto-corridor) | True | None | merged | base/actual/delta |
+
+The composer doesn't know about route ids — only about the options dict. The route engine maps each route to the right combination.
+
+---
+
+## Data types
+
+```python
+@dataclass
+class ComposedLeg:
+    kind: str               # "navmesh" or "osm"
+    island: Optional[str]   # e.g. "scandinavium"; None for OSM legs
+    points: List[Vec3]      # >= 2 world-space points
+    edge_classes: List[str] # len == len(points) - 1; "navmesh"/"bridge" for NavMesh legs, OSM class strings for OSM legs
+
+@dataclass
+class ComposedRoute:
+    legs: List[ComposedLeg]
+    polyline: List[Vec3]          # flat stitched polyline (shared boundaries deduped)
+    segment_speeds: List[float]   # per-segment speed multiplier; len == len(polyline) - 1
+    segment_classes: List[str]    # per-segment path class parallel to segment_speeds
+    start_island: Optional[str]
+    end_island: Optional[str]
+```
+
+**Convenience properties** (computed on read):
+
+| Property | Purpose |
+|---|---|
+| `has_navmesh` / `has_osm` | Predicates for quick branching |
+| `navmesh_points` / `osm_points` | All NavMesh / OSM points concatenated — feeds the two `BirdEyeRouteProjector` channels |
+| `distance_cm` / `distance_meters` | Sum of XZ segment lengths — used for `navmeshRouteMeasure` |
+| `estimated_time_seconds` | Honours `segment_speeds` and `DEFAULT_WALK_SPEED_M_PER_S` |
+
+### `segment_classes`
+
+Parallel to `segment_speeds`, one class string per segment. Possible values:
+
+| Class | Meaning |
+|---|---|
+| `navmesh` | NavMesh leg segment |
+| `bridge` | Synthetic segment connecting a NavMesh leg to an adjacent OSM leg (the entrance → first-OSM-node handover) |
+| `pedestrian` / `steps` / `residential` / `arterial` / `highway` | OSM edge class — matches `OsmGraphService.path_to_edge_classes()` |
+
+`PointClickAutoMover` consumes this channel to detect path-class transitions at runtime (e.g. `navmesh → bridge → pedestrian → residential`) and dispatches `playerPathClassChange { prev, next, segIdx, routeId }`. See `osm-navigation.mdc` for the event contract.
+
+---
+
+## Public API
+
+```python
+composer = get_route_composer()  # singleton, mode-cache aware
+
+# Plain compose — used by player route (worker thread), bird-eye preview,
+# pause + free-walk recompose, etc.
+route = composer.compose(
+    start_world,
+    end_world,
+    *,
+    camera_area_costs=None,         # crowd costs
+    sound_area_costs=None,          # quiet-zone costs
+    via_points=None,                # explicit corridor via-points
+    enable_corridor_routing=False,  # auto-pick corridor when via_points=None
+    apply_navmesh_validated_straighten=True,
+    is_stale=None,                  # callback; True aborts the compose
+    debug_log=False,
+    allow_osm_bridge=True,          # see "allow_osm_bridge" under Public API
+)
+if route is None:
+    ...  # no walkable path
+
+# Cost-aware measure breakdown — used by seat / find-toilets / quiet-zone
+# routes. Runs compose() 1-3 times internally.
+from .route_composer import compose_with_measure
+route, measure_dict = compose_with_measure(
+    composer, start_world, end_world,
+    camera_area_costs=cam, sound_area_costs=snd,
+    via_points=via, enable_corridor_routing=False,
+    speed_m_per_s=1.3,
+)
+# measure_dict has {distance_meters_base, ..._actual, ..._crowd_delta, ..._sound_delta}
+```
+
+`compose()` returns `None` whenever any required leg fails (NavMesh unreachable, OSM graph unavailable, no entrance in scope, stale callback fired). Callers handle the `None` case — the composer never partially succeeds.
+
+### `allow_osm_bridge` (first-person player clicks)
+
+When **`allow_osm_bridge=False`**, `compose()` only runs **same-island pure NavMesh** (`_same_navmesh`). Any branch that would touch the OSM graph (`_navmesh_to_osm`, `_osm_to_navmesh`, `_osm_to_osm`, `_cross_navmesh`) returns `None` immediately — no lazy OSM graph load, no `navmesh → bridge → …` polylines from a misclassified off-mesh click inside the bake volume.
+
+- **Default** `True` — all guided routes, bird-eye preview, `poi_nav`, `compose_with_measure`, map-marker preview, etc. unchanged.
+- **Threaded `player` point-and-click** passes `allow_osm_bridge` from `NavMeshRouteService` policy: **`True`** only when **`/younite/camera/viewType` is `birdEye`** or the dev **OSM route overlay** (“Show OSM routes”) is visible (`extension.py` registers `set_player_osm_bridge_policy` on startup). Otherwise **`False`**.
+
+See `osm-route-overlay.mdc` for the overlay pipeline (direct polylines still bypass the composer when appropriate).
+
+### Cross-extension singleton
+
+`FeatureCommandsService`'s directions handlers (in `younite.usd_viewer_stage_core_extension`) and the navmesh route extension share the same composer instance so mode-cache state stays consistent. The navmesh route extension sets the singleton on startup:
+
+```python
+# extension.py on_startup
+self._route_composer = RouteComposer(mode_cache=self._navmesh_mode_cache)
+set_route_composer(self._route_composer)
+set_route_service(self._navmesh_route_service)
+```
+
+A fallback (no mode cache) is constructed lazily if startup has not registered one yet — harmless for single-mode deployments.
+
+---
+
+## Algorithm
+
+```
+compose(start, end, ctx)
+   │
+   ├─ start_island = _identify_island(start)     # navmesh closest-point + entrance name lookup
+   ├─ end_island   = _identify_island(end)
+   │
+   ├── both same island        → _same_navmesh    (corridor or direct, see below)
+   ├── cross-island            → _cross_navmesh   (NavMesh → OSM → NavMesh)
+   ├── inside start, outside   → _navmesh_to_osm  (NavMesh leg to entrance + OSM leg)
+   ├── outside start, inside   → _osm_to_navmesh  (OSM leg to entrance + NavMesh leg)
+   └── both outside            → _osm_to_osm      (single OSM leg)
+```
+
+### Island identification
+
+`_identify_island(pos)` runs the NavMesh containment test via `query_closest_point` and the 50 cm XZ tolerance. If walkable, the nearest entrance waypoint's island prefix determines the island. Entrance naming:
+
+- **Modern**: `nav_waypoint_entrance_<island>_<idx>` — e.g. `nav_waypoint_entrance_artmuseum_01`
+- **Legacy**: `nav_waypoint_entrance_<idx>` — maps to `DEFAULT_ISLAND = "scandinavium"` so existing entrances keep working without renaming a single prim.
+
+If walkable but no entrance exists at all, falls back to `DEFAULT_ISLAND`.
+
+### NavMesh leg
+
+`_navmesh_leg(start, end, ctx)` wraps `navmesh_shortest_path.calculate_path_points` with:
+
+- `camera_area_costs=ctx.merged_costs` — camera + sound costs combined into one dict (`route_measure.compute_single.compute_route_measure` still exposes separate `camera_area_costs` / `sound_area_costs` kwargs at the bulk-measure API; the composer merges for `_navmesh_leg`)
+- `apply_navmesh_validated_straighten=ctx.apply_navmesh_validated_straighten` — gated upstream by the `ENABLE_VALIDATED_STRAIGHTEN_CALCULATED_ROUTES` toggle in `route_engine/constants.py` (default **False**, so calculated routes pass `False` regardless of leg shape). Player point-and-click (`_player_compute_in_thread` in `route_engine/player_route.py`) is the only caller that currently passes `True`. See `.cursor/rules/topics/navmesh-path-refinement.mdc` § "Master switch" for the full contract and the wall-clip rationale.
+- `is_stale=ctx.is_stale` — passed straight through so the worker-thread player route can cancel before the heavy native call
+- `navmesh_override=<active cached mesh>` — respects the current mode (walking / wheelchair)
+
+Returns `None` on any failure (and validates 2-point fallbacks against the navmesh to reject paths that pierce walls — same logic as before the unification).
+
+### Same-island (intra-NavMesh) routing
+
+`_same_navmesh` picks via-points using a three-step precedence:
+
+1. **`ctx.via_points` (caller-supplied)** — POI search, bird-eye seat directions, `find_my_seat`, etc. pre-compute corridor via-points and pass them in. Take priority because they encode section-aware logic the composer can't replicate.
+2. **Auto corridor router** — when `ctx.enable_corridor_routing=True` and the caller did **not** supply via-points, the composer asks `waypoint_router.plan_route_to_position` for ring/entrance via-points. Bird-eye / `poi_nav` opts in here so a within-arena pin doesn't cut across the bowl.
+3. **Direct single leg** — player point-and-click and the `default` route fall through to `_navmesh_leg(start, end)` directly. A click on the floor must produce the closest direct path the user pointed at.
+
+**Shortcut hop outer legs** (elevators, dev toggle): `_shortcut_leg_vias` supplies vias for the NavMesh legs bracketing the zero-length shortcut segment — walk **to** the lift uses `plan_route_to_position` (never seat `plan_route` toward the door); walk **from** the lift toward the seat uses `plan_route(..., section=corridor_section, floor_hint_y=, branch_join_pos=)` when `corridor_section` is set on the route config (`seat_nav`). See `shortcuts.mdc` and `waypoint-routing.mdc`.
+
+All legs run the cheap native string-pull (`navmesh.query_shortest_path(..., straighten=True)`). The validated XZ straightener (Stage 2 in `navmesh-path-refinement.mdc`) is currently OFF for every calculated route — see § "Master switch" in that topic — and was historically off for multi-segment legs anyway because the per-leg O(n²) sub-query cost wasn't worth the visual gain. Player point-and-click is the only route that currently runs the validated straightener.
+
+Matters most for **pause + free-walk recompose**: after the user pauses and wanders into the arena interior, the route engine's periodic recalc fires — `RouteInstance._compute_path` re-resolves `start_ref` (live `/World/PlayerCharacter`) and re-runs `RouteComposer.compose(current_player, cached_end, …)`. Both endpoints now sit on the same NavMesh, so `_same_navmesh` runs — and respects the same corridor structure (or direct leg) the initial path followed because the engine passes the same `enable_corridor_routing` / `via_points` options it always does.
+
+### OSM leg (`OsmLegPlanner.plan`)
+
+`OsmLegPlanner` lazily loads `OsmGraphService`, converts world → local frame via `/World/OSM_Roads` translate offset, runs **mode-aware** Dijkstra with a forward-bias probe at each terminal (so `nearest_node` doesn't snap behind the bridge and produce a 180° hook), and converts back. Single shared graph instance across calls.
+
+The planner now takes `mode: str = "walking"` and returns `Optional[OsmLegResult]` where `OsmLegResult = Tuple[List[Vec3], List[str]]` — the polyline *and* its per-edge class list from `OsmGraphService.path_to_edge_classes()`. The composer uses the class list when building `ComposedLeg.edge_classes` so `segment_classes` survives the world-frame conversion and trimming.
+
+Returns `None` on disconnected sub-graphs or on endpoints that are unreachable in the current mode (e.g. a `wheelchair` query whose `nearest_node` can only find a `steps`-only node) — the composer surfaces the failure as "no route", matching the city-navigate flow.
+
+#### Mode resolution (`_active_osm_mode`)
+
+`RouteComposer._active_osm_mode()` reads `self._mode_cache.get_active_mode()` and falls back to `"walking"` if the cache isn't available or returns an unrecognised value. Every `_osm.plan(...)` call site (`_navmesh_to_osm`, `_osm_to_navmesh`, `_cross_navmesh`, `_osm_to_osm`) resolves the mode this way **once** at the top of the case handler and threads the same value into both the Dijkstra query and the forward-bias probe. There is no public per-compose-call `mode=` kwarg — the production CU mode toggle is the single source of truth. The dev widget's standalone `osmNavigateSetMode` event does **not** go through the composer; it is wired directly to `OsmNavigationExtension` for its own `OsmGraphService` calls.
+
+### Stitching
+
+`_finalize()` concatenates leg polylines dropping shared boundary vertices, and builds two parallel arrays:
+
+- **`segment_speeds`** — `OSM_SEGMENT_SPEED = 5.0` for OSM segments, `NAVMESH_SEGMENT_SPEED = 1.0` for NavMesh. Cross-kind handover segments inherit the *outgoing* leg's speed so each transition matches the terrain the player is about to enter. If lengths desync (empty / one-point legs) the array is dropped and the auto-mover defaults to `1.0`.
+- **`segment_classes`** — `"navmesh"` for NavMesh leg segments, `leg.edge_classes[i]` for OSM leg segments, `"bridge"` for the single cross-kind handover segment where an OSM leg joins a NavMesh leg. The helper `_osm_leg_classes()` matches stitched polyline segments back to the original OSM edge classes via `_OSM_CLASS_MATCH_TOL2`; unmatched segments fall back to `"bridge"`. Always stays length-aligned with `segment_speeds`.
+
+---
+
+## How the route engine uses it
+
+`RouteInstance._compute_path()` is the single sync entry point for every non-player route, and `_player_compute_in_thread()` is the worker-thread variant for point-and-click. Both:
+
+1. Resolve `start_ref` / `end_ref` to world tuples (USD reads on the main thread, even for the threaded player path).
+2. Read the route's `RouteConfig.use_composer` flag (set from the dispatch payload's `useComposer`) and propagate it as `enable_corridor_routing` to the composer.
+3. Read camera + sound area costs from the service callbacks.
+4. For non-player routes: call `compose_with_measure()` if measure is enabled (default), or plain `compose()` otherwise. The measure helper handles base/actual/delta breakdowns.
+5. For the player route: call plain `compose()` with `is_stale=lambda: my_gen != self._player_calc_gen` and `allow_osm_bridge` from the service policy (bird-eye or OSM overlay on — see **`allow_osm_bridge`** under Public API) so a newer click cancels the in-flight compute and FP gap-clicks do not activate OSM.
+6. Smooth pure-NavMesh polylines via `smooth_path_xz` (skipped when the route has any OSM leg or via-points — those vertices must stay where they are).
+7. Draw the curve, cache positions, dispatch waypoints + measure.
+
+There is no `_compute_via_composer` (it merged into `_compute_path`), no `_compute_multi_segment`, no direct `calculate_path_points` call from the engine, and no `set_route_with_preset` glue. Everything goes through the composer.
+
+---
+
+## Callers
+
+### Directions-panel commit (`MapMarkerDirectionsHandler._run`)
+
+Used when the user presses "Start Navigation" on the map-marker directions panel (POI or ad-hoc pin, forward or swap). The handler (in `feature_commands_service/map_marker_directions.py`) drives the route through the standard orchestrator pipeline — same as seat_nav / find-toilets:
+
+```python
+# Preview compose — only used to (a) fail fast with the no-route
+# overlay before teleporting, and (b) derive the body yaw for the
+# start rotation. The route engine composes again internally; this
+# preview compose is throwaway.
+composed = compose_route(start_world, end_world)  # delegates to composer.compose(enable_corridor_routing=True)
+if composed is None or len(composed.polyline) < 2:
+    self._report_no_route(...); return
+
+initial_yaw_deg = yaw_from_polyline([list(p) for p in composed.polyline])
+self._apply_start_rotation(start_pos=start_pos, initial_yaw_deg=initial_yaw_deg)
+
+# Hand off to the orchestrator. ``useComposer: True`` flips the
+# engine's ``enable_corridor_routing`` flag so intra-island routes
+# walk the corridor and cross-island / NavMesh↔OSM routes go through
+# the bridge logic.
+dispatch_to_events2("navigationStateSet", {
+    "movementMode": "pointClick",
+    "autoMove": False,
+    "routeId": "poi_nav",
+    "endPos": [end_world[0], end_world[1], end_world[2]],
+    "useComposer": True,
+    "drawPath": True,
+})
+await svc.await_navmesh_route_settled("poi_nav")
+svc.dispatch_view_transition_ready("firstPerson", True, "")
+```
+
+From here the route lives on the standard pipeline:
+
+```
+navigationStateSet
+  → NavigationOrchestratorService._apply_state
+  → navmeshRouteCalculate (autoMove=False, useComposer=True)
+  → NavMeshRouteService.set_route_for_id(use_composer=True)
+  → RouteInstance._compute_path  → composer.compose(enable_corridor_routing=True)
+  → navmeshRouteWaypoints (faceDirection, segmentSpeeds, measure)
+  → PointClickAutoMover.on_route_waypoints (caches waypoints, awaits Play)
+```
+
+Play / Pause is just another `navigationStateSet { autoMove: true|false }`. The orchestrator's `_apply_state` re-dispatches `navmeshRouteCalculate` with the current state (still `useComposer=True`, still the same `endPos`), the route engine composes a fresh polyline from the player's current position to the destination, and the auto-mover reactivates from the freshly cached waypoints. **This is identical to how seat_nav's pause + free-walk + play flow works** — both routes call `_compute_path()`, both routes go through `composer.compose()`. The only difference is the `via_points` / `enable_corridor_routing` options each route passes.
+
+### Bird-eye preview (`extension._on_bird_eye_route_request`)
+
+Used whenever the web asks for a dashed preview polyline on the bird-eye overlay — POI, seat, pin, stored FP, or any combination. After stopping any prior bird_eye route in the engine and resolving start/end world positions:
+
+```python
+composed = composer.compose(
+    start_world,
+    end_world,
+    enable_corridor_routing=True,  # match the engine's poi_nav behaviour
+)
+if composed is None:
+    projector.clear_route(); projector.clear_osm_segment(); return
+
+if composed.navmesh_points: projector.on_route_computed(composed.navmesh_points)
+else:                       projector.clear_route()
+if composed.osm_points:     projector.set_osm_segment(composed.osm_points)
+else:                       projector.clear_osm_segment()
+
+dispatch_to_events2("navmeshRouteMeasure", { ... composed.distance_meters ... })
+```
+
+The dispatched `navmeshRouteMeasure` targets `routeId: "poi_nav"` (not `bird_eye`) because that is the route id the web directions-panel pill listens to.
+
+### Player point-and-click
+
+`RouteInstance._player_compute_in_thread` wraps `composer.compose(...)` in a worker thread (`asyncio.run_in_executor`) with a 1 s safety timeout. The composer receives `is_stale=lambda: my_gen != self._player_calc_gen` and re-checks it before every native NavMesh / OSM call, so a fresh click cancels the in-flight compute mid-flight. The threaded variant also smooths the result via `smooth_path_xz` when the polyline is pure NavMesh.
+
+### Seat / find-toilets / quiet-zone (cost-aware, measured)
+
+`RouteInstance._compute_path` calls `compose_with_measure(composer, start, end, …)` which runs `composer.compose()` 1-3 times:
+
+1. Base (no costs) — always run, used as the baseline for the breakdown.
+2. Camera-only intermediate — only when both crowd and sound costs are active, used to attribute crowd vs sound deltas separately.
+3. Actual (all costs) — drawn and dispatched. Skipped when no costs are active (reuses base).
+
+Returns `(ComposedRoute, measure_dict)`. The engine packs the dict into a `RouteMeasure` and dispatches it as part of `navmeshRouteWaypoints`.
+
+---
+
+## Tunables (in `route_composer/types.py`)
+
+| Constant | Value | Purpose |
+|---|---|---|
+| `NAVMESH_TOLERANCE_CM` | 50.0 | XZ tolerance for "is this position on a NavMesh?" inside the composer (bird-eye pins use magnet distance separately) |
+| `OSM_SEGMENT_SPEED` | 5.0 | Per-segment speed multiplier for OSM crossings (≈15 m/s on top of the ~3 m/s base) |
+| `NAVMESH_SEGMENT_SPEED` | 1.0 | Per-segment speed multiplier for NavMesh segments (base speed) |
+| `DEFAULT_WALK_SPEED_M_PER_S` | 1.3 | Base walking speed for the ETA estimate; matches `route_measure.constants.DEFAULT_WALK_SPEED_M_PER_S` |
+| `DEFAULT_ISLAND` | `"scandinavium"` | Legacy fallback for entrance waypoints without an island prefix |
+| `ENTRANCE_PREFIX` | `"nav_waypoint_entrance_"` | Entrance prim name prefix |
+| `RouteComposer._OSM_ENTRY_FORWARD_BIAS_CM` | 500.0 | Forward-bias distance for the OSM `nearest_node` probe (avoids 180° hooks at the bridge) |
+
+---
+
+## Failure modes
+
+All return `None` from `compose()` (or `(None, None)` from `compose_with_measure()`):
+
+| Failure | Cause |
+|---|---|
+| NavMesh leg failed | `calculate_path_points` returned `success=False` (endpoint off-mesh, query disconnected) |
+| OSM graph unavailable | `OsmGraphService.load()` failed or the graph is not yet loaded |
+| No OSM path | `shortest_path()` returned empty / zero-distance (endpoints disconnected in the graph) |
+| No entrance in scope | `_scan_entrances()` returned empty for the required island |
+| Stale | `is_stale()` callback returned True before the next leg started |
+
+Callers either dispatch a visible error (`navmeshRouteError`, `birdEyePinError`) or just lift the view-transition overlay and let the user try again.
+
+---
+
+## Adding a new A → B navigation feature
+
+The composer is the only pathfinder. Pattern for any future "walk from A to B" flow:
+
+```python
+composer = get_route_composer()
+composed = composer.compose(
+    start_world, end_world,
+    camera_area_costs=cam, sound_area_costs=snd,  # optional cost overrides
+    via_points=via,                               # optional corridor pts
+    enable_corridor_routing=True,                 # optional auto-corridor
+)
+if composed is None:
+    return  # handle failure
+
+# Auto-mover dispatch — works for any route shape, no branching needed.
+dispatch_to_events2("navmeshRouteWaypoints", {
+    "routeId": my_route_id,
+    "success": True,
+    "points": [list(p) for p in composed.polyline],
+    "segmentSpeeds": composed.segment_speeds,
+    "segmentClasses": composed.segment_classes,  # opt-in; enables playerPathClassChange
+})
+```
+
+If the feature wires into the route engine via `set_route_for_id`, just pass the right options and `_compute_path` will use them.
+
+---
+
+## Known limitations / future work
+
+- **Cross-island preview on the overlay** — both NavMesh legs currently concatenate into `navmesh_points`; the projector renders them as one polyline. Acceptable for single-island production. Upgrade the projector to accept a list of NavMesh legs when a second arena goes live.
+- **NavMesh leg quality on cross-island** — only single-mesh validated straightening per leg. If a future cross-island route produces a visibly zigzag NavMesh leg, extend `_navmesh_leg` to also apply Laplacian smoothing.
+- **OSM graph selection** — one graph (Gothenburg) shared across calls. If new cities are added, expand `OsmGraphService` to select the relevant graph per island pair.
+- **Failure recovery** — any failed leg aborts the whole route. A fallback policy ("if the NavMesh leg to the entrance fails, try the next-nearest entrance") could be added once the multi-island dataset exposes which entrances actually reach which parts of an island.
+- **`compute_routes_to_exits` (one-shot bulk measure)** — implemented in `route_measure/exits.py`; primary path still calls `compute_route_measure` (`route_measure/compute_single.py`) directly because it iterates over many endpoints in one request and benefits from a single-call API. **Shortcut-aware fallback**: when the dev "Use shortcuts" toggle is on (`enable_shortcuts=True`), every entry that returns `success=False` is retried via `RouteComposer.compose(enable_shortcuts=True)` so destinations behind stairs become discoverable in wheelchair mode through an elevator hop. See `shortcuts.mdc` § "POI / quiet / exit visibility (shortcut-aware fallback)" for caveats. If the exits widget needs OSM-aware measures in the future, fold it through `compose_with_measure`.
+
+---
+
+## Related
+
+- Bird-eye pin anywhere (the main consumer today): `.cursor/rules/topics/bird-eye-pin-anywhere.mdc`
+- NavMesh path refinement (validated straightening, smoothing): `.cursor/rules/topics/navmesh-path-refinement.mdc`
+- Dual-mode NavMesh cache (walking vs wheelchair): `.cursor/rules/topics/navmesh-dual-mode.mdc`
+- Waypoint routing (corridor graph, `plan_route`, post-elevator kwargs): `.cursor/rules/topics/waypoint-routing.mdc`
+- Navigation shortcuts (elevator legs, `corridor_section`): `.cursor/rules/topics/shortcuts.mdc`
+- Route measurement (distance / ETA contract): `.cursor/rules/topics/route-measurement.mdc`

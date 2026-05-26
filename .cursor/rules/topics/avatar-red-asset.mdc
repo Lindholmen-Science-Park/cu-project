@@ -1,0 +1,76 @@
+---
+description: Red player avatar USD asset — SkelRoot payload, SkelAnimation time samples, scene length alignment, runtime NavMesh Exclude volume (POI-style rectangular cutout)
+---
+
+# Red player avatar (`Red.usda`)
+
+## Where it lives
+
+- **File**: `kit-app-template-main/source/data/Assets/Avatars/Red.usda`
+- **Composed via**: `source/data/scenes/sublayers/avatars_layer.usda` → `prepend payload = @../../Assets/Avatars/Red.usda@` under the scene `Red` prim (display name "Red").
+
+## Structure (runtime)
+
+- **`/World`** is the layer `defaultPrim`; **`/World/Hips`** is a **SkelRoot** with meshes, **`Skeleton`**, and **`SkelAnimation` "Animation"`** (joints + **`rotations` / `translations` / `scales`** **time samples**).
+- Invalid or truncated USD in this file causes the **payload to fail loading** — the avatar **disappears** entirely (not a visibility toggle issue).
+
+## Time samples vs scene `endTimeCode`
+
+Kit evaluates skel animation at the **stage time**. If the scene root has **`endTimeCode = 3600`** and **`timeCodesPerSecond = 60`** (see `main_scene.usda`), one full authored timeline span is **60 seconds** of real time.
+
+- If SkelAnimation keys exist only for **0–N** and **N < endTimeCode**, USD **holds the last sample** from frame **N+1** through **endTimeCode** — the avatar **freezes** until stage time wraps or resets.
+- To keep motion over the full range, **extend** `rotations`, `translations`, and **`scales`** through **`endTimeCode`** (all three should stay consistent).
+
+**Practical approach used in-repo**: repeat a short cycle with **`frame % period`** (e.g. period **378** for keys **0–377**) when filling **378…3600**. That **inflates file size** (dense keys per frame); prefer a **re-export from DCC** or **value clips** if the asset must stay small.
+
+**Scene loop wrap**: If playback jumps **endTimeCode → startTimeCode**, the pose at the last frame may not match frame **0** unless authored that way (e.g. **3600 % 378 ≠ 0** vs frame **0**), so a small **pop** at wrap is possible.
+
+## Truncation / parse failure
+
+A **truncated** `.usda` (e.g. cut off mid-`translations.timeSamples`) breaks **Sdf/Usd** open — **restore from backup or re-export** when possible. Emergency repair involved completing the broken sample and closing braces so the layer parses; **git history may not help** if the broken file was already committed.
+
+## NavMesh exclusion (walk-through prevention)
+
+Players must not path onto the avatar mesh (especially on mobile, where the camera can end up inside the collider with no ground to tap). Two mechanisms work together:
+
+### 1. Rectangular cutout — `NavMeshVolume` Exclude (POI / 360° pattern)
+
+**Module**: `younite.interactions_extension` → `services/kit_services/avatar_nav_exclusion.py`
+
+Kit only carves **axis-aligned boxes** from the baked navmesh via `NavMeshVolume` + `nav:volume:type = "Exclude"` — the same authored pattern as `NavMeshVolume_01`–`_07` in `navigation_layer.usda` (360° video / spatial-sound POI holes). A **single** scaled box produces a **solid rectangular** grey void in Show NavMesh; do **not** use multiple overlapping boxes (ring layouts leave a jagged star-shaped hole) or a very thin Y scale (e.g. `0.12` — only slices a few triangles and looks tattered in the overlay).
+
+**Runtime prims** (on `navigation_layer.usda`, not session layer — baker ignores session-only prims):
+
+| Path | Role |
+|------|------|
+| `/World/AvatarNavExclusions/<AvatarName>` | Xform at snapped world position |
+| `…/ExcludeVolume` | One `NavMeshVolume` Exclude box |
+
+**Lifecycle**
+
+1. `session_authoring.attach_npc_payload` → `register_avatar_nav_exclusion(primPath)` + `ensure_avatar_nav_exclusion(primPath)` when `npcConfig.avatarAsset` is set.
+2. `ensure` **purges and recreates** the avatar subtree on the nav layer (drops stale `ExcludeRing_*` / `ExcludeFill_*` / disc experiments from earlier sessions).
+3. Scale: XZ = `diameter / 100` from `DEFAULT_RADIUS_CM` (default **75 cm** → ~**1.5 m** square footprint, sized so default `npcSpawnMeters` **1.0 m** stays outside the hole); Y = `POI_VOLUME_Y_SCALE` (**2.0**, matching POI `(2, 2, 2)`).
+4. `payload_orchestrator` `show()` on the exclusion paths so the volume participates in the stage.
+5. **Rebake required** — the hole exists only in the **baked** mesh. On `navmeshDualBakeComplete`, Y is re-snapped with `query_closest_point`, the volume is replaced, and **one** corrective `navmeshRebakeRequest` runs (`_post_snap_rebake_done` guard).
+6. `interactions` extension subscribes to `navmeshDualBakeComplete` via `subscribe_avatar_nav_exclusion_events` (wired from `extension.py`).
+
+**Tuning constants** (`avatar_nav_exclusion.py`): `DEFAULT_RADIUS_CM`, `POI_VOLUME_Y_SCALE`, `GROUND_OFFSET_CM`, `VOLUME_HALF_EXTENT_CM` (±50 cm base extent, same as authored POI volumes).
+
+**What does not work for this visual**
+
+| Attempt | Result |
+|---------|--------|
+| Flat disc mesh + `incident_blocked` | Cost-area tagging; not the same geometric void as `NavMeshVolume` Exclude |
+| Many overlapping exclude boxes (ring) | Jagged star-shaped carved hole |
+| Thin Y scale on one box | Ragged triangular overlay edge |
+
+### 2. Mesh exclude from bake
+
+`session_authoring._apply_navmesh_exclude_on_asset_root` prepends `NavMeshExcludeAPI` on `{primPath}/World` so SkelRoot geometry does not add stray walkable islands during bake. Complements the floor cutout; does not replace it.
+
+The approach ring (`approach.distanceMeters` = 3 m in `avatar_red`) and default `PlayerSpawnPoint_*` offset (`npcSpawnMeters` = 1 m) stay outside the exclusion footprint.
+
+## Distinction from NPC avatars
+
+**Red** is a **scene payload character** (SkelRoot in USD). **NPC** speech bubbles, chat overlays, and **`interactions.json`** are covered in **`interactions-avatars.mdc`** — different pipeline.

@@ -1,0 +1,23 @@
+[package]
+title = "Younite NavMesh Dev Overlays Extension"
+description = "Dev-only: full NavMesh debug mesh + walking/wheelchair stair diff overlays in the Kit viewport"
+version = "0.1.0"
+authors = ["Younite"]
+keywords = ["navmesh", "debug", "dev"]
+category = "Feature"
+
+[dependencies]
+"younite.navmesh_route_extension" = {}
+"younite.messaging_core_extension" = {}
+"younite.usd_viewer_stage_core_extension" = {}
+"younite.payload_orchestrator_core_extension" = {}
+"omni.usd" = {}
+
+[[python.module]]
+name = "younite.navmesh_dev_overlays_extension"
+
+[build]
+include = [
+    "younite/**/*.py",
+    "*.toml",
+]

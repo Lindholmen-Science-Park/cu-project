@@ -1,0 +1,115 @@
+---
+description: Open data live (dev) — WAQI air quality + GBFS bike share + baked OSM POIs, Kit USD markers, web panels (list → camera + detail), messaging, geo + payload orchestrator
+globs:
+  - "**/younite.open_data_live_extension/**/air_quality_stations.py"
+  - "**/younite.open_data_live_extension/**/bike_share_service.py"
+  - "**/younite.open_data_live_extension/**/osm_poi_markers_service.py"
+  - "**/younite.open_data_live_extension/**/extension.py"
+  - "**/IotSubmenu.tsx"
+  - "**/iotAirQuality/**"
+  - "**/iotBikeShare/**"
+  - "**/iotOsmPois/**"
+  - "**/iotTransitLive/**"
+  - "**/iotShared/**"
+---
+
+# Open data live — WAQI air quality, GBFS bike share & baked OSM POIs
+
+**Dev-only.** Open-data overlays: **WAQI** air stations and **GBFS** bike-share docks (Styr & Ställ / nextbike_zg) are fetched in the browser on demand; **OSM places** use a **baked JSON** file produced by `source/data/osm/export_osm_pois.py`. All are shown in dev overlay panels and mirrored as runtime USD geometry in Kit. Production streaming does **not** load this extension.
+
+The **dev IoT drawer (`IotSubmenu.tsx`) hosts air quality, bike share, baked OSM places, and live transit (Västtrafik)** — using the same shape where applicable: a primary action, an "Open list" entry-point, and a status/error line. List panels (`IotAirStationsPanel`, `IotBikeSharePanel`, `IotOsmPoisPanel`, `IotTransitLivePanel`) let the user select a row to pan the bird-eye camera (or ground teleport) and show details. See `transit-live-overlay.mdc` for live vehicles; see **`osm-poi-overlay.mdc`** for OSM stops vs live buses.
+
+## Kit extension
+
+| Item | Location |
+|------|----------|
+| Extension | `younite.open_data_live_extension` (shared with live transit) |
+| Lifecycle + events | `extension.py` (air + bike + OSM POIs + transit wiring) |
+| Air geometry + highlight | `services/air_quality_stations.py` (`AirQualityStationsService`) |
+| Bike geometry + highlight | `services/bike_share_service.py` (`BikeShareStationsService`, reuses pole/halo/beacon helpers from `air_quality_stations.py`) |
+| OSM POI geometry + highlight | `services/osm_poi_markers_service.py` (`OsmPoiMarkersService`, pole/halo/beacon layout; vivid default crowns + selection accent — see `osm-poi-overlay.mdc`) |
+| Shared focus helper | `_focus_lat_lon(lat, lon)` in `extension.py` — bird-eye pan via `birdEyePanFocusWorld`, else ground teleport. Reused by air + bike + OSM list selection. |
+| Shared event wiring | `_register_station_service(...)` in `extension.py` — registers `{prefix}{Stations,Toggle,FocusStation,HighlightStation}`. Optional **`cache_stations_attr`** + **`after_stations_sync`** (used by OSM) for late georef + replay on **`scene.loaded`**. |
+| Kit profile | `younite.usd_viewer_streaming_dev.kit` only (`order = 1205`) |
+
+**Dependencies** (see `config/extension.toml`): messaging, payload orchestrator, `usd_viewer_stage_core` (GeoCoordinateService for WGS84 → USD), `osm_navigation` + `omni.physx` (for the bundled transit service), `omni.usd`.
+
+**USD root (air)**: prims under `/World/IoT_AirQuality/Stations` (sublayer `iot_air_quality_layer.usda`). Each station is an Xform with pole, emissive “halo” sphere (AQI palette), and ground beacon. Neutral pole/beacon color; crown sphere color reflects AQI.
+
+**USD root (bike)**: prims under `/World/IoT_BikeShare/Stations` (sublayer `iot_bike_share_layer.usda`). Same pole/beacon/halo layout; crown color reflects bike availability (empty = red, few = amber, several = green).
+
+**USD root (OSM POIs)**: prims under `/World/IoT_OsmPois/Stations` (sublayer `iot_osm_pois_layer.usda`). Same layout; **category** is stored on prims for metadata — stream-visible colours are a shared high-contrast palette (see `osm-poi-overlay.mdc`).
+
+**Custom data** on air station root (when provided by web): `iot:lat`, `iot:lon`, `iot:aqi`, `iot:name`, optional `iot:pm25`, `iot:temp_c`, `iot:time`.
+
+**Custom data** on bike station root: `iot:lat`, `iot:lon`, `iot:name`, `iot:bikes`, `iot:docks`.
+
+**Custom data** on OSM POI root: `iot:lat`, `iot:lon`, `iot:name`, `iot:category`, optional `iot:detail`, `iot:opening_hours`.
+
+**Visibility**: geometry show/hide goes through `batch_show_hide` from the payload orchestrator (`SOURCE = "open_data_live"`), not raw `MakeVisible` / `MakeInvisible`.
+
+**Stage lifecycle**: on `omni.usd@stage_event` OPENED/CLOSED, the service clears tracked station prims.
+
+Startup failure is logged once with `[open_data_live] startup failed: …` (no per-frame spam).
+
+## Web
+
+| Area | Path |
+|------|------|
+| WAQI client + enrichment | `web-viewer-sample-main/src/services/iot/waqiAirQuality.ts` |
+| GBFS bike client | `src/services/iot/styrStallGbfs.ts` (clips docks to tight bbox in `gothenburgBikeShareClipBBox()`, not WAQI extent) |
+| Baked OSM JSON import | `src/services/iot/osmPoisBaked.ts` → `kit-app-template-main/source/data/osm/osm_pois_gbg.json` |
+| Air types / Kit payload | `src/types/iotAirQuality.ts` |
+| Bike types / Kit payload | `src/types/iotBikeShare.ts` |
+| OSM POI types / categories | `src/types/iotOsmPois.ts` |
+| Dev menu (fetch, open list) | `src/features/dev/controls/submenus/IotSubmenu.tsx` (drawer: AIQ + bike + OSM + live transit) |
+| Live transit dev block (same IoT drawer) | `src/features/dev/controls/submenus/TransitLiveDevSection.tsx` |
+| Air panel + AQI/temp scales | `src/features/streaming/overlays/iotAirQuality/` |
+| Bike panel | `src/features/streaming/overlays/iotBikeShare/IotBikeSharePanel.tsx` (reuses air panel CSS) |
+| OSM panel + category toggle | `src/features/streaming/overlays/iotOsmPois/IotOsmPoisPanel.tsx` (one category at a time → Kit markers) |
+| Transit panel | `src/features/streaming/overlays/iotTransitLive/IotTransitLivePanel.tsx` (reuses air panel CSS) — see `transit-live-overlay.mdc` |
+| **IoT list shell (mobile)** | `src/features/streaming/overlays/iotShared/` — `IotPanelLayout`, `useIotPanelDrag`, barrel `index.ts`; narrow viewports (≤639px): bottom sheet, capped height, drag handle to dismiss, safe-area padding. Styles live in `iotAirQuality/IotAirStationsPanel.css`. |
+| Panel open state + dismiss | `useControlHandlers.ts` (dismiss helpers + IoT state for all panels) |
+| Overlay mount | `SharedOverlayLayer.tsx` (mounts IoT panels) |
+
+**Token**: `VITE_WAQI_TOKEN` in repo-root `.env` (Vite `envDir` is parent of `web-viewer-sample-main`); see `.env.example`.
+
+**Bike feed**: default GBFS root `https://api.nextbike.net/maps/gbfs/v1/nextbike_zg/gbfs.json` — optional override `VITE_GBFS_BIKE_URL` in `.env`.
+
+**Data**: map/bounds response supplies AQI and sometimes `iaqi` (PM2.5, temperature `t`). `enrichStationsMissingPm25` backfills per-station feed data for missing PM2.5 and/or `tempC` (WAQI `iaqi.t`). Station `id` uses `waqi_<uid>` when the API provides `uid`.
+
+**UI**: dev-only English strings (not in customer i18n). Panel supports **AQI** vs **Temperature** toggle; temperature scale is a separate educational strip (−50 … +50 °C for marker position). **Web ↔ Kit ordering:** list panels send **`*Stations` before `*HighlightStation`** so Kit applies highlight to the current prim set (air, bike, OSM).
+
+## Web ↔ Kit messaging
+
+Registered in `extension.py` via `kit_app.register_event_alias` + `carb.eventdispatcher.observe_event`:
+
+| Event | Direction | Purpose |
+|-------|-----------|---------|
+| `iotAirQualityStations` | Web → Kit | Payload `{ stations: IotAirQualityStation[] }`. **Empty list removes** all station prims (`sync_stations` → `clear`). |
+| `iotAirQualityToggle` | Web → Kit | Payload `{ enabled: bool }` — toggles visibility of existing station geometry via orchestrator (optional; empty station list clears prims entirely). |
+| `iotAirQualityFocusStation` | Web → Kit | `{ lat, lon }` — bird-eye: pan view center toward station base; else ground teleport. |
+| `iotAirQualityHighlightStation` | Web → Kit | `{ id: string \| null }` — list selection highlight (emissive / halo emphasis). |
+| `iotBikeShareStations` | Web → Kit | Payload `{ stations: IotBikeShareStation[] }`. **Empty list removes** all bike dock prims. |
+| `iotBikeShareToggle` | Web → Kit | Payload `{ enabled: bool }` — toggles visibility of existing bike geometry via orchestrator. |
+| `iotBikeShareFocusStation` | Web → Kit | `{ lat, lon }` — same focus/teleport behaviour as air. |
+| `iotBikeShareHighlightStation` | Web → Kit | `{ id: string \| null }` — list selection highlight for bike markers. |
+| `iotOsmPoisStations` | Web → Kit | `{ stations: [{ id, lat, lon, category }] }` — **active category**, slim rows only (no name/hours/detail); empty list clears OSM POI prims. |
+| `iotOsmPoisToggle` | Web → Kit | `{ enabled: bool }` — visibility toggle via orchestrator. |
+| `iotOsmPoisFocusStation` | Web → Kit | `{ lat, lon }` — same focus behaviour as air/bike. |
+| `iotOsmPoisHighlightStation` | Web → Kit | `{ id: string \| null }` — selection highlight. |
+
+**Markers only while the panel is open**: when a list panel opens, it sends the corresponding `*Stations` event with the current list. On close, the web sends `{ stations: [] }` and clears highlight. Refresh in the dev IoT submenu loads data and opens the bike panel when docks exist; reopening uses “Open docks list” without refetch until Refresh is pressed again. **OSM:** data is bundled from `osm_pois_gbg.json`; refresh the file by re-running `export_osm_pois.py`, then rebuild the web app if needed.
+
+## World state sync
+
+These markers are **ephemeral dev overlays**, not part of the production world snapshot. They are **not** registered on `WorldStateSyncService` today. If a future requirement needs reconnect persistence, design an explicit snapshot field with the team first.
+
+## Related topics
+
+- **Geo** → `cesium-geolocation.mdc` (GeoCoordinateService)
+- **Payload / visibility** → `payload-orchestrator.mdc`
+- **Messaging** → `streaming-profiles.mdc` + `younite.messaging_core_extension`
+- **Sublayers** → `sublayers.mdc` (`iot_air_quality_layer.usda`, `iot_bike_share_layer.usda`, `iot_osm_pois_layer.usda`)
+- **Live transit (same Kit extension)** → `transit-live-overlay.mdc`
+- **Baked OSM POI workflow** → `osm-poi-overlay.mdc`

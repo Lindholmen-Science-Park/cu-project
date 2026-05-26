@@ -1,0 +1,266 @@
+---
+description: React Context architecture — centralized state management, provider hierarchy, adding new state
+globs: web-viewer-sample-main/src/features/**/*.tsx,web-viewer-sample-main/src/features/**/*.ts
+---
+
+# React Context Architecture
+
+All shared web-side state lives in **nine domain-specific React Contexts** plus
+**`StreamShellContext`** (spectator join only) under
+`web-viewer-sample-main/src/features/streaming/contexts/`. Six broad-domain
+contexts cover most of the app; three narrow feature contexts
+(`SpatialSoundContext`, `Video360Context`, `VideoBookSettingsContext`) hold
+overlay-specific or session media preferences (the first two: entry, open flag,
+per-session onboarding; `VideoBookSettingsContext`: shared videobook / 360 /
+spatial caption size and related controls).
+
+## Repository layout vs runtime tree
+
+On disk, `features/streaming/` holds the **viewer shell** (WebRTC, provider
+stack, shared widgets/overlays). `features/cu/` and `features/dev/` are
+**mode-specific UI** imported by `CuViewLayer` and `DevViewLayer` — they are
+**not** above the context providers in the React tree. Runtime order is:
+**contexts → shared layers → CU or DEV view layer → leaf components.**
+
+App-wide **CU vs DEV mode** is `AppModeContext` (`src/context/AppModeContext.tsx`),
+mounted in `App.tsx`. It is **re-exported** from
+`features/streaming/contexts/index.ts` as `useAppMode` / `AppModeProvider` aliases
+so consumers can import mode next to domain hooks from one barrel when desired.
+
+## Kit-backed settings and World State Sync
+
+Anything that mirrors **Kit / world configuration** (camera height, weather,
+season, time, fog, navmesh mode, movement speed, physics, people visibility,
+camera view type, etc.) must live in **one field** on the appropriate domain
+context (`Environment`, `Control`, `Navigation`). Dev hamburger panels, CU quick
+settings, and CU full settings must **read and write that same field** — no
+parallel `useState` for the same knob.
+
+Reconnect and refresh: Kit is authoritative. See `world-state-sync.mdc` —
+`worldStateSync` updates the same context setters via `worldStateHandlers.ts`.
+Purely **browser** preferences (theme, CU text size, some audio UI) stay out of
+world sync as documented there.
+
+## Provider Hierarchy
+
+Providers are nested in `StreamOnlyWindow` in this order (outer → inner).
+**Outside** the domain stack, `StreamShellProvider` wraps the spectator join
+gate and the stream provider tree (see `contexts/StreamShellContext.tsx`).
+
+```
+StreamShellProvider         → spectator join (viewer mode only)
+  StreamProvider            → stream connection, loading phases
+    EnvironmentProvider     → cameras, weather, sound, fog, sky
+```
+
+Full nesting (inside `StreamShellProvider` after join):
+
+```
+StreamProvider              → stream connection, loading phases
+  EnvironmentProvider       → cameras, weather, sound, fog, sky
+    NavigationProvider      → navmesh, seats, exits, restrooms, routes, OSM
+      ControlProvider       → control mode, markers, incidents, USD edit,
+                              video player + videobook
+        SpatialSoundProvider → spatial-sound overlay entry, isOpen,
+                              hasOnboarded (per session)
+          Video360Provider  → 360° video overlay entry, isOpen,
+                              hasOnboarded (per session)
+          VideoBookSettingsProvider → session media prefs: caption size index,
+                              mute, CC, autoplay, playback speed (see below)
+            ChatProvider    → conversation store, AI chat, interaction actions
+              AppUIProvider → isViewer, onboarding, scenes, viewport,
+                              seat ceremony
+```
+
+Each provider **calls its hook internally** (e.g. `EnvironmentProvider` calls
+`useEnvironmentHandlers()` and reads `streamReady` from `useStream()`).
+No props are needed on providers except `StreamProvider` (needs `userId`,
+`onStreamFailed`, `isViewer` from route props) and `AppUIProvider` (needs
+`isViewer`).
+
+`SpatialSoundProvider` and `Video360Provider` each own a single `useState`
+trio (`entry`, `hasOnboarded`, plus a memoised `isOpen` derived from
+`entry !== null`) — no internal handlers hook, no Kit wiring of their own.
+Kit events land in `ChatContext`'s interaction-action handlers, which call
+`useSpatialSound().open(entry)` / `useVideo360().open(entry)`. The two
+providers sit outside `ChatProvider` (so `ChatContext` can read them) and
+inside `ControlProvider`.
+
+## Consuming State
+
+Any component inside the provider tree calls the matching hook:
+
+```tsx
+const env = useEnvironment();
+const nav = useNavigation();
+const ctrl = useControl();
+const chat = useChat();
+const appUI = useAppUI();
+const stream = useStream();
+const spatialSound = useSpatialSound();
+const video360 = useVideo360();
+```
+
+**Never pass context-available values as props.** Components read what they need
+directly. The only props that should exist are:
+
+- **Instance-specific** — e.g. `JoystickWidget` needs `position="left"|"right"`
+  because two instances exist with different handlers.
+- **Parent-owned UI routing** — e.g. `closeMenu`, `onClose`, `onOpenSettings`
+  where a parent manages local menu/dialog open state.
+- **Composition / children** — React `children`, render props.
+
+## Context Files
+
+Each context file in `contexts/` exports three things:
+
+| Export | Purpose |
+|--------|---------|
+| `FooProvider` | Provider component (wraps hook, renders `Context.Provider`) |
+| `useFoo()` | Consumer hook (throws if used outside provider) |
+| `FooContextType` | TypeScript type (auto-derived from the hook return) |
+
+Barrel file: `contexts/index.ts` re-exports everything.
+
+## The 9 Contexts
+
+### `StreamContext` — connection lifecycle
+- `streamReady`, `sceneLoading`, `loadingText`, `loadingPhase`
+- `handleStreamStarted`, `handleStreamFailed`, `retryConnection`
+- `handleSceneSwitch`, `processSceneEvent`, `appStreamKey`
+- Hook: `useStreamConnection(userId, onStreamFailed, isViewer)`
+
+### `EnvironmentContext` — world environment
+- Camera: `currentCamera`, `handleCameraChange`, `activeFixedCamera`, `placedCameras`
+- Weather/sky: `timeOfDay`, `dayOfYear`, `cloudCoverage`, `weatherPreset`, `fogIntensity`
+- CU weather: `weather`, `season`, `timeOfDayMinutes` + `apply*` handlers
+- Sound: `soundAreasVisible`, `soundCosts`, `soundCostWidgetOpen`
+- Camera data: heatmap, tracker, depth capture, pathfinding widget
+- Hook: `useEnvironmentHandlers(streamReady)`
+
+### `NavigationContext` — pathfinding & routes
+- NavMesh: `navmeshActive`, `navmeshMode`, `navmeshBaking`
+- Spots/exits/restrooms/quiet zones: results, routes, move handlers
+- Seats: `seatWidgetOpen`, `activeSeatRouteId`, navigate/teleport/measure
+- OSM: `osmNavigateOpen`, `osmSelectedPoiId`, route info
+- Hook: `useNavigationHandlers(streamReady)`
+
+### `ControlContext` — UI control state
+- Mode: `controlMode` (pointClick/wasd/joystick)
+- Markers/incidents/cameras: placement flags, click handlers
+- People/NPCs: `peopleVisible`, `nearestNpc`, `nearestIcon`
+- USD edit: mode, sub-mode, phase, vertex/prim selection, save
+- Video player (full-screen 2D overlay): `videoPlayerOpen`, `videoPlayerConfig`, play/close
+- Videobook (chapter player): `videobookOpen`, `videobookIconId`
+- Hook: `useControlHandlers()`
+
+**Note**: spatial-sound and 360°-video overlay state is **not** here — it
+lives in the dedicated `SpatialSoundContext` / `Video360Context` below.
+
+### `ChatContext` — conversation & AI
+- `conversation` (per-avatar message store)
+- `interactionActions` (dispatch registry for overlays/NPCs/video)
+- `chatOpenSource` ('npc' | 'search' | null)
+- `avatarAgentTyping`, `welcomeAvatarChatConfig`
+- `lastAIResponseText`, `lastAIResponseIsError`
+- All chat handlers: `handleChatClose/Send/Back/QuickAction/UserMessage`
+- `handleSearchSendToAI`, `handleOpenAssistantChat`
+
+### `SpatialSoundContext` — spatial-sound overlay state
+- `entry: SpatialSoundEntry | null` — the current spot's payload (sound URL,
+  caption URL, i18n keys, prim path)
+- `isOpen: boolean` — derived (`entry !== null`)
+- `hasOnboarded: boolean` — true once the user has clicked "Start" in the
+  onboarding card during this session; the next open skips the card
+- Actions: `open(entry)`, `close()`, `markOnboarded()`
+- No internal handlers hook — the provider is just `useState` + memo.
+- Consumed by: `SpatialSoundOverlay` (everything), `IconBubbleOverlay`
+  (`isOpen` to suppress, `open()` from the bubble click), `ChatContext`
+  (registers `spatialSound.open` interaction action → `open()`; hides the
+  icon prim while `isOpen`), `useAmbientSoundEngine` (`isOpen` to duck
+  ambient gain), `CuViewLayer` (`isOpen` to hide CU chrome).
+
+See `spatial-audio.mdc` for the full pipeline.
+
+### `Video360Context` — 360° video overlay state
+- `entry: Video360Entry | null` — the current spot's payload (video URL,
+  caption URL, i18n keys, prim path)
+- `isOpen: boolean` — derived (`entry !== null`)
+- `hasOnboarded: boolean` — true once the user has clicked "Start the
+  experience" during this session; the next open skips onboarding
+- Actions: `open(entry)`, `close()`, `markOnboarded()`
+- No internal handlers hook — same shape as `SpatialSoundContext`.
+- Consumed by: `Video360Overlay` (everything), `IconBubbleOverlay`
+  (`isOpen` to suppress, `open()` from the bubble click), `ChatContext`
+  (registers `video360.open` interaction action → `open()`; hides the
+  icon prim while `isOpen`).
+
+See `360-video.mdc` for the full pipeline.
+
+### `VideoBookSettingsContext` — session media preferences (web streaming tree)
+- `captionSizeIndex` (0/1/2) — small / default / large caption typography; used by
+  `VideoBookSettingsPanel` and by `data-caption-size` on caption strips in
+  `VideoBookPlayer`, `Video360Overlay`, and `SpatialSoundOverlay` (shared Figma
+  tokens: `video-playback.mdc` § Caption size).
+- `autoplayEnabled`, `muted`, `captionsOn`, `playbackSpeedIndex` — same session
+  lifetime as the caption index; videobook player and settings panel read/write
+  these. 360° / spatial use caption size (and where applicable CC) from here.
+- File: `contexts/VideoBookSettingsContext.tsx` — `useVideoBookSettings()`. Provider
+  is mounted in `StreamOnlyWindow.tsx` between `Video360Provider` and
+  `ChatProvider` so `ChatContext` and all underlays can consume it.
+
+### `AppUIContext` — app-level & seat ceremony
+- `isViewer`, `onboardingVisible`, `handleOnboardingDone`
+- `invertTouchLook`, `handleInvertTouchLookToggle`
+- `availableScenes`, `viewportCaptureStatus`
+- Seat ceremony: `seatArrivalCelebrationVisible`, `seatStreamOverlayActive`,
+  `seatRouteCuPortalEl`, `closeSeatPanel`, `dismissArrivalCelebration`
+- `seatPanelDraft`, `seatForceExpandSignal`, `seatPanelStickyOpen`
+- `handleSearchChipNavigate` (opens seat/restroom/quiet widgets from CU search)
+
+## Adding New State
+
+1. **Identify the domain** — which of the 9 contexts does it belong to?
+2. **Add to the hook** — e.g. add a `useState` to `useEnvironmentHandlers`.
+   The context type updates automatically (`ReturnType<typeof hook>`).
+3. **Consume** — any component calls `useEnvironment()` and sees the new field.
+
+If the new state doesn't fit any existing domain, create a new context file
+following the same pattern (Provider + hook + type export) and nest it in the
+provider stack in `StreamOnlyWindow`.
+
+### When to create a dedicated narrow context vs. extend an existing one
+
+Default to extending an existing context. Create a new narrow context
+(`SpatialSoundContext` / `Video360Context` shape) when **all** of:
+
+- State belongs to a single self-contained feature (one overlay, one
+  panel, one widget).
+- State is consumed by ≥3 unrelated components.
+- Feature carries non-trivial UI-preference state (e.g. session-level
+  `hasOnboarded`) that belongs in React state rather than module globals.
+
+Narrow-context providers don't need an internal handlers hook — a ~30-line
+file with `useState` + `useCallback` + `useMemo` and the exported
+`Provider`/`use*`/`*Type`/`*Entry` is the whole shape. Nest the new
+provider as a sibling of `ChatProvider` (so `ChatContext` can register
+Kit interaction actions that call into it).
+
+## WebRTC canvas (`AppStream`)
+
+`AppStreamCore` (default export from `features/streaming/AppStream.tsx`) is the
+low-level WebRTC surface; it accepts the full prop bundle (used by legacy
+`connection/Window.tsx`). **`AppStreamConnected`** is the Goteverse entry: it
+reads `useStream` / `useEnvironment` / `useNavigation` / `useControl` / `useAppUI`
+and passes session fields from `AppProps` plus the Kit event bridge — mount it
+only under the provider stack (`StreamOnlyWindowInner`).
+
+## Kit → React Event Bridge
+
+`useCustomEventHandler` in `StreamOnlyWindowInner` wires Kit events to context
+setters. It receives setters from the context hooks it wires and maps incoming event types
+to state updates. When adding a new Kit event:
+
+1. Add a setter to the appropriate hook (e.g. `useControlHandlers`)
+2. Add the mapping in `useCustomEventHandler`'s `EventStateSetters` type
+3. Handle the event in the relevant handler file under `hooks/eventHandlers/`

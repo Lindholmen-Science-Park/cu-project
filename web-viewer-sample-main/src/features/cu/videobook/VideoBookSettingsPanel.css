@@ -1,0 +1,387 @@
+/*
+ * Video Book Settings Panel — modal overlay floating above the videobook menu / player.
+ *
+ * Figma spec (Video-book-settings-explore_LIGHT):
+ *   Panel:  358 × hug 410, radius 24, border 1px #211740/30%, padding 16, gap 16, bg #EAE7E5/80%
+ *   Cards:  326 × hug ~96, radius 12, border 1px #211740/30%, padding 12, gap 12
+ *   Active toggle card highlight: bg #D8CFFF (Lighter Purple)
+ *   Caption text: Lexend 400 / 18 / 130%
+ *
+ * The z-index sits above `.vbook-overlay` (10050) and `.vbp-overlay` (10051) so the panel
+ * works equally over the chapter menu and the in-progress player.
+ */
+
+.vbsp-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 10060;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    /* Sit near the top of the viewport, with the safe-area inset respected on notched devices. */
+    padding: calc(16px + env(safe-area-inset-top, 0px)) 16px 16px 16px;
+    /*
+     * Transparent backdrop — the panel itself is translucent + blurred, and the design (Figma)
+     * shows the live video behind without a dark scrim. Pointer-events on the bare overlay so
+     * a click outside the panel still dismisses (handled by `onClick` on the React node).
+     */
+    background: transparent;
+    animation: vbsp-fade-in 0.18s ease;
+}
+
+@keyframes vbsp-fade-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+.vbsp-panel {
+    width: min(358px, 100%);
+    max-height: calc(100vh - 32px - env(safe-area-inset-top, 0px));
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 16px;
+    border-radius: 24px;
+    border: 1px solid rgba(33, 23, 64, 0.3); /* #2117404D */
+    background: rgba(234, 231, 229, 0.8);    /* #EAE7E5CC */
+    -webkit-backdrop-filter: blur(20px);
+    backdrop-filter: blur(20px);
+    box-shadow: 0 3px 7px rgba(0, 0, 0, 0.15);
+    color: #211740;
+    font-family: 'Lexend', system-ui, sans-serif;
+}
+
+/* Header — title + close button row, 326×48 (Figma). The 326 matches the panel's
+ * inner width (358 outer − 2×16 padding); we let it stretch instead of pinning so the
+ * row stays flush with the cards below regardless of side padding tweaks. */
+.vbsp-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 48px;
+    gap: 12px;
+}
+
+.vbsp-title {
+    margin: 0;
+    font-family: 'Lexend', system-ui, sans-serif;
+    font-weight: 500;
+    font-size: 20px;
+    line-height: 115%;
+    letter-spacing: 0;
+    color: var(--Dark-Purple, #351A84);
+}
+
+/*
+ * Reuse the videobook close button shell (white 48×48 circle, dark-purple X) by composing
+ * `vbp-close-btn` + `cu-panel-close-btn` — same component used by the chapter menu and the
+ * player top bar. The local `vbsp-close` class is kept as a hook in case we need scoped
+ * tweaks later (e.g. dark-mode overrides), but currently it only shrink-locks the flex item.
+ */
+.vbsp-close {
+    flex-shrink: 0;
+}
+
+/* Card — 326×96 hug per Figma; 326 is the panel inner width (358 − 2×16). */
+.vbsp-card {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 12px;
+    min-height: 96px;
+    box-sizing: border-box;
+    border-radius: 12px;
+    border: 1px solid rgba(33, 23, 64, 0.3);   /* #2117404D */
+    background: rgba(255, 255, 255, 0.0);
+    transition: background 0.18s ease;
+}
+
+.vbsp-card-title {
+    margin: 0;
+    font-family: 'Lexend', system-ui, sans-serif;
+    font-weight: 500;       /* Medium */
+    font-size: 17px;
+    line-height: 20px;
+    letter-spacing: 0;
+    color: var(--Dark-Purple, #351A84);
+}
+
+/*
+ * Card header — 302×24 (Figma "Label and toggle container") with the title pinned left
+ * and the toggle pinned right. Fixed 24px height so it lines up with the toggle pill,
+ * regardless of where the descender of the 17px Lexend title would otherwise push it.
+ */
+.vbsp-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    height: 24px;
+}
+
+.vbsp-card-hint {
+    margin: 0;
+    font-family: 'Lexend', system-ui, sans-serif;
+    font-weight: 400;
+    font-size: 12px;
+    line-height: 125%;
+    letter-spacing: 0;
+    color: var(--Dark-Purple, #351A84);
+}
+
+/*
+ * Autoplay card — 326×90, always Lighter Purple per Figma (it's not a "highlight when on"
+ * affordance; the entire card is treated as a toggleable region). Title row at the top,
+ * description hint at the bottom, justified with `space-between` for a clean ~12px gap.
+ */
+.vbsp-card--autoplay {
+    min-height: 90px;
+    justify-content: space-between;
+    background: var(--Lighter-Purple, #D8CFFF);
+    border-color: rgba(33, 23, 64, 0.3);   /* #2117404D */
+}
+
+/*
+ * Slider row — 302×40 (Figma "Slider container") holds the left label, the slider wrapper,
+ * and the right label. The Aa labels and the slider track all sit on the same 25px band at
+ * the top of the row; the bottom 15px is reserved for the under-track dots row.
+ *
+ * 302 = card inner width (326 − 2×12 padding).
+ */
+.vbsp-slider-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    width: 100%;
+    height: 40px;
+}
+
+/*
+ * "Aa" labels flanking the captions slider — both in Dark Purple Lexend Medium, sized
+ * differently to telegraph the range direction. Each label is forced into a 25px-tall box
+ * with its text vertically centred so the small/large variants share a baseline with the
+ * slider track regardless of their intrinsic font height.
+ */
+.vbsp-aa {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 25px;
+    font-family: 'Lexend', system-ui, sans-serif;
+    font-weight: 500;
+    color: var(--Dark-Purple, #351A84);
+    user-select: none;
+    line-height: 1;
+}
+
+.vbsp-aa--sm { font-size: 17px; }
+.vbsp-aa--lg { font-size: 24px; }
+
+/*
+ * Speed slider end glyphs (Min / Max). Wrapped in a fixed 25px-tall flex box so the SVGs —
+ * which have different intrinsic heights (14 vs 19) — share the same vertical centre as
+ * the slider track and the Aa labels on neighbouring cards.
+ */
+.vbsp-speed-icon {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 25px;
+    color: var(--Dark-Purple, #351A84);
+}
+
+/*
+ * Slider wrapper — relatively positioned so the two purple endpoint dots can sit on the
+ * track's start / end without affecting flex sizing of the input. The dots align with
+ * where the thumb rests at min / max (the input has natural inner padding equal to one
+ * thumb radius on each side, which the dots intentionally fall *inside* of).
+ */
+/*
+ * Slider wrapper — taller than the input (40 vs 25) so the purple stop dots can sit
+ * directly *under* the track (matching Figma's "Dots container under slider" frame at
+ * top: 22.5px). The input is anchored to the top so the thumb's vertical centre lines
+ * up where it would in a 25px-tall control.
+ */
+.vbsp-range-wrap {
+    position: relative;
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 40px;
+    display: flex;
+    align-items: flex-start;
+}
+
+.vbsp-range-dot {
+    position: absolute;
+    top: 28px;                /* dot top: 25 (track row) + small gap so it sits clearly below */
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--Medium-Purple, #5421CC);
+    pointer-events: none;
+}
+
+/* Sit the dots under the thumb's resting positions (track ends + dead centre).
+ * Captions slider renders 3 dots; playback-speed renders only start + end. */
+.vbsp-range-dot--start  { left: 8px; }
+.vbsp-range-dot--end    { right: 8px; }
+.vbsp-range-dot--middle { left: 50%; transform: translateX(-50%); }
+
+/*
+ * Range slider — purple-on-light track + medium-purple thumb to match Figma.
+ * Flexes by default so it works as a direct child of `.vbsp-slider-row` (e.g. the
+ * playback-speed card). When wrapped by `.vbsp-range-wrap` for endpoint dots, the
+ * wrapper carries the flex sizing and the input simply fills it.
+ */
+.vbsp-range {
+    flex: 1 1 auto;
+    min-width: 0;
+    width: 100%;
+    height: 25px;
+    margin: 0;
+    appearance: none;
+    -webkit-appearance: none;
+    background: transparent;
+    cursor: pointer;
+}
+
+.vbsp-range:focus { outline: none; }
+
+.vbsp-range:focus-visible {
+    outline: 2px solid var(--Dark-Purple, #351A84);
+    outline-offset: 6px;
+    border-radius: 999px;
+}
+
+.vbsp-range::-webkit-slider-runnable-track {
+    height: 6px;
+    border-radius: 999px;
+    background: rgba(84, 33, 204, 0.25);
+}
+
+.vbsp-range::-webkit-slider-thumb {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--Medium-Purple, #5421CC);
+    box-shadow: 0 1px 4px rgba(33, 23, 64, 0.25);
+    cursor: pointer;
+    margin-top: -8px;
+    position: relative;
+    z-index: 1;
+}
+
+.vbsp-range::-moz-range-track {
+    height: 6px;
+    border-radius: 999px;
+    background: rgba(84, 33, 204, 0.25);
+}
+
+.vbsp-range::-moz-range-thumb {
+    width: 22px;
+    height: 22px;
+    border: none;
+    border-radius: 50%;
+    background: var(--Medium-Purple, #5421CC);
+    box-shadow: 0 1px 4px rgba(33, 23, 64, 0.25);
+    cursor: pointer;
+    position: relative;
+    z-index: 1;
+}
+
+.vbsp-card--active .vbsp-range::-webkit-slider-runnable-track,
+.vbsp-card--active .vbsp-range::-moz-range-track {
+    background: rgba(33, 23, 64, 0.18);
+}
+
+/*
+ * Toggle group — 69×24 (Figma "Toggle container") with the uppercase ON/OFF text on the
+ * left and the 45×24 pill on the right, separated by a 4px gap.
+ */
+.vbsp-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+    height: 24px;
+}
+
+/* Uppercase status text (~20×13). Lexend SemiBold 12 / 110%, Dark Purple. */
+.vbsp-toggle__text {
+    min-width: 20px;
+    font-family: 'Lexend', system-ui, sans-serif;
+    font-weight: 600;     /* SemiBold */
+    font-size: 12px;
+    line-height: 110%;
+    letter-spacing: 0;
+    text-transform: uppercase;
+    text-align: right;
+    color: var(--Dark-Purple, #351A84);
+    user-select: none;
+}
+
+/* Pill button — 45×24 outer (border-box so the 1px border is included in the footprint).
+ * Dark Purple background in both states (Figma shows the pill colour fixed; only the
+ * knob slides). */
+.vbsp-toggle__pill {
+    position: relative;
+    flex-shrink: 0;
+    box-sizing: border-box;
+    width: 45px;
+    height: 24px;
+    padding: 0;
+    margin: 0;
+    border-radius: 30px;
+    border: 1px solid rgba(33, 23, 64, 0.3);   /* #2117404D */
+    background: var(--Dark-Purple, #351A84);
+    cursor: pointer;
+    transition: background 0.18s ease, border-color 0.18s ease;
+}
+
+.vbsp-toggle__pill:focus { outline: none; }
+
+.vbsp-toggle__pill:focus-visible {
+    outline: 2px solid var(--Dark-Purple, #351A84);
+    outline-offset: 3px;
+}
+
+/*
+ * Knob — 18×18 Off-white circle, slides between the two stops with symmetric 4px insets.
+ * Coordinates are relative to the content edge (i.e. inside the 1px border):
+ *   - Vertical: top: 2  → outer-y = 3   (Figma "top: 3px")
+ *   - OFF:      left: 3  → outer-x = 4   (left inset 4px)
+ *   - ON:       left: 22 → outer-x = 23  (Figma "left: 23px"; right inset 4px)
+ */
+.vbsp-toggle__knob {
+    position: absolute;
+    top: 2px;
+    left: 3px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--Off-white, #F6F6F6);
+    box-shadow: 0 1px 2px rgba(33, 23, 64, 0.25);
+    transition: left 0.22s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+.vbsp-toggle__pill--on .vbsp-toggle__knob {
+    left: 22px;
+}
+
+/* Landscape / short viewport — keep the panel scrollable instead of clipping. */
+@media (max-height: 500px) {
+    .vbsp-overlay {
+        align-items: flex-start;
+        padding-top: 12px;
+        padding-bottom: 12px;
+    }
+
+    .vbsp-panel {
+        max-height: calc(100vh - 24px);
+    }
+}

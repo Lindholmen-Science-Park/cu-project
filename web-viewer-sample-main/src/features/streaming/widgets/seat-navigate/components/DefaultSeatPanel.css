@@ -1,0 +1,215 @@
+/* Default (dev) variant of the seat navigation panel — draggable floating card */
+
+.seat-panel-default {
+    position: absolute;
+    z-index: 1100;
+    width: 320px;
+}
+
+.seat-panel-default__card {
+    background: rgba(0, 0, 0, 0.75);
+    border-radius: 10px;
+    color: #fff;
+    font-size: 13px;
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+    overflow: hidden;
+}
+
+.seat-panel-default__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    user-select: none;
+    touch-action: none;
+}
+
+.seat-panel-default__close {
+    background: none;
+    border: none;
+    color: #b3b3b3;
+    cursor: pointer;
+    font-size: 18px;
+    padding: 0 4px;
+}
+
+.seat-panel-default__body {
+    padding: 12px;
+}
+
+.seat-panel-default__row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.seat-panel-default__field {
+    flex: 1;
+    min-width: 0;
+}
+
+.seat-panel-default__field-label {
+    font-size: 11px;
+    color: #999999;
+    margin-bottom: 3px;
+    font-weight: 600;
+}
+
+.seat-panel-default__input {
+    width: 100%;
+    padding: 8px 10px;
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: rgba(0, 0, 0, 0.3);
+    color: #fff;
+    font-size: 0.9rem;
+    box-sizing: border-box;
+}
+
+.seat-panel-default__btn-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.seat-panel-default__btn {
+    flex: 1;
+    padding: 8px 14px;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 13px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    cursor: pointer;
+}
+
+.seat-panel-default__btn--go {
+    background: rgba(76, 175, 80, 0.4);
+    color: #fff;
+}
+
+.seat-panel-default__btn--go:disabled {
+    background: rgba(76, 175, 80, 0.15);
+    color: #999999;
+    cursor: default;
+}
+
+.seat-panel-default__btn--stop {
+    background: rgba(244, 67, 54, 0.4);
+    color: #fff;
+}
+
+.seat-panel-default__btn--teleport {
+    border: 1px solid rgba(156, 39, 176, 0.5);
+    background: rgba(156, 39, 176, 0.4);
+    color: #fff;
+}
+
+.seat-panel-default__btn--teleport:disabled {
+    background: rgba(156, 39, 176, 0.15);
+    color: #999999;
+    cursor: default;
+}
+
+.seat-panel-default__status {
+    font-size: 0.8rem;
+    color: #cccccc;
+    margin-bottom: 6px;
+}
+
+.seat-panel-default__status--error {
+    color: #ff6b6b;
+}
+
+.seat-panel-default__measure {
+    font-size: 0.8rem;
+    color: #b3b3b3;
+    margin-bottom: 4px;
+}
+
+.seat-panel-default__measure-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.seat-panel-default__measure-delta {
+    font-size: 0.75rem;
+    color: #808080;
+    margin-top: 2px;
+}
+
+.seat-panel-default__icon-btn {
+    background: none;
+    border: none;
+    color: #b3b3b3;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.seat-panel-default__checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 6px;
+    margin-bottom: 4px;
+    cursor: pointer;
+    font-size: 11px;
+    color: #999999;
+}
+
+.seat-panel-default__checkbox {
+    accent-color: #4caf50;
+}
+
+.seat-panel-default__toggle-row {
+    display: flex;
+    gap: 6px;
+    margin-top: 4px;
+}
+
+.seat-panel-default__toggle {
+    flex: 1;
+    padding: 5px 8px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.08);
+    color: #999999;
+}
+
+.seat-panel-default__toggle--crowd-on {
+    border: 1px solid rgba(255, 152, 0, 0.6);
+    background: rgba(255, 152, 0, 0.25);
+    color: #ffcc80;
+}
+
+.seat-panel-default__toggle--noise-on {
+    border: 1px solid rgba(33, 150, 243, 0.6);
+    background: rgba(33, 150, 243, 0.25);
+    color: #90caf9;
+}
+
+.seat-panel-default__move-btn {
+    margin-top: 8px;
+    width: 100%;
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    color: #fff;
+}
+
+.seat-panel-default__move-btn--go {
+    background: rgba(76, 175, 80, 0.7);
+}
+
+.seat-panel-default__move-btn--stop {
+    background: rgba(244, 67, 54, 0.7);
+}

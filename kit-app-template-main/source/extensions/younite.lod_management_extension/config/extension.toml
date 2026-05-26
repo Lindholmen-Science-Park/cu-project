@@ -1,0 +1,14 @@
+[package]
+title = "LOD Management Extension"
+description = "Switches Skandinavium LOD variant automatically based on camera view mode, with manual override support"
+version = "2.0.0"
+authors = ["Younite"]
+keywords = ["USD", "LOD", "Performance", "Camera", "VariantSet"]
+category = "3D"
+
+[dependencies]
+"omni.usd" = {}
+"younite.messaging_core_extension" = {}
+
+[[python.module]]
+name = "younite.lod_management_extension"

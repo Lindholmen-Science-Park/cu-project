@@ -1,0 +1,113 @@
+#usda 1.0
+
+over "World"
+{
+    def Xform "Environment"
+    {
+        custom string date = "2026-02-26"
+        custom double location:latitude = 57.692830562
+        custom double location:longitude = 11.985996056
+        custom double location:north_orientation = 0
+        custom float time:current = 14.009137
+        custom float weather:cloud_coverage = 0
+        custom bool weather:cumulus_enabled = 1
+        float3 xformOp:rotateXYZ = (0, 0, 0)
+        float3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (-3134.3314475767547, -2.02817318495363e-10, -1891.5997795118928)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+
+        def Xform "sky" (
+            prepend references = @https://omniverse-content-production.s3.us-west-2.amazonaws.com/Environments/2024_1/DomeLights/Dynamic/CumulusLight.usd@
+        )
+        {
+            float3 xformOp:rotateZYX = (0, 0, 0)
+
+            over "AxisNorth"
+            {
+                double3 xformOp:rotateZYX = (0, 0, 0)
+
+                over "AxisLatitude"
+                {
+                    double3 xformOp:rotateZYX = (0, 0, 57.7089)
+                    float3 xformOp:scale = (1, 1, 1)
+                    double3 xformOp:translate = (0, 0, 0)
+                    uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateZYX", "xformOp:scale"]
+
+                    over "AxisSHA"
+                    {
+                        double3 xformOp:rotateZYX = (150.20640829557885, 0, 0)
+
+                        over "AxisDeclination"
+                        {
+                            double3 xformOp:rotateZYX = (0, 0, 7.999834338981633)
+
+                            over "DistantLight"
+                            {
+                                color3f inputs:color = (1, 0.98, 0.95)
+                                float inputs:intensity = 4000
+                            }
+                        }
+                    }
+                }
+
+                over "AxisAzimuth"
+                {
+                    double3 xformOp:rotateZYX = (0, 139.9371142832247, 0)
+                    float3 xformOp:scale = (1, 1, 1)
+                    double3 xformOp:translate = (0, 0, 0)
+                    uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateZYX", "xformOp:scale"]
+
+                    over "AxisElevation"
+                    {
+                        double3 xformOp:rotateZYX = (0, 0, 40.1391377706579)
+                    }
+                }
+
+                over "SkySphere"
+                {
+                    float3 xformOp:rotateZYX = (0, 0, 0)
+                    float3 xformOp:scale = (10000, 10000, 10000)
+                    double3 xformOp:translate = (0, 0, 0)
+                    uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateZYX", "xformOp:scale"]
+                }
+            }
+
+            over "DomeLight" (
+                prepend apiSchemas = ["ShadowAPI"]
+            )
+            {
+                # See dynamic_environment.usda — same CumulusLight ./textures/office2.hdr pitfall.
+                asset inputs:texture:file = @../../environment/textures/color_0C0C0C.exr@
+                float inputs:intensity = 0.9
+                bool inputs:shadow:enable = false
+                float3 xformOp:rotateZYX = (270, 0, 0)
+                float3 xformOp:scale = (1, 1, 1)
+                float3 xformOp:translate = (0, 0, 0)
+                uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateZYX", "xformOp:scale"]
+            }
+
+            over "Looks"
+            {
+                over "SkyMaterial"
+                {
+                    over "Shader"
+                    {
+                        float inputs:Azimuth = 139.93712
+                        custom float inputs:CloudCoverage = 0
+                        custom bool inputs:CumulusEnabled = 1
+                        float inputs:DayOfYear = 100
+                        float inputs:Declination = 7.9998345
+                        float inputs:Elevation = 40.139137
+                        float inputs:Latitude = 57.7089
+                        float inputs:Longitude = -0.985
+                        float inputs:NorthOrientation = 0
+                        float inputs:SHA = 29.793592
+                        float inputs:TimeOfDay = 14.009137
+                        float inputs:TimeOfDaySpeed = 0.001
+                    }
+                }
+            }
+        }
+    }
+}
+

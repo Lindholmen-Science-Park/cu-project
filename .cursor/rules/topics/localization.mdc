@@ -1,0 +1,74 @@
+---
+description: Localization (i18n) — i18next setup, translation files, language selector wiring, AI API language fallback, Kit-side localized strings, adding new languages
+---
+
+# Localization (i18n)
+
+CU frontend localization via **i18next** + **react-i18next**. All CU UI strings are translated; the dev UI is intentionally left hardcoded in English.
+
+**Supported languages**: English (`en`), Swedish (`sv`), French (`fr`), Spanish (`es`).
+**AI API languages**: Only `en` and `sv` — others fall back to `en` via the shared `aiLanguageFor()` helper in `services/aiLanguage.ts` (never duplicate this list elsewhere).
+
+## Key files
+
+| File | Purpose |
+|------|---------|
+| `web-viewer-sample-main/src/i18n/index.ts` | i18next init, language detection config, resource registration |
+| `web-viewer-sample-main/src/i18n/locales/{en,sv,fr,es}.json` | Translation strings — includes `interactions.*` keys for NPC/icon content |
+| `web-viewer-sample-main/src/features/cu/constants.ts` | `SETTINGS_LANGUAGES` with `i18nCode` per language |
+| `web-viewer-sample-main/src/features/cu/controls/SettingsPanel.tsx` | Language selector + `ai.agent.setLanguage` dispatch |
+| `web-viewer-sample-main/src/features/cu/overlays/onboarding/OnboardingOverlay.tsx` | Onboarding language selector (same logic) |
+| `kit-app-template-main/source/data/interactions.json` | Interaction entries — localizable fields contain i18n key references (e.g. `"interactions.avatar_red.greeting"`) |
+| `web-viewer-sample-main/src/features/streaming/overlays/interactionBoxes/InteractionBoxesOverlay.tsx` | `resolveLocalized()` — picks `title_{lang}` from Kit payloads (area/object interactions) |
+| `web-viewer-sample-main/src/features/streaming/contexts/ChatContext.tsx` | `welcomeAvatarChatConfig` — translated greeting + quick actions via `t('interactions.avatar_red.*')` |
+| `web-viewer-sample-main/src/features/streaming/overlays/avatarChat/AvatarChatOverlay.tsx` | Overrides first message with current translated greeting on language change |
+
+## How it works
+
+1. **Startup** — `i18n/index.ts` initializes with `fallbackLng: 'en'`. Language detection is disabled (empty `order`/`caches`), so every session starts English.
+2. **Language change** — Dropdown calls `i18n.changeLanguage(code)`. All components using `useTranslation()` / `t()` re-render with the new locale.
+3. **AI API fallback** — `services/aiLanguage.ts` exports `aiLanguageFor(uiLang)` (single source of truth, knows only `en`/`sv`). All outgoing AI request payloads include `language: aiLanguageFor(i18n.language)` (`ai.agent.setLanguage`, `ai.agent.request`, `ai.chat.request`). Incoming `ai.agent.response` messages are tagged with the same lang so the TTS "Listen" button uses the correct voice — see `text-to-speech.mdc`. The UI itself stays in the selected language.
+4. **Interaction strings (i18n key pattern)** — NPC and icon interaction entries in `interactions.json` store **i18n key references** (e.g. `"greeting": "interactions.avatar_red.greeting"`) instead of literal text. Frontend components resolve these via `t(cfg.greeting)`. Translations live in the `"interactions"` section of each locale file.
+5. **Area/object interaction strings** — `InteractionBoxesOverlay` still uses the `title_{lang}` fallback pattern via `resolveLocalized()` for area/object interaction payloads. These may be migrated to the i18n key pattern in the future.
+6. **Chat greeting** — `welcomeAvatarChatConfig` in `ChatContext.tsx` is a `useMemo` using `t('interactions.avatar_red.*')` keys. `AvatarChatOverlay` dynamically patches the first displayed message with the current translation.
+
+## Persistence (currently disabled)
+
+Neither language nor theme is persisted to localStorage. To re-enable, in `i18n/index.ts`:
+```typescript
+detection: {
+    order: ['localStorage'],
+    caches: ['localStorage'],
+}
+```
+For theme, uncomment the `localStorage` read in `constants.ts` (`getInitialLightMode`) and write in `SettingsPanel.tsx`.
+
+## Interaction locale keys
+
+NPC (`npcConfig`) and icon (`iconConfig`) entries in `interactions.json` use i18n key references for all user-facing text. The keys follow the pattern `interactions.<entry_id>.<field>`.
+
+Example keys for the NPC `avatar_red`:
+- `interactions.avatar_red.greeting` — bubble greeting
+- `interactions.avatar_red.quickAction_navigate_help` — quick action label
+
+Example keys for icon `icon_ipad`:
+- `interactions.icon_ipad.greeting` — icon bubble greeting
+- `interactions.icon_ipad.title` — videobook title
+- `interactions.icon_ipad.subtitle` — videobook subtitle
+- `interactions.icon_ipad.chapter_queues` — chapter label
+
+Frontend resolution:
+- `NpcBubbleOverlay.tsx` — `t(cfg.greeting)`
+- `IconBubbleOverlay.tsx` — `t(cfg.greeting)`
+- `VideoBookOverlay.tsx` — `t(entry.title)`, `t(entry.subtitle)`, `t(ch.label)` via a `localizedEntry` memo
+- `ChatContext.tsx` — `t('interactions.avatar_red.greeting')` for the welcome chat config
+
+The `videobook` section in locale files holds UI labels for the videobook player (`videobook.autoplay`, `videobook.settings`).
+
+## Adding a new language
+
+1. Create `src/i18n/locales/{code}.json` with all translation keys, including the `interactions` and `videobook` sections
+2. Import in `src/i18n/index.ts`, add to `resources` and `supportedLngs`
+3. Add entry to `SETTINGS_LANGUAGES` in `constants.ts` with matching `i18nCode`
+4. Add `title_{code}` fields to area/object interaction entries in `interactions.json` that still use the `resolveLocalized()` pattern
+5. If the AI API supports the language, add the code to `AI_SUPPORTED_LANGS` in both `SettingsPanel.tsx` and `OnboardingOverlay.tsx`

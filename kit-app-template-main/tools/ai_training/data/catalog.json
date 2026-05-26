@@ -1,0 +1,67 @@
+{
+	"version": 1,
+	"generatedFrom": "../poi_index.json",
+	"note": "Reference catalog for training. Positions and descriptions are stored in poi_index.json (runtime). AI training only needs to learn query -> poi_id mapping.",
+	"items": [
+		{
+			"id": "poi_gothia_towers",
+			"names": { "en": "Gothia Towers", "sv": "Gothia Towers" },
+			"tags": ["hotel","towers","modern","landmark","conference"],
+			"aliases": ["gothia", "gothia tower", "gothia towers hotel"]
+		},
+		{
+			"id": "poi_skandinavium",
+			"names": { "en": "Skandinavium", "sv": "Skandinavium" },
+			"tags": ["arena","stadium","events","sports","concerts","entertainment"],
+			"aliases": ["scandinavium", "arena", "stadion"]
+		},
+		{
+			"id": "poi_liseberg",
+			"names": { "en": "Liseberg", "sv": "Liseberg" },
+			"tags": ["amusement park","entertainment","rides","family","attraction"],
+			"aliases": ["liseberg", "amusement park", "nöjespark"]
+		},
+		{
+			"id": "poi_universeum",
+			"names": { "en": "Universeum", "sv": "Universeum" },
+			"tags": ["science","museum","aquarium","rainforest","education","family"],
+			"aliases": ["universeum", "science center", "vetenskapscenter", "aquarium"]
+		},
+		{
+			"id": "poi_garden_society",
+			"names": { "en": "Garden Society of Gothenburg", "sv": "Trädgårdsföreningen" },
+			"tags": ["park","garden","historic","nature","green space","peaceful"],
+			"aliases": ["garden society", "trädgårdsföreningen", "palm house", "palmhuset"]
+		},
+		{
+			"id": "poi_gotaplatsen",
+			"names": { "en": "Götaplatsen", "sv": "Götaplatsen" },
+			"tags": ["square","plaza","statue","culture","art","landmark"],
+			"aliases": ["gotaplatsen", "götaplatsen", "poseidon", "square"]
+		},
+		{
+			"id": "poi_art_museum",
+			"names": { "en": "Gothenburg Museum of Art", "sv": "Göteborgs Konstmuseum" },
+			"tags": ["museum","art","culture","exhibitions","historic"],
+			"aliases": ["art museum", "konstmuseum", "museum", "art gallery"]
+		},
+		{
+			"id": "poi_haga",
+			"names": { "en": "Haga District", "sv": "Haga" },
+			"tags": ["historic","neighborhood","cafes","shopping","cobblestone","old"],
+			"aliases": ["haga", "haga district", "old town", "gamla stan"]
+		},
+		{
+			"id": "poi_feskekorka",
+			"names": { "en": "Feskekôrka", "sv": "Feskekôrka" },
+			"tags": ["market","seafood","fish","historic","food","shopping"],
+			"aliases": ["feskekorka", "fish church", "fiskkyrkan", "seafood market"]
+		},
+		{
+			"id": "poi_avenyn",
+			"names": { "en": "Avenyn", "sv": "Avenyn" },
+			"tags": ["shopping","street","restaurants","entertainment","main"],
+			"aliases": ["avenyn", "main street", "shopping street", "huvudgatan"]
+		}
+	]
+}

@@ -1,0 +1,363 @@
+---
+description: Camera view switching, spawnpoint teleport, view-type propagation, fixed scene cameras, TeleportService, view transition overlay, CU view toggle, FP state capture/restore, user location marker
+globs:
+  - "**/camera_service*"
+  - "**/teleport_service*"
+  - "**/feature_commands_service*"
+  - "**/feature_commands_service/**"
+  - "**/settings_watchers*"
+  - "**/player_spawnpoints_layer*"
+  - "**/viewTransition*"
+  - "**/view_transition*"
+  - "**/CUControls*"
+alwaysApply: false
+---
+
+# Camera view switching & spawnpoint teleport
+
+Two view modes: **firstPerson** (ground level, mouse look) and **birdEye** (overhead, mouse pan). Both use the same camera prim (`/World/PlayerCharacter/first_person_camera`) — the difference is spawnpoint height and how input is interpreted.
+
+The default startup view is configured via `/younite/camera/defaultViewType` in the `.kit` app config (see `stage-init.mdc`). All modules read this through `get_default_view_type()` in `world_conventions.py`.
+
+## Architecture overview
+
+```
+Web UI button click
+       │
+       ▼
+beginViewTransition({ onFadeOutComplete: () => sendMessage(...) })
+       │
+       ├─ CSS fade-out (1s) ──► screen fully black
+       │                              │
+       │                    onFadeOutComplete fires
+       │                              │
+       │                    Kit command sent via streaming channel
+       │                              │
+       ▼                              ▼
+ViewTransitionOverlay          FeatureCommandsService
+(state machine:                       │
+ idle→fadeOut→solid→fadeIn→idle) ┌─────┼──────────┐
+       ▲                        ▼     ▼          ▼
+       │               CameraService  LOD    NavMesh (FP)
+       │                     │
+       │              TeleportService
+       │                     │
+       │              viewTransitionReady ──► notifyViewTransitionKitReady()
+       │                                              │
+       └──────────── fade-in (1s) ◄───────────────────┘
+```
+
+## View transition overlay (web)
+
+**Package**: `web-viewer-sample-main/src/features/streaming/viewTransition/`
+
+All teleport and view-switch actions go through a full-screen fade overlay. The flow is consistent for every entry point (camera buttons, map markers, chat, seat teleport, POI teleport):
+
+1. Caller invokes `beginViewTransition({ onFadeOutComplete: () => { ... } })`
+2. Overlay fades to black (1s CSS transition)
+3. Phase reaches `solid` — `onFadeOutComplete` fires, sending the Kit command
+4. Kit processes (LOD switch, navmesh bake if first FP entry, teleport)
+5. Kit dispatches `viewTransitionReady`
+6. Web receives the event, overlay fades in (1s)
+
+The overlay shows a centered label while the screen is solid black.
+
+### Overlay message convention (target the *destination view*, not the action)
+
+Every entry point that calls `beginViewTransition({ message })` must label the overlay by **the view the player is switching INTO**, not by the underlying action (teleport, navigate, chat-move, etc.). The very first thing every flow does — whether it is a seat teleport, a POI teleport, a click on a map-marker, a chat "go there", a geo-teleport, or the CU view-toggle — is move the player out of bird's-eye and into first person. Naming the overlay after that universal step keeps the UX consistent across all flows.
+
+| Destination | i18n key | English value |
+|---|---|---|
+| First person (any path: teleport / directions / chat / map-marker / CU toggle / geo) | `streaming.switchingFirstPerson` | "Switching to first person…" |
+| Bird's-eye (CU toggle back to overview, GlobeViewOverlay return) | `streaming.switchingOverview` | "Switching to overview…" |
+| Space view (Globe view) | `streaming.enteringSpace` | "Entering space view…" |
+
+**Anti-patterns to avoid** (historic bugs):
+- Hard-coding `'Teleporting…'` in non-component modules (`useSeatNavigation`, `useNavmeshCore`, `geoTeleport`, `ChatWidget`) — bypasses i18n and reads as an *action* not a destination.
+- Reusing a button label as the overlay text (e.g. `t('search.toiletTeleportThere')` → "Teleport me there") — describes the click intent, not the resulting view.
+
+For non-component modules, use `import i18n from '../.../i18n'` and `i18n.t('streaming.switchingFirstPerson')` directly (this is the same pattern `navigationHandlers.ts` uses).
+
+### Key types
+
+- `BeginViewTransitionOptions.onFadeOutComplete` — callback fired when screen is fully opaque; send Kit commands here
+- `ViewTransitionPhase` — `'idle' | 'fadeOut' | 'solid' | 'fadeIn'`
+- `beginViewTransition()` — imperative API callable from any component
+- `useViewTransitionController()` — React hook managing the state machine
+
+### Reliability (fade-in phase must return to `idle`)
+
+If the overlay stays in **`fadeIn`** without receiving **`transitionend`** on opacity (browser timing quirks), two issues appeared historically:
+
+1. **Invisible input blocker** — `.view-transition-layer--fadeIn` used **`pointer-events: auto`** while **`opacity: 0`**, so the full-screen layer ate all clicks/look even though it looked clear.
+2. **Stuck state** — `begin()` refuses to start unless `phase === 'idle'`, so a second teleport never began.
+
+**Fixes** (`ViewTransitionOverlay.css`, `useViewTransitionController.tsx`):
+
+- **`fadeIn`** uses **`pointer-events: none`** so input reaches the stream while fading in (and if stuck, the app stays usable).
+- **Fallback timeout** after entering **`fadeIn`** (`fadeInMs + 200`) forces **`idle`** if `transitionend` never fires.
+
+## CameraService
+
+**File**: `stage_core_extension/services/kit_services/camera_service.py`
+**Owner**: `younite.usd_viewer_stage_core_extension`
+
+### Key methods
+
+**`_apply_view_type(view_type)`** — single source of truth for all view-type transitions. Does NOT teleport.
+1. Sets `_current_view_type`
+2. Writes carb setting `/younite/camera/viewType`
+3. Dispatches `younite.camera.viewTypeChanged` via eventdispatcher (LOD extension reacts synchronously)
+4. Rebinds viewport to player camera via `viewport.set_active_camera()`
+
+**`switch_camera_view(view_type, *, spawn_point="")`** — full view switch with teleport.
+- Calls `_apply_view_type` **first** (LOD / listeners see the new mode before the move)
+- Teleports to `spawn_point` or the default for the view type (`PlayerSpawnPoint_01` for firstPerson, `PlayerSpawnPoint_02` for birdEye)
+
+**`move_player_to_spawnpoint(name, apply_gravity=None)`** — teleport only, no view-type change.
+
+## FeatureCommandsService (event routing + async orchestration)
+
+**Package**: `stage_core_extension/services/core_services/feature_commands_service/`
+
+A thin orchestrator split into focused submodules (was a 1474-line monolith):
+
+| Submodule | Role |
+|---|---|
+| `service.py` | `FeatureCommandsService` — event wiring, shared primitives, small inline handlers (fog / fixed camera / reset / movement speed / camera height / physics) |
+| `view_switcher.py` | `ViewSwitcher` — first-person entry + non-FP view transitions (`async_first_person_enter`, `async_non_fp_view_switch`, `on_camera_view_switch`, `on_spawnpoint_teleport`) |
+| `fp_state.py` | `FpStateStore` — FP state capture / restore (carb settings + `WorldStateSyncService`) |
+| `map_marker_directions.py` | `MapMarkerDirectionsHandler` — bird-eye directions panel (POI + pin-anywhere) |
+| `seat_directions.py` | `SeatDirectionsHandler` — bird-eye seat directions + seat teleport |
+| `directions_utils.py` | Pure helpers shared by the directions flows (polyline yaw, world-pos coerce, route compose + preset dispatch) |
+
+Routes incoming web/chat events to `CameraService`. For view switches and FP entry, orchestrates async steps and dispatches `viewTransitionReady` when the scene is ready.
+
+**`ViewSwitcher.async_non_fp_view_switch`** — calls `switch_camera_view` (synchronous), awaits LOD predicate, waits `STREAM_SETTLE_FRAMES` render frames, then dispatches `viewTransitionReady`.
+
+**`ViewSwitcher.async_first_person_enter`** — serialized via `asyncio.Lock` on the `ViewSwitcher` instance. Applies FP view type, awaits LOD predicate (`full` variant), awaits navmesh bake (first time only via `first_person_navmesh_bridge`), teleports (restoring stored FP state if available, see below), waits `STREAM_SETTLE_FRAMES` render frames, then dispatches `viewTransitionReady`. Returns `True` on success, `False` on failure.
+
+The orchestrator exposes `svc.async_first_person_enter(...)` as a thin forwarder so the directions handlers don't reach through `svc.view_switcher.*`.
+
+**Teleport options (single code path through `_apply_transform_to_player`).** All teleport variants — Foyer / seat / restroom / pin — land in the same player+camera state shape (translate + body rotation + camera reset to identity + movement-controller reset); only the input data differs:
+
+1. **Named spawn** — Foyer and other map-marker POIs go through `TeleportService.teleport_to_spawn_point(name)`, reading translate + rotation from the authored `PlayerSpawnPoint_*` prim.
+2. **Stored FP** — "back to previous location" toggle restores the captured first-person pose via `teleport_to_coordinates(x, y, z)` + `_restore_fp_rotation`.
+3. **Arbitrary world pose (post-FP-enter)** — destinations without a `PlayerSpawnPoint_*` (restrooms / quiet zones / pin-anywhere) and swap flows are handled by the directions handlers, **after** `async_first_person_enter` completes. The handler composes the route first so it can derive `body_yaw_deg` from the first polyline segment (`directions_utils.yaw_from_polyline`), then calls `TeleportService.teleport_to_coordinates(x, y, z, world_body_yaw_deg=yaw)` to both translate and orient the player so the dashed bird-eye polyline leads forward — never behind them. Navmesh POIs arrive on `mapMarkerDirectionsStart` as `startEndpointPath`; the handler resolves the prim's xform to a world-space `start_pos` before the teleport. (`TeleportService.teleport_to_pose` exists for callers that already have a yaw and want a single-method path, but directions handlers prefer `teleport_to_coordinates` because it reuses the same yaw-sync machinery used by generic spawn flows.)
+
+**`dispatch_ready=False` (deferred ready dispatch).** The bird-eye-directions handlers (`SeatDirectionsHandler._run_directions`, `MapMarkerDirectionsHandler._run`) call `svc.async_first_person_enter(spawn_point, dispatch_ready=False)` and then **`await svc.await_navmesh_route_settled(route_id, timeout_sec=20.0)`** before manually calling `svc.dispatch_view_transition_ready('firstPerson', success)`. This keeps the black "Switching to first person…" overlay up until the route polyline is genuinely drawable in the new view, so the user never sees an empty FP scene that pops a route in late. Failure paths still dispatch `viewTransitionReady` (otherwise the overlay would hang forever); on a route failure the user **stays in first person** and the panel-level error surfaces — we deliberately do not roll back to bird-eye. See `bird-eye-route.mdc` → "Route ready gating" for the matching web-side gate that withholds the play FAB until `navmeshRouteReady` arrives.
+
+LOD predicate polling uses `view_transition_readiness.await_stadium_lod_for_view_type()` with a monotonic deadline as safety cap. Teleport correctness is not re-verified — `move_player_to_spawnpoint` is synchronous and its return value indicates success.
+
+### FP state capture/restore
+
+When the user toggles from first person to bird's eye (or any non-FP view), `ViewSwitcher.on_camera_view_switch` snapshots the player's full first-person state via `FpStateStore` before the camera switches. When toggling back, this state is restored so the user resumes exactly where they left off. If the user instead teleports to a named location (Foyer, Arena, etc.), the spawn point's own transform is used and any stored state is discarded.
+
+**State dict** returned by `FpStateStore.capture()`:
+```
+{
+    "x", "y", "z":        world-space translation (from XformCache)
+    "bodyRotX/Y/Z":        player prim rotation (RotateYXZ or RotateXYZ op)
+    "camRotX", "camRotY":  first_person_camera local rotation (pitch, yaw)
+}
+```
+
+**Storage** (`FpStateStore.store` / `FpStateStore.read`):
+- **Carb settings** (`/younite/player/lastFp*`): individual float keys + a `lastFpPosValid` boolean gate. Used by the interactions extension to project the user location marker (cross-extension, no import needed).
+- **WorldStateSyncService** (`lastFirstPersonPosition`): position-only `{x, y, z}` dict pushed to the web for display-copy state. Rotation is Kit-internal only.
+- Passing `None` to `FpStateStore.store` sets `lastFpPosValid = False` without clearing individual keys.
+
+**Restore flow** (`ViewSwitcher.async_first_person_enter`):
+1. If `spawn_point` is provided (named teleport like Foyer) → `stored = None`, uses spawn point transform + rotation
+2. If `spawn_point` is empty (toggle back from bird's eye) → reads stored state from carb settings via `FpStateStore.read()`
+3. If stored state exists → `teleport_to_coordinates(x, y, z)` positions the player, then `FpStateStore.restore_rotation(stored)` applies body rotation via USD xform ops, camera rotation via RotateXYZ, and dispatches `immediateViewAngles` to sync the movement controller
+4. If no stored state (first launch, cleared) → falls back to `PlayerSpawnPoint_01`
+5. In all cases, `FpStateStore.store(None)` invalidates stored state after teleport
+
+When the directions handlers need to land the player at a non-spawn pose (POI swap / pin / navmesh-POI), they run a follow-up `teleport_to_coordinates(..., world_body_yaw_deg=yaw)` **after** `async_first_person_enter` returns, using the first polyline segment for yaw. This cleanly reuses the restore flow above for the FP-enter step while still letting the handler aim the player along the route.
+
+**Key constraint**: `FpStateStore.store(None)` must NOT happen in `ViewSwitcher.on_camera_view_switch` before the async coroutine runs — doing so would wipe the state before `async_first_person_enter` can read it. Instead, invalidation happens after the teleport inside the coroutine.
+
+**Capture is gated on "currently first-person"**: `ViewSwitcher.on_camera_view_switch` only calls `FpStateStore.capture()` when the destination is non-FP **and** `camera._current_view_type == "firstPerson"`. Without this guard a redundant birdEye → birdEye switch (e.g. the globe view exit re-entering bird-eye) would overwrite the valid stored FP pose with the player's current bird-eye spawn position, breaking the wayfinding "current location" + the bird-eye user-location arrow.
+
+### `playerStateCaptureRequest` (FP snapshot without view switch)
+
+Web-side flows that move the player out of first-person **without** going through `cameraViewSwitchRequest` (currently only `dev → space` globe view) must still preserve the FP pose so that the eventual return to bird's-eye restores it correctly.
+
+`UIControls.handleCameraChangeForUi` sends `sendMessage('playerStateCaptureRequest', {})` when entering `'space'` from `currentCamera === 'first_person'`. Kit's `ViewSwitcher.on_player_state_capture_request` snapshots + stores via `FpStateStore` using the **same FP-only guard** as `on_camera_view_switch`, so it's safe to send unconditionally — never stores a non-FP pose.
+
+| Event | Direction | Purpose |
+|---|---|---|
+| `playerStateCaptureRequest` | Web → Kit | Snapshot + store player's FP pose without switching view (used by globe Space entry) |
+
+### WorldStateSyncService integration
+
+Both `ViewSwitcher.on_camera_view_switch` and `ViewSwitcher.on_spawnpoint_teleport` push `cameraViewType` to WorldStateSyncService. This is critical for `on_spawnpoint_teleport` — when the user clicks a map marker (e.g. Foyer) from bird's eye view, the web needs the state update to switch `currentCamera` from `'bird_eye'` to `'first_person'`, which enables point-and-click movement and updates the toggle button icon.
+
+### Stream settle timing
+
+All teleport operations (spawn point, seat, POI, view switch) are synchronous — the USD transform and camera are set immediately. However, `viewTransitionReady` must not fire until the NVST streaming pipeline has encoded and delivered at least one frame from the new viewpoint. Without this buffer, the web client fades in while still displaying the previous camera position.
+
+**`STREAM_SETTLE_FRAMES = 4`** (module-level in `view_switcher.py`) — the number of Kit `next_update_async()` ticks awaited after all operations complete before dispatching `viewTransitionReady`. At 30fps this is ~130ms of invisible delay while the screen is fully black. The same frame count is used in the navmesh route extension (`_dispatch_view_transition_ready_after_settle`) for seat and POI teleports. Error paths dispatch `viewTransitionReady` immediately (no settle) so the overlay never gets stuck.
+
+This is an architectural constant, not a workaround — it accounts for the inherent encode-decode latency of the NVST WebRTC streaming pipeline between Kit's renderer and the browser.
+
+| Event | Handler | Action |
+|---|---|---|
+| `cameraViewSwitchRequest` | `ViewSwitcher.on_camera_view_switch` | FP or non-FP async path |
+| `teleportToSpawnpoint` | `ViewSwitcher.on_spawnpoint_teleport` | Same, with named spawnpoint |
+| `chat.moveToSpawnpoint` | `ViewSwitcher.on_spawnpoint_teleport` | Same |
+| `chat.moveAccepted` | `ViewSwitcher.on_spawnpoint_teleport` | Same |
+| `fixedCameraSwitchRequest` | `FeatureCommandsService._on_fixed_camera_switch` | `switch_to_fixed_camera(path)` |
+| `fixedCameraExitRequest` | `FeatureCommandsService._on_fixed_camera_exit` | `exit_fixed_camera()` |
+| `resetStage` | `FeatureCommandsService._on_reset_stage` | `reset_camera()` |
+
+`ViewSwitcher.on_spawnpoint_teleport` defaults `viewType` to `"firstPerson"` when not provided. It pushes `cameraViewType` to WorldStateSyncService so the web updates `currentCamera` (critical for map marker → FP transitions).
+
+### Fixed scene cameras
+
+**`switch_to_fixed_camera(prim_path)`** — switches viewport to a scene `UsdGeom.Camera`, saves the player camera path, sets `_fixed_camera_active = True`. Movement is suppressed while active.
+
+**`exit_fixed_camera()`** — restores viewport to saved player camera, clears fixed state.
+
+Both dispatch `fixedCameraStatus` events to the web UI.
+
+## CU view toggle button
+
+**File**: `web-viewer-sample-main/src/features/cu/CUControls.tsx` + `CUControls.css`
+
+A purple rounded-square button in the CU control column that toggles between first person and bird's eye. Shows `toggleFirstPerson.svg` when in bird's eye (inviting the user to enter FP) and `toggleOverview.svg` when in first person.
+
+**`handleViewToggle`** fires `beginViewTransition` with `onFadeOutComplete: () => env.handleCameraChange(target)`.
+
+SVG icons live in `features/cu/figma-export-icons/`.
+
+### Centralized bird-eye autoMove clear (`useEnvironmentHandlers.handleCameraChange`)
+
+Every entry point to bird's-eye (CU view toggle, dev `CamerasSubmenu`, globe pin exit) goes through `env.handleCameraChange(cameraType)`. When `cameraType === 'bird_eye'`, that handler dispatches `navigationStateSet { autoMove: false, movementMode: 'pointClick', routeId: 'player', endPos: null, endpointPath: null }` **before** sending `cameraViewSwitchRequest`.
+
+Why: the scene-load init dispatches `navigationStateSet { autoMove: true, routeId: 'player' }` which sets `_auto_move_active = True` in the **interactions extension** (`younite.interactions_extension`), which short-circuits its `_on_update` tick — including the projectables loop that publishes `uiInteractionBoxesUpdate`. Until that flag is cleared, both POI **map markers** and the bird-eye **user-location arrow** stay invisible in `InteractionBoxesOverlay`. Centralising the clear in `handleCameraChange` means **no caller can forget**, and the message is idempotent, so callers that previously sent it themselves (CU's old `handleViewToggle` block) can drop the duplicate. See also `map-markers.mdc` § "Visibility gotcha".
+
+### User location marker (bird's eye)
+
+A lemon-colored (`#DCFF7D`) arrow icon projected onto the bird's eye view showing where the player was in first person **and the direction they were facing**. Uses the existing interactions extension projectable overlay pipeline — no new event system needed.
+
+**Kit injection** (`interactions_extension/services/kit_services/projectables_loop.py`, `_maybe_inject_player_marker`): when `/younite/player/lastFpPosValid` is true, reads the stored position from carb settings, projects it to screen coordinates, and inserts a `userLocation`-styled item at position 0 of the items array (renders first in DOM → behind other markers). Visibility gating (bird's eye only, hidden during directions preview) is handled web-side via `hiddenStyles`.
+
+To transfer the looking direction, the same method reconstructs the player's first-person forward vector by composing the stored `lastFpBodyRot[X/Y/Z]` **and** `lastFpCamRot[X/Y]` Euler angles. Important: in this kit's first-person controller the *body* rotation is typically `(0, 0, 0)` and the look yaw lives on the *camera* (`camRotY`) — using body rotation alone yields a constant arrow direction. Camera is parented under body, so world forward = `body_rot * cam_rot * (0, 0, -1)` (USD camera convention: -Z=forward, Y=up). The Y component of the resulting forward vector is dropped (yaw-only / horizontal heading; pitch is irrelevant for a top-down marker), then a short offset point (100 USD units along the X-Z forward) is projected to screen, and `ui.headingDeg` is emitted as the CSS `rotate()` angle between the two screen points (0° = screen-up, CW positive). Robust to any camera orientation since the heading is computed in screen space.
+
+**Web rendering** (`InteractionBoxesOverlay.tsx`): `userLocation` style renderer — an `<img>` using `location_arrow.svg` wrapped with `transform: rotate(${headingDeg + USER_LOCATION_ARROW_SVG_OFFSET_DEG}deg)`. The SVG offset constant (~39.2°) compensates for the Figma arrow's natural orientation (tip is 39.2° CCW of straight-up). Hidden via `hiddenStyles` when `currentCamera !== 'bird_eye'`.
+
+**CSS** (`InteractionBoxesOverlay.css`): `.ibox-user-location` uses `z-index: 0` (not negative — negative z-index paints behind the parent stacking context and becomes invisible). DOM ordering via `items.insert(0, ...)` ensures it appears behind map markers.
+
+**Web context state**: `firstPersonLocation` in `useEnvironmentHandlers` receives the position-only dict from `worldStateSync` (`lastFirstPersonPosition`). Available for future "get directions from here" calculations.
+
+## TeleportService
+
+**File**: `stage_core_extension/services/kit_services/teleport_service.py`
+
+Handles the physical repositioning of `/World/PlayerCharacter`.
+
+**`teleport_to_spawn_point(name)`**:
+1. Finds spawn point prim via `find_spawn_point_prim()` (checks `/World/<name>`, then traverses descendants)
+2. Reads translate + rotation from the spawn point's xform ops (supports both `rotateXYZ` and `rotateYXZ`)
+3. Applies to player prim (USD xform + CCT teleport if available)
+4. Resets camera rotation to `(0, 0, 0)`
+5. Calls movement controller reset callback
+
+**`teleport_to_coordinates(x, y, z, *, camera_local_yaw_deg=None)`** — direct CCT teleport without spawn point lookup. Used by seat and POI "Take Me There" teleports. **Translate-only** (does NOT touch body rotation — the body keeps whatever rotation was already there). Optional **`camera_local_yaw_deg`** sets first-person camera yaw at spawn and dispatches **`younite.player.immediateViewAngles`** (see `.cursor/rules/topics/poi-teleport.mdc`). Seat teleport uses it for bowl-facing; POI "Take Me There" omits it (player keeps current orientation).
+
+**`teleport_to_pose(x, y, z, *, body_yaw_deg=0.0)`** — world-space pose teleport. Wraps `_apply_transform_to_player` with `(translate, RotateXYZ(0, body_yaw_deg, 0))` so it applies **the same machinery as `teleport_to_spawn_point`** — sets translate, body rotation, resets camera RotateXYZ to identity, fixes scale + xform op order, fires the movement-controller reset callback. Use this for any "land at an arbitrary world pose" case where the destination has no authored spawn point (navmesh POIs like restrooms / quiet zones, ad-hoc bird-eye pins). The caller decides the body yaw — typically `atan2(-dx, -dz)` from the destination toward the route's other endpoint, so the player faces the dashed polyline forward. Driven by `_async_first_person_enter`'s `start_pose` parameter; not called directly from event handlers.
+
+**Why the two coordinate APIs.** `teleport_to_coordinates` is the right fit for "Take Me There" buttons where the user is already in first-person and we don't want to disturb the camera they were looking around with — we only update position (and optionally yaw, for seats facing the bowl). `teleport_to_pose` is the right fit for view-transition flows (bird-eye → FP for restroom / pin / quiet-zone directions) because the FP camera state from before bird-eye no longer makes sense and the player must land oriented along the route. Choosing the wrong one was a bug class historically — the "wrong-direction restroom navigation" symptom came from using `teleport_to_coordinates` (which left bird-eye body rotation on the player) where `teleport_to_pose` was needed.
+
+## View-type propagation to player core
+
+The player core extension (`younite.usd_viewer_player_core_extension`) needs to know the current view type every frame for input routing. `_camera_view_type` on the `PlayerCoreExtension` host is updated via two redundant listeners in `SettingsWatchers`:
+
+1. **Carb settings subscription** on `/younite/camera/viewType` — may fire asynchronously
+2. **EventDispatcher observation** on `younite.camera.viewTypeChanged` — fires synchronously during dispatch
+
+Both call the same `_on_view_type_changed` callback which:
+- Sets `h._camera_view_type`
+- Resets bird-eye mover height when entering birdEye
+- Resets `PlayerInputController` yaw/pitch (prevents rotation snap after teleport)
+- Snaps player to ground when entering firstPerson
+
+### How input branches on view type
+
+**`PlayerInputController._is_bird_eye()`** — reads `_camera_view_type` via lambda. When `True`:
+- Touch drag → XZ movement (pan) instead of camera rotation
+- Mouse deltas consumed and discarded (no look)
+- Early return skips all camera rotation logic
+
+**`ManualMovementRouter.drive()`** — reads `_camera_view_type`. When `"birdEye"`:
+- Uses `BirdEyeUsdTranslateMover` (direct USD translate at locked height)
+- Otherwise uses `FirstPersonCctMover` (PhysX CCT control_state)
+
+## Spawnpoints
+
+**File**: `source/data/scenes/sublayers/player_spawnpoints_layer.usda` (sublayer of main scene)
+
+| Prim | Purpose |
+|---|---|
+| `PlayerSpawnPoint_01` | Default first-person spawn (ground level); optional bird-eye pin removed — spawn only |
+| `PlayerSpawnPoint_02` | Default bird's-eye spawn (high altitude, angled down) |
+| `PlayerSpawnPoint_Arena` | Named spawn — arena interior |
+| `PlayerSpawnPoint_Foyer` | Named spawn — foyer |
+| `PlayerSpawnPoint_Entrance` | Named spawn — stadium entrance (bird-eye map marker) |
+
+Each is a `def Xform` with `xformOp:translate`, rotation, and scale. Adding a new spawn point: add a new Xform to this layer, then reference its name in `interactions.json` (for map markers) or use it directly via `teleportToSpawnpoint` events.
+
+## Events summary
+
+| Event | Direction | Purpose |
+|---|---|---|
+| `cameraViewSwitchRequest` | Web → Kit | Switch first-person / bird's-eye (CU toggle + dev camera buttons) |
+| `viewTransitionReady` | Kit → Web | Unified "done" signal; triggers overlay fade-in for all teleport/view-switch paths |
+| `navigationStateSet` | Web → Kit | Stop navigation/auto-mover before bird's-eye switch (sent by CU toggle) |
+| `teleportToSpawnpoint` | Web → Kit | Teleport to named spawnpoint + set view type |
+| `seatTeleport` | Web → Kit | Teleport to seat coordinates |
+| `seatTeleportResult` | Kit → Web | Seat teleport result (payload only; fade-in via `viewTransitionReady`) |
+| `poiTeleport` | Web → Kit | Teleport to POI prim position |
+| `poiTeleportResult` | Kit → Web | POI teleport result (payload only; fade-in via `viewTransitionReady`) |
+| `younite.camera.viewTypeChanged` | Kit internal | Notifies player core, LOD extension, Cesium orchestrator |
+| `fixedCameraSwitchRequest` | Web → Kit | Switch to scene camera |
+| `fixedCameraExitRequest` | Web → Kit | Return to player camera |
+| `fixedCameraStatus` | Kit → Web | Fixed camera active/inactive + camera ID |
+
+## Key files
+
+| File | Role |
+|---|---|
+| `camera_service.py` | View switching, fixed cameras, `_apply_view_type` |
+| `teleport_service.py` | Spawn point resolution and player repositioning |
+| `feature_commands_service/service.py` | Event wiring, shared primitives (`dispatch_view_transition_ready`, `await_navmesh_route_settled`), small inline handlers |
+| `feature_commands_service/view_switcher.py` | `ViewSwitcher` — FP entry + non-FP view switch async primitives, sync handlers |
+| `feature_commands_service/fp_state.py` | `FpStateStore` — FP state capture / restore |
+| `feature_commands_service/map_marker_directions.py` | `MapMarkerDirectionsHandler` — bird-eye directions panel |
+| `feature_commands_service/seat_directions.py` | `SeatDirectionsHandler` — bird-eye seat directions + teleport |
+| `feature_commands_service/directions_utils.py` | Pure helpers shared by the directions flows |
+| `view_transition_readiness.py` | LOD predicate polling (`await_stadium_lod_for_view_type`) |
+| `first_person_navmesh_bridge.py` | Decoupled navmesh bake awaiting for FP entry |
+| `navmesh_route_extension/extension.py` | Seat/POI teleport handlers, `_dispatch_view_transition_ready_after_settle` |
+| `world_conventions.py` | Path constants, `find_spawn_point_prim()` |
+| `settings_watchers.py` | Dual carb/event listener → `_camera_view_type` |
+| `player_spawnpoints_layer.usda` | Spawn point Xform definitions |
+| `viewTransition/` (web) | Fade overlay: types, controller hook, API, CSS, channel |
+| `CUControls.tsx` + `.css` | CU view toggle button (purple FP ↔ bird's eye) |
+| `InteractionBoxesOverlay.tsx` + `.css` | `userLocation` style renderer for player location marker |
+| `interactions_extension/services/kit_services/projectables_loop.py` | Bird's eye player location marker injection (carb settings → projectable item) |
+| `worldStateHandlers.ts` | Handles `cameraViewType` and `lastFirstPersonPosition` from `worldStateSync` |
+
+## Related
+
+- Bird's-eye route overlay (dotted path between two world points in overview): `.cursor/rules/topics/bird-eye-route.mdc`
+- Map markers (bird's eye overlays → spawnpoint click): `.cursor/rules/topics/map-markers.mdc`
+- World state sync (Kit-side registry, `worldStateSync` event): `.cursor/rules/topics/world-state-sync.mdc`
+- React contexts (6 domain contexts, `useEnvironment` for `firstPersonLocation`): `.cursor/rules/topics/react-contexts.mdc`
+- Cesium tile orchestrator (reacts to viewTypeChanged): `.cursor/rules/topics/cesium-geolocation.mdc`
+- Stage init / loading phases: `.cursor/rules/topics/stage-init.mdc`
+- Seat auto-move (uses teleport): `.cursor/rules/topics/seat-navigation.mdc`
+- PhysX CCT movement (WASD/joystick, on-demand CCT, jump): `.cursor/rules/topics/cct-movement.mdc`
+- LOD management (variant switching): `.cursor/rules/topics/lod-management.mdc`

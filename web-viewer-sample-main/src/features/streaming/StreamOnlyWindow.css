@@ -1,0 +1,40 @@
+/* Root shell for the streaming viewer (replaces inline layout on the outer div). */
+.stream-only-window {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    padding: 0;
+    margin: 0;
+    overflow: hidden;
+    box-sizing: border-box;
+}
+
+/* Must generate a box so #main-content can receive focus (skip link / WCAG 2.4.1). */
+.stream-only-window__main {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+}
+
+.stream-only-wrapper {
+    width: 100vw;
+    height: 100vh;
+    position: absolute;
+    top: 0;
+    left: 0;
+    box-sizing: border-box;
+}
+
+.stream-only-wrapper--hidden {
+    visibility: hidden;
+}
+
+.stream-only-wrapper--visible {
+    visibility: visible;
+}

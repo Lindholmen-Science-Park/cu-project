@@ -1,0 +1,54 @@
+/* Interaction Buttons Styles */
+
+.interaction-buttons-container {
+    position: absolute;
+    top: 20px;
+    right: 20px;  /* Changed from left to right to avoid overlap with camera controls */
+    z-index: 1000;
+    background: rgba(0, 0, 0, 0.8);
+    border-radius: 8px;
+    padding: 15px;
+    color: white;
+    font-family: Arial, sans-serif;
+    min-width: 200px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.interaction-message {
+    margin-bottom: 10px;
+    font-size: 14px;
+    color: #00ff00;
+    text-align: center;
+}
+
+.test-button {
+    width: 100%;
+    padding: 12px 20px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.test-button:hover {
+    background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.test-button:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+.test-button:focus {
+    outline: 2px solid #00ff00;
+    outline-offset: 2px;
+}
+
+

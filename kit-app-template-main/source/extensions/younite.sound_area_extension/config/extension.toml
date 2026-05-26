@@ -1,0 +1,22 @@
+[package]
+title = "Younite Sound Area Extension"
+description = "Sound location NavMesh areas — radial ground-following zones around sound sources"
+version = "0.1.0"
+authors = ["Younite"]
+keywords = ["sound", "navmesh", "area"]
+category = "Feature"
+
+[dependencies]
+"younite.messaging_core_extension" = {}
+"younite.usd_viewer_stage_core_extension" = {}
+"younite.payload_orchestrator_core_extension" = {}
+"omni.usd" = {}
+
+[[python.module]]
+name = "younite.sound_area_extension"
+
+[build]
+include = [
+    "younite/**/*.py",
+    "*.toml",
+]

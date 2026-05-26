@@ -1,0 +1,90 @@
+.globe-view-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9000;
+    background: #000;
+}
+
+.globe-view-overlay .cesium-viewer,
+.globe-view-overlay .cesium-viewer-cesiumWidgetContainer,
+.globe-view-overlay .cesium-widget,
+.globe-view-overlay .cesium-widget canvas {
+    width: 100% !important;
+    height: 100% !important;
+}
+
+.globe-view-overlay .cesium-viewer-bottom,
+.globe-view-overlay .cesium-viewer-toolbar {
+    display: none !important;
+}
+
+.globe-view-overlay .cesium-credit-logoContainer,
+.globe-view-overlay .cesium-credit-textContainer {
+    opacity: 0.4;
+    pointer-events: none;
+}
+
+.globe-view-back-button {
+    position: absolute;
+    top: 16px;
+    left: 16px;
+    z-index: 9001;
+    padding: 10px 20px;
+    background: rgba(0, 0, 0, 0.75);
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    backdrop-filter: blur(8px);
+    transition: background 0.2s, border-color 0.2s;
+}
+
+.globe-view-back-button:hover {
+    background: rgba(118, 185, 0, 0.3);
+    border-color: #76b900;
+}
+
+.globe-view-hint {
+    position: absolute;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 9001;
+    padding: 10px 24px;
+    background: rgba(0, 0, 0, 0.7);
+    color: rgba(255, 255, 255, 0.85);
+    border-radius: 20px;
+    font-size: 14px;
+    pointer-events: none;
+    backdrop-filter: blur(8px);
+    animation: globe-hint-fade 0.6s ease-in;
+}
+
+@keyframes globe-hint-fade {
+    from { opacity: 0; transform: translateX(-50%) translateY(10px); }
+    to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+/* ---- Cloud pass-through layer ---- */
+
+.globe-cloud-layer {
+    position: fixed;
+    inset: 0;
+    z-index: 9002;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s linear;
+    background:
+        radial-gradient(ellipse 120% 80% at 20% 30%, rgba(255, 255, 255, 0.95) 0%, transparent 70%),
+        radial-gradient(ellipse 100% 60% at 80% 60%, rgba(255, 255, 255, 0.90) 0%, transparent 65%),
+        radial-gradient(ellipse 140% 90% at 50% 50%, rgba(240, 245, 250, 0.85) 0%, transparent 80%),
+        radial-gradient(ellipse 80% 50% at 70% 20%, rgba(255, 255, 255, 0.80) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 40% at 30% 75%, rgba(248, 250, 255, 0.75) 0%, transparent 55%),
+        linear-gradient(180deg, rgba(220, 230, 245, 0.3) 0%, rgba(255, 255, 255, 0.6) 40%, rgba(255, 255, 255, 0.7) 60%, rgba(240, 245, 255, 0.3) 100%);
+}
+
+.globe-view-hint--flying {
+    z-index: 9003;
+}

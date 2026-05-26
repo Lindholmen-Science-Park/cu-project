@@ -1,0 +1,106 @@
+---
+description: Known platform restrictions and unsupported features — vGPU limitations, CUDA interop, feature blockers. Read before suggesting GPU-dependent features.
+globs: 
+alwaysApply: false
+---
+
+# Platform Restrictions & Known Limitations
+
+This file documents features that **do not work** in our environment due to hardware, virtualisation, or platform constraints. Check here before suggesting or implementing GPU-intensive or platform-specific features.
+
+---
+
+## GPU Environment
+
+- **GPU**: NVIDIA L40S-48Q (vGPU — virtual GPU profile, 48 GB VRAM, Compute Capability 8.9)
+- **Virtualisation**: The `-Q` suffix indicates a **virtual workstation** profile running inside a VM with NVIDIA vGPU software.
+- **Kit version**: 110.0.0
+
+---
+
+## Blocked: Gaussian Splatting / NuRec Rendering in Omniverse
+
+**Status**: NOT WORKING on vGPU
+
+**What it is**: Kit 110.0 added Neural Rendering (NuRec) support for 3D Gaussian Splats via `OmniNuRecVolumeAPI` on `UsdVol::Volume` prims. Gaussian Splat `.ply` files must be converted to `.usdz` with the NuRec schema (using [3DGRUT](https://github.com/nv-tlabs/3dgrut) `ply_to_usd.py` or the standalone [PLY_to_USD](https://github.com/TimChen1383/PLY_to_USD) converter).
+
+**Why it fails**: NuRec uses `carb.cudainterop.plugin` to allocate GPU memory through CUDA-graphics API interoperability (sharing memory between CUDA and DirectX). vGPU environments **do not support CUDA-graphics interop**, producing:
+
+```
+CUDA error 801: cudaErrorNotSupported - operation not supported
+Failed to allocate CUDA device memory (size: 8)
+NuRec Device Memory Allocator: Failed to allocate 8 bytes via cudaInterop on device 0
+```
+
+This crashes Composer (exit code 3489660927). The 8-byte allocation size confirms it is not a memory limit — the API call itself is blocked.
+
+**Workarounds investigated**:
+- Importing raw `.ply` → shows as black dots (no NuRec schema, just point cloud)
+- Converting `.ply` → `.usdz` with NuRec schema → crashes on `cudaInterop`
+- Poisson mesh reconstruction from splat positions → poor quality ("lump of clay"), SH-to-vertex-color transfer loses all view-dependent detail
+- OBJ export with vertex colors → Omniverse ignores OBJ vertex colors
+- USD export with `displayColor` primvar → geometry is poor (Poisson from volumetric Gaussians ≠ surface reconstruction)
+
+**What would fix it**:
+- **GPU passthrough** instead of vGPU (full CUDA interop support)
+- A different vGPU profile that enables CUDA-graphics interop (requires infrastructure/IT change)
+- Future Kit update that avoids `cudaInterop` for NuRec allocation
+
+**Alternatives that DO work**:
+- **Gaussian Splat viewer (nerfstudio)**: `ns-viewer` at `localhost:7007` renders splats beautifully — runs on CUDA directly, no graphics interop needed
+- **Web viewers**: [Playcanvas SuperSplat](https://playcanvas.com/supersplat/editor), [antimatter15](https://antimatter15.com/splat/), [Three.js viewer](https://mkkellogg.github.io/GaussianSplats3D/) — drag-and-drop `.ply`
+- **Polycam**: Upload source video → get proper textured mesh (OBJ/GLTF/USDZ) via their photogrammetry pipeline
+- **Nerfacto + TSDF**: Train a NeRF model (not Gaussian Splat) with `ns-train nerfacto`, then `ns-export tsdf` produces a proper mesh that Omniverse can render as standard geometry
+
+**Gaussian Splat lab location**: `D:\Dev\gaussian-splat-lab\` — isolated conda environment with nerfstudio, gsplat, COLMAP, FFmpeg. Activate via `activate.bat`.
+
+---
+
+## Limitation: BAR1 Memory Exhaustion (Scene Complexity Cap)
+
+**Status**: RECURRING RISK on vGPU
+
+**What it is**: BAR1 is the PCIe Base Address Register that allows the CPU to directly map and access GPU memory. A bare-metal L40S has 256 MB BAR1, but vGPU profiles **partition** BAR1 across virtual machines. The `L40S-48Q` profile receives a reduced BAR1 allocation (exact size depends on how many VMs share the physical GPU).
+
+**When it hits**: Composer crashes with out-of-memory errors when opening large scenes, adding sublayers, or loading heavy USD assets. The crash is **not** about VRAM (48 GB is plenty) — it's the BAR1 window being too small for the number of GPU resources (textures, buffers, render targets) that need CPU-visible mapping.
+
+**Symptoms**:
+- Crash when opening or adding a new sublayer in Composer
+- Console reports out-of-memory despite plenty of VRAM available
+- Happens more often as scene complexity grows (more textures, more geometry, more materials)
+
+**Mitigation**:
+- Keep scene complexity reasonable — avoid loading everything at once
+- Use the **LOD management extension** to switch between light/full variants (see `lod-management.mdc`)
+- Use the **Payload Orchestrator** to load/unload prims on demand rather than keeping everything loaded
+- Close unnecessary sublayers before opening new ones
+- Monitor VRAM and BAR1 usage in the viewport stats overlay
+
+**What would fix it**:
+- **GPU passthrough** (full BAR1 access, no partitioning)
+- A vGPU profile with larger BAR1 allocation (requires infrastructure/IT change)
+- NVIDIA vGPU software updates that improve BAR1 management
+
+---
+
+## General vGPU Restrictions
+
+The following CUDA features are **not supported on vGPU** (per NVIDIA docs):
+
+- CUDA-graphics API interoperability (OpenGL/DirectX ↔ CUDA memory sharing)
+- GPUDirect RDMA
+- Peer-to-peer GPU communication
+- Dynamic page retirement
+- **Reduced BAR1 memory** — partitioned across VMs, limits scene complexity
+
+Any Omniverse feature that relies on these will fail in our environment. Before implementing features that use custom CUDA kernels or CUDA-graphics bridging, verify they work on vGPU. Be mindful of scene complexity to avoid BAR1 exhaustion.
+
+---
+
+## Adding New Restrictions
+
+When you discover a feature that doesn't work due to platform constraints:
+
+1. Add a new `## Blocked: <Feature Name>` section above
+2. Include: what it is, why it fails, error messages, workarounds investigated, what would fix it
+3. Date the discovery so we know when to re-test after platform upgrades

@@ -1,0 +1,22 @@
+[package]
+title = "Younite Scene Switch Extension"
+description = "Optional scene switching via switchScene events"
+version = "0.1.0"
+authors = ["Younite"]
+keywords = ["scene", "switch", "stage", "events"]
+category = "Feature"
+
+[dependencies]
+"younite.messaging_core_extension" = {}
+"omni.usd" = {}
+"omni.timeline" = {}
+
+[[python.module]]
+name = "younite.scene_switch_extension"
+
+[build]
+include = [
+    "younite/**/*.py",
+    "*.toml",
+]
+

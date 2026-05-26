@@ -1,0 +1,15 @@
+[package]
+title = "Younite Video Extension"
+description = "Manages pre-rendered video catalog and serves metadata to the web frontend"
+version = "0.1.0"
+authors = ["Younite"]
+category = "Feature"
+
+[dependencies]
+"younite.messaging_core_extension" = {}
+
+[[python.module]]
+name = "younite.video_extension"
+
+[build]
+include = ["younite/**/*.py", "*.toml"]

@@ -1,0 +1,110 @@
+---
+description: Text-to-Speech (TTS) — "Listen" buttons, AvatarVoiceProfile, per-avatar voice data in interactions.json, voice vs text language separation, AI reply language tagging
+---
+
+# Text-to-Speech (TTS)
+
+CU "Listen" buttons read out content via the browser **Web Speech API** (`SpeechSynthesis`). All voice logic lives in **one** place: `web-viewer-sample-main/src/services/speechSynthesis.ts`. Per-character voice data lives in **`interactions.json`** on the Kit side — the frontend never picks a default character voice.
+
+## Two axes, kept separate
+
+| Axis | Driven by | Why |
+|------|-----------|-----|
+| **Voice language** (e.g. `fr-FR`, `sv-SE`) | The language of the *text* being spoken | WCAG 3.1.2 — words must be pronounced with the right phonetic rules. |
+| **Voice character** (gender, rate, pitch, name hint) | `AvatarVoiceProfile` from Kit | Keeps a given avatar consistent across UI languages (Red sounds female in en *and* sv). |
+
+Voice gender is a **preference**, not a hard filter — many OSes only ship one voice per locale.
+
+## Key files
+
+| File | Purpose |
+|------|---------|
+| `services/speechSynthesis.ts` | `speakText()`, `pickVoice()`, `parseVoiceProfile()`, `ttsLanguageFor()`, `AvatarVoiceProfile`, `FEMALE_/MALE_/NEUTRAL_VOICE_PROFILE` constants |
+| `services/aiLanguage.ts` | `aiLanguageFor()` — UI-lang → AI-supported lang (en/sv only) for AI request payloads *and* for tagging incoming AI replies |
+| `kit-app-template-main/source/data/interactions.json` | Source of truth for avatar voice data: `npcConfig.voice` (NPCs) and `ui.voice` (interaction boxes) |
+| `streaming/overlays/avatarChat/AvatarChatOverlay.tsx` | Avatar chat "Listen" — uses `config.voiceProfile` + per-message `m.lang` |
+| `streaming/overlays/npcBubble/NpcBubbleOverlay.tsx` | NPC speech bubble "Listen" — uses `cfg.voiceProfile` + UI lang |
+| `streaming/overlays/interactionBoxes/InteractionBoxesOverlay.tsx` | Interaction-box "Listen" — uses `parseVoiceProfile(ui?.voice)` + UI lang |
+| `streaming/contexts/ChatContext.tsx` | Coerces `payload.voice` from Kit's `avatarChat.open` into a profile via `parseVoiceProfile` |
+| `streaming/StreamOnlyWindow.tsx` | Tags incoming `ai.agent.response` messages with `lang: aiLanguageFor(i18n.language)` so the listen button uses the right voice |
+
+## Voice data on Kit side
+
+Voice is a **string** (gender shorthand) or **object** (full descriptor) on the Kit interaction entry. The frontend `parseVoiceProfile` accepts both. New avatars opt in by shipping data — never by hardcoding in the frontend.
+
+```jsonc
+// NPC: simple gender shorthand
+"npcConfig": {
+  "avatarId": "red",
+  "avatarName": "Red",
+  "voice": "female",          // "female" | "male" | "any"
+  ...
+}
+
+// Or full descriptor for custom rate/pitch/branded voice:
+"npcConfig": {
+  "voice": { "gender": "male", "rate": 0.95, "pitch": 0.9, "voiceNameHints": "alex|daniel" }
+}
+
+// Interaction box (speechBubbleBottom etc.) — same shapes on `ui.voice`:
+"behaviors": [
+  { "type": "projectable", "ui": { "style": "speechBubbleBottom", "title": "...", "voice": "male" } }
+]
+```
+
+The Kit interactions extension forwards the entire `npcConfig` (and `ui`) verbatim to the frontend, so any new key shows up automatically — no Kit-side schema changes needed.
+
+## Language of the text vs language of the UI
+
+Most spoken text is properly localized via i18n (`t(key)`) or `interactions.json` `title_<lang>` fields, so **the text language matches the UI language** and the caller just passes `i18n.language` to `speakText`.
+
+The **one exception** is AI chat replies: the AI backend only supports `en`/`sv`. In a French/Spanish UI, `ChatContext` sends the request with `language: aiLanguageFor(i18n.language) === 'en'`, the AI replies in English, and we tag the message:
+
+```typescript
+// StreamOnlyWindow.tsx — `ai.agent.response` handler
+const lang = String(p.language ?? aiLanguageFor(i18n.language));
+chat.conversation.addMessage(avatarId, { role: 'assistant', text, lang });
+```
+
+`AvatarChatOverlay.handleListenClick` then reads `m.lang ?? i18n.language` so the English text gets an English voice instead of being mangled by a French TTS engine.
+
+`AvatarChatMessage` carries an optional `lang?: string` field for exactly this purpose. User-typed messages, i18n greetings, quick-action labels, error strings — none set `lang` because they're already in the UI language.
+
+## Adding a "Listen" button to a new component
+
+1. Import the shared utility, never re-implement:
+   ```typescript
+   import { speakText, type SpeechController } from '../../../services/speechSynthesis';
+   ```
+2. Hold the controller in a ref so you can cancel:
+   ```typescript
+   const ttsCtrl = useRef<SpeechController | null>(null);
+   useEffect(() => () => ttsCtrl.current?.cancel(), []); // cancel on unmount
+   ```
+3. Toggle on click:
+   ```typescript
+   ttsCtrl.current = speakText(text, {
+     uiLang: messageLang ?? i18n.language,  // language of the *text*
+     voiceProfile: cfg.voiceProfile,        // from Kit, already parsed
+     onStart: () => setPlaying(true),
+     onEnd:   () => setPlaying(false),
+     onError: () => setPlaying(false),
+   });
+   ```
+4. WCAG: button needs `aria-label={t('common.listen')}` / `t('common.stopListening')` and `aria-pressed={playing}`. See `wcag-accessibility.mdc`.
+
+## Adding a new avatar with a voice
+
+Frontend changes: **none** for voice. Kit changes:
+
+1. Add the NPC entry to `interactions.json` with a `voice` key in its `npcConfig`.
+2. Add the i18n key for the avatar's greeting / quick actions in `src/i18n/locales/*.json`.
+
+That's it — `parseVoiceProfile` reads the `voice` field on the `avatarChat.open` payload and the listen button picks the right voice automatically.
+
+## Pitfalls
+
+- **Don't hardcode `FEMALE_/MALE_VOICE_PROFILE` in components or contexts** — those constants are TTS-implementation details (rate/pitch/name-hint defaults), not data about *who* has what voice. Always go through `parseVoiceProfile(<kit data>)`.
+- **Don't add new gender allowlists in `ttsLanguageFor`** — every UI language should get its own voice (the OS decides what's installed); the only "force-to-en" mapping lives in `aiLanguageFor`, scoped to AI request payloads and AI reply tagging.
+- **Voice list is async on first load** — `SpeechSynthesis.getVoices()` may return `[]` on the very first call. `pickVoice` returns `null` in that case and `speakText` falls back to the OS default; subsequent clicks pick correctly.
+- **Always cancel on unmount** — utterances continue speaking after the component unmounts unless you call `controller.cancel()` in a cleanup effect.

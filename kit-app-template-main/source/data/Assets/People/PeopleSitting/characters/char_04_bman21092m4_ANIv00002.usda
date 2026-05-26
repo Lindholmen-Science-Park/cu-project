@@ -1,0 +1,11 @@
+#usda 1.0
+(
+    defaultPrim = "Character"
+)
+
+def Xform "Character" (
+    instanceable = true
+    prepend references = @../baked/char_04_bman21092m4_ANIv00002_baked.usdc@
+)
+{
+}

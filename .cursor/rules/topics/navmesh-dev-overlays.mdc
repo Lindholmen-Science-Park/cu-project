@@ -1,0 +1,77 @@
+---
+description: Dev-only NavMesh Kit viewport overlays — full active mesh triangulation + walking/wheelchair stair diff; Tools menu, events, world state, payload orchestrator. Read when working on NavMesh debug visuals, accessibility diff, or streaming dev tooling.
+---
+
+# NavMesh dev overlays (streaming Kit)
+
+Composer can show navigation mesh debug geometry; streaming viewer Kit profiles do not ship `omni.anim.navigation.ui`. These **dev-only** features rebuild visible USD geometry from cached `INavMesh` handles so match-mode surfaces are inspectable in the streamed viewport.
+
+**Extension**: `younite.navmesh_dev_overlays_extension` (loaded only from `younite.usd_viewer_streaming_dev.kit`, **not** production base)
+
+**Depends on**: `younite.navmesh_route_extension` (dual-mode cache, bake orchestrator)
+
+**Bridge**: `younite.navmesh_route_extension.navmesh_route_bridge` — `get_navmesh_mode_cache_for_dev()`, `schedule_navmesh_rebake_if_idle()`. Populated when the route extension creates the bake orchestrator; cleared on its shutdown.
+
+**Internal Kit event** (after dual bake succeeds): `navmeshDualBakeComplete` `{ success: true }` — dispatched from `NavMeshRouteExtension` so the dev overlay extension can refresh enabled overlays without living inside route `extension.py`.
+
+---
+
+## 1. Full active NavMesh (`Show NavMesh`)
+
+**Service**: `younite/navmesh_dev_overlays_extension/services/active_navmesh_overlay_service.py` — `ActiveNavMeshOverlayService`
+
+- Reads **`get_active_navmesh()`** from `NavMeshModeCache` (walking or wheelchair per current mode).
+- Triangulates **`INavMesh.get_draw_triangles(area_index)`** for every area into one `UsdGeom.Mesh` on the **session layer** under `/World/NavMeshDebugOverlay` (material at `.../DebugMaterial`).
+- **`UsdPreviewSurface`**: translucent cyan, `opacityThreshold = 0`, `subdivisionScheme = none`, double-sided — same RTX translucency recipe as `osm-route-overlay.mdc`.
+- **Visibility**: payload orchestrator only — `source="younite.navmesh_dev_overlays"` (`show_hide` / `hide`); never `MakeVisible` on prims directly.
+
+**Web → Kit**: `navmeshDebugShow` `{ visible: boolean }`  
+**Kit → Web ack**: `navmeshDebugStatus` `{ visible }`  
+**World state**: `navmeshDebugOverlayVisible` (default `False` in `world_state_sync_service.py` `_DEFAULTS`).
+
+**When geometry refreshes**: `navmeshDualBakeComplete` with `success` while overlay enabled; `navmeshModeStatus` with `status: "ready"` while overlay enabled (active mesh follows mode); first enable after cache ready (or `schedule_navmesh_rebake_if_idle()` if cache not ready).
+
+**Perf**: very large triangle counts possible — service warns in logs above ~350k tris.
+
+**Shared helper**: `navmesh_draw_helpers.xyz_from_draw_point` (in this extension) for draw-triangle point payloads (also used by stair diff).
+
+---
+
+## 2. Walking vs wheelchair stair diff (`NavMesh difference`)
+
+**Service**: `younite/navmesh_dev_overlays_extension/services/accessibility_diff_service.py` — `AccessibilityDiffService`
+
+- Compares **walking** mesh triangles to **wheelchair** mesh via `query_closest_point` (centroid + vertex probes, low-quantile flat baseline, step threshold). Classifies stair / tall-step regions only.
+- Builds clustered red translucent meshes under `/World/AccessibilityOverlay/StairBlocks`.
+- **Default off** — no diff CPU work during rebakes until enabled.
+- **Visibility**: orchestrator `source="younite.navmesh_dev_overlays"`.
+
+**Web → Kit**: `accessibilityDiffShow` `{ visible }`  
+**Kit → Web**: `accessibilityDiffStatus` `{ visible }`  
+**World state**: `accessibilityDiffOverlayVisible`.
+
+Algorithm version `_DIFF_ALG_VERSION` bumps invalidate the mesh-signature short-circuit when classification rules change.
+
+---
+
+## 3. Extension wiring
+
+- **`younite.navmesh_dev_overlays_extension/extension.py`**: `register_outbound_events` lists `accessibilityDiffStatus` and `navmeshDebugStatus`; observes `accessibilityDiffShow`, `navmeshDebugShow`, `navmeshDualBakeComplete`, and `navmeshModeStatus` (debug mesh refresh on successful mode switch).
+- **`younite.navmesh_route_extension/extension.py`**: sets `set_navmesh_route_dev_hooks(mode_cache, schedule_rebake)` after the orchestrator exists; dispatches `navmeshDualBakeComplete` when `bake_both_modes()` succeeds; does **not** register the dev overlay outbounds or toggle handlers.
+
+---
+
+## 4. Web UI
+
+- **Dev → Tools** (`ToolsSubmenu.tsx`): two toggles — **Show NavMesh** / **Hide NavMesh**, **NavMesh difference** / **Hide NavMesh difference**.
+- State lives in **`useNavmeshCore`** (`navmeshDebugOverlayVisible`, `accessibilityDiffVisible`); rehydrated from **`worldStateSync`**; status events update React via `navigationHandlers` + `StreamOnlyWindow` event setters.
+
+---
+
+## Related
+
+- **Dual-mode cache** (handles, mode switch, orchestrator dual-bake): `navmesh-dual-mode.mdc`
+- **Bake orchestrator**: `bake-orchestrator.mdc`
+- **Payload orchestrator**: `payload-orchestrator.mdc`
+- **World state sync** (`navmeshDebugOverlayVisible`, `accessibilityDiffOverlayVisible`): `world-state-sync.mdc`
+- **OSM route overlay** (same translucency authoring patterns): `osm-route-overlay.mdc`

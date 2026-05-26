@@ -1,0 +1,46 @@
+{
+  "sync_rules": [
+    {
+      "name": "City Tiles (SBF)",
+      "remote_path": "/Projects/CU/SBF/USD/Tiles/",
+      "local_path": "source/data/nucleus/city_tiles/Tiles/",
+      "recursive": true
+    },
+    {
+      "name": "City References (SBF)",
+      "remote_path": "/Projects/CU/SBF/USD/References/",
+      "local_path": "source/data/nucleus/city_tiles/References/",
+      "recursive": true
+    },
+    {
+      "name": "Skandinavium Model",
+      "remote_path": "/Projects/CU/Scandinavium/Skandinavium.usda",
+      "local_path": "source/data/nucleus/skandinavium/Skandinavium.usda",
+      "recursive": false
+    },
+    {
+      "name": "Skandinavium Mesh Assets",
+      "remote_path": "/Projects/CU/Scandinavium/Assets/",
+      "local_path": "source/data/nucleus/skandinavium/Assets/",
+      "recursive": true
+    },
+    {
+      "name": "Symbolic Buildings (CU)",
+      "remote_path": "/Projects/CU/Symbolic Buildings/",
+      "local_path": "source/data/nucleus/symbolic_buildings/",
+      "recursive": true
+    },
+    {
+      "name": "Videos (CU)",
+      "remote_path": "/Projects/CU/Videos/",
+      "local_path": "source/data/nucleus/videos/",
+      "recursive": true
+    },
+    {
+      "name": "Sounds (CU)",
+      "remote_path": "/Projects/CU/Sounds/",
+      "local_path": "source/data/nucleus/sounds/",
+      "recursive": true
+    }
+  ]
+}

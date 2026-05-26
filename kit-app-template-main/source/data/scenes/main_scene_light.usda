@@ -1,0 +1,435 @@
+#usda 1.0
+(
+    customLayerData = {
+        dictionary cameraSettings = {
+            dictionary Front = {
+                double3 position = (0, 0, 50000)
+                double radius = 500
+            }
+            dictionary Perspective = {
+                double3 position = (-5995.060163081319, 2534.272198246055, -9205.96008522118)
+                double3 target = (12329.973587124427, 4629.007907930447, 28506.422788703574)
+            }
+            dictionary Right = {
+                double3 position = (-50000, 0, 0)
+                double radius = 500
+            }
+            dictionary Top = {
+                double3 position = (0, 50000, 0)
+                double radius = 500
+            }
+            string boundCamera = "/OmniverseKit_Persp"
+        }
+        dictionary omni_layer = {
+            string authoring_layer = "./main_scene_light.usda"
+        }
+    }
+    defaultPrim = "World"
+    endTimeCode = 3600
+    metersPerUnit = 0.01
+    startTimeCode = 0
+    subLayers = [
+        @./main_scene.usda@
+    ]
+    timeCodesPerSecond = 60
+    upAxis = "Y"
+)
+
+over "World"
+{
+    over "Skandinavium"
+    {
+        over "SC_Context" (
+            active = false
+        )
+        {
+        }
+
+        over "The_roof" (
+            active = false
+        )
+        {
+        }
+
+        over "SC_Facade"
+        {
+            over "FACADE_NULL"
+            {
+                over "NORTHFACADE_NULL"
+                {
+                    over "SC_Metal_Facade_Exterior008" (
+                        active = false
+                    )
+                    {
+                    }
+
+                    over "SC_Metal_Facade_Exterior009" (
+                        active = false
+                    )
+                    {
+                    }
+
+                    over "SC_Metal_Facade_Exterior010" (
+                        active = false
+                    )
+                    {
+                    }
+
+                    over "SC_Metal_Facade_Exterior011" (
+                        active = false
+                    )
+                    {
+                    }
+
+                    over "SC_Metal_Facade_Exterior012" (
+                        active = false
+                    )
+                    {
+                    }
+
+                    over "SC_Metal_Facade_Interior003" (
+                        active = false
+                    )
+                    {
+                    }
+
+                    over "SC_Metal_Facade_Interior004" (
+                        active = false
+                    )
+                    {
+                    }
+
+                    over "SC_Metal_Facade_Interior005" (
+                        active = false
+                    )
+                    {
+                    }
+
+                    over "SC_Metal_Facade_Interior006" (
+                        active = false
+                    )
+                    {
+                    }
+
+                    over "SC_Metal_Facade_Interior007" (
+                        active = false
+                    )
+                    {
+                    }
+
+                    over "SC_Metal_Facade_Interior008" (
+                        active = false
+                    )
+                    {
+                    }
+
+                    over "SC_Metal_Facade_Interior009" (
+                        active = false
+                    )
+                    {
+                    }
+
+                    over "SC_Metal_Facade_Interior010" (
+                        active = false
+                    )
+                    {
+                    }
+
+                    over "SC_Metal_Facade_Interior011" (
+                        active = false
+                    )
+                    {
+                    }
+
+                    over "SC_Metal_Facade_Interior012" (
+                        active = false
+                    )
+                    {
+                    }
+
+                    over "SC_Metal_Facade_Interior013" (
+                        active = false
+                    )
+                    {
+                    }
+
+                    over "SC_Metal_Facade_Interior014" (
+                        active = false
+                    )
+                    {
+                    }
+
+                    over "SC_Metal_Facade_Interior015" (
+                        active = false
+                    )
+                    {
+                    }
+
+                    over "SC_Metal_Frame_Facade" (
+                        active = false
+                    )
+                    {
+                    }
+
+                    over "SC_Concrete_Facade008" (
+                        active = false
+                    )
+                    {
+                    }
+
+                    over "SC_Concrete_Facade010" (
+                        active = false
+                    )
+                    {
+                    }
+
+                    over "SC_Concrete_Facade011" (
+                        active = false
+                    )
+                    {
+                    }
+
+                    over "SC_Concrete_Facade012" (
+                        active = false
+                    )
+                    {
+                    }
+
+                    over "SC_Concrete_Facade_Pillars003" (
+                        active = false
+                    )
+                    {
+                    }
+
+                    over "SC_Concrete_Edges_Facade" (
+                        active = false
+                    )
+                    {
+                    }
+                }
+
+                over "SOUTHFACADE_NULL"
+                {
+                    over "SC_Metal_Facade_Exterior000" (
+                        active = false
+                    )
+                    {
+                    }
+
+                    over "SC_Concrete_Facade000" (
+                        active = false
+                    )
+                    {
+                    }
+
+                    over "SC_Metal_Facade_Interior037" (
+                        active = false
+                    )
+                    {
+                    }
+
+                    over "SC_Concrete_Facade_Pillars001" (
+                        active = false
+                    )
+                    {
+                    }
+                }
+            }
+        }
+
+        over "SC_Roof"
+        {
+            over "ROOFEXTENSION_NULL"
+            {
+                over "SC_Metal_Roof_Extension" (
+                    active = false
+                )
+                {
+                }
+
+                over "SC_Glass_Roof_Top" (
+                    active = false
+                )
+                {
+                }
+
+                over "SC_Metal_Roof_Extension003" (
+                    active = false
+                )
+                {
+                }
+
+                over "SC_Metal_Roof_Extension001" (
+                    active = false
+                )
+                {
+                }
+
+                over "SC_Metal_Roof_Extension002" (
+                    active = false
+                )
+                {
+                }
+
+                over "SC_Metal_Roof_Extension004" (
+                    active = false
+                )
+                {
+                }
+
+                over "SC_Metal_Roof_Extension005" (
+                    active = false
+                )
+                {
+                }
+
+                over "SC_Metal_Roof_Extension_Beam" (
+                    active = false
+                )
+                {
+                }
+
+                over "SC_Metal_Roof_Extension006" (
+                    active = false
+                )
+                {
+                }
+
+                over "SC_Metal_Roof_Extension000" (
+                    active = false
+                )
+                {
+                }
+
+                over "SC_White_Ceiling_Extension" (
+                    active = false
+                )
+                {
+                }
+            }
+        }
+
+        over "SC_SVM"
+        {
+            over "SVM_NULL"
+            {
+                over "SVM_Facade" (
+                    active = false
+                )
+                {
+                }
+
+                over "SVM_Frame" (
+                    active = false
+                )
+                {
+                }
+
+                over "SVM_Slab008" (
+                    active = false
+                )
+                {
+                }
+
+                over "SVM_Slab005" (
+                    active = false
+                )
+                {
+                }
+
+                over "SVM_Slab006" (
+                    active = false
+                )
+                {
+                }
+
+                over "SVM_Slab007" (
+                    active = false
+                )
+                {
+                }
+
+                over "SVM_Slab004" (
+                    active = false
+                )
+                {
+                }
+            }
+        }
+
+        over "NS_NULL" (
+            active = false
+        )
+        {
+        }
+
+        over "SC_Props"
+        {
+            over "PROPS_NULL"
+            {
+                over "EXTENSIONPROPS_NULL"
+                {
+                    over "P_Wood_Glod_Table" (
+                        active = false
+                    )
+                    {
+                    }
+
+                    over "P_Metal_Glod_Table" (
+                        active = false
+                    )
+                    {
+                    }
+
+                    over "P_Wood_Glod_Tables_2" (
+                        active = false
+                    )
+                    {
+                    }
+
+                    over "P_Grey_Glod_Legs" (
+                        active = false
+                    )
+                    {
+                    }
+
+                    over "P_Wood_Glod_Tables" (
+                        active = false
+                    )
+                    {
+                    }
+
+                    over "P_Metal_Extension_Legs" (
+                        active = false
+                    )
+                    {
+                    }
+                }
+            }
+        }
+    }
+
+    over "CU_DT_8km2_Project_Scene" (
+        active = false
+    )
+    {
+    }
+
+    over "edited_tile_3" (
+        active = false
+    )
+    {
+    }
+
+    over "edited_tile_4"
+    {
+        over "Geometry"
+        {
+            over "_00070_CU_DT_8km2" (
+                active = false
+            )
+            {
+            }
+        }
+    }
+}

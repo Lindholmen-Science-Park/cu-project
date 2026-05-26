@@ -1,0 +1,77 @@
+---
+description: USD sublayers — scene composition, file conventions, adding new sublayers, existing sublayers reference
+---
+
+# USD Sublayers
+
+Sublayers are USD's composition mechanism for splitting scene data across multiple files. Each sublayer adds or overrides prims in the main scene without modifying it directly.
+
+**Directory**: `source/data/scenes/sublayers/`
+**Main scene**: `source/data/scenes/main_scene.usda` — the `subLayers` list (in the file header metadata) references all sublayers.
+
+## File structure
+
+Every sublayer follows the same pattern:
+
+```usda
+#usda 1.0
+(
+    defaultPrim = "World"
+)
+
+over "World"
+{
+    def Xform "MyPrim"
+    {
+        double3 xformOp:translate = (100, 200, 300)
+        ...
+    }
+}
+```
+
+- `over "World"` — overlays onto the existing `/World` prim defined in the main scene (does not redefine it)
+- `def Xform "..."` — creates new prims inside `/World`
+- Use `over` (not `def`) for the World scope; use `def` for the actual prims you're adding
+
+## Adding a new sublayer
+
+1. Create the `.usda` file in `source/data/scenes/sublayers/`
+2. Add `@./sublayers/<filename>.usda@` to the `subLayers` list in the main scene file header
+3. No code changes needed — USD composes all sublayers into a single stage automatically
+
+## Code transparency
+
+All USD stage queries (e.g. `stage.GetPrimAtPath`, `Usd.PrimRange`, `find_spawn_point_prim`) operate on the **composed stage** — they resolve prims regardless of which layer defines them. Moving a prim from the root layer to a sublayer (or vice versa) requires no code changes.
+
+Extensions that create prims at runtime target specific sublayers via helper functions like `_find_nav_layer()` which searches `root_layer.subLayerPaths` for a filename match.
+
+## Existing sublayers
+
+| File | Purpose |
+|------|---------|
+| `avatars_layer.usda` | NPC avatar prims + Collider children |
+| `camera_layer.usda` | Fixed/CCTV camera prims |
+| `camera_tracker_layer.usda` | Camera tracker sphere prims |
+| `collider_layer.usda` | PhysX collision geometry |
+| `deactivation_layer.usda` | Deactivated/hidden prims |
+| `dynamic_sky_layer.usda` | DomeLight (shadow disabled, intensity 1.5), DistantLight, CumulusLight sky, axis hierarchy for sun positioning |
+| `exit_points_layer.usda` | Exit point Xforms for route-to-exit |
+| `heatmap_layer.usda` | Heatmap visualization prims |
+| `iot_air_quality_layer.usda` | `/World/IoT_AirQuality/Stations` scope for runtime WAQI station markers (Kit `younite.open_data_live_extension`) |
+| `iot_bike_share_layer.usda` | `/World/IoT_BikeShare/Stations` scope for runtime GBFS bike-dock markers (same extension) |
+| `iot_osm_pois_layer.usda` | `/World/IoT_OsmPois/Stations` scope for baked OSM POI markers (`younite.open_data_live_extension`) |
+| `maintenance_bot_layer.usda` | Maintenance bot prims |
+| `material_edit_layer.usda` | Material overrides |
+| `nav_waypoints_layer.usda` | Navigation waypoint Xforms (`nav_waypoint_*`) for corridor routing |
+| `navigation_layer.usda` | NavMesh area prims (camera, sound, incident areas) |
+| `osm_layer.usda` | OSM road network visualization |
+| `player_spawnpoints_layer.usda` | Player spawn point Xforms (PlayerSpawnPoint_01, _02, _Arena, _Foyer) |
+| `quiet_zone_layer.usda` | Quiet zone location Xforms (`quiet_zone_01`–`quiet_zone_03`) |
+| `restroom_layer.usda` | Restroom location Xforms |
+| `sensor_layer.usda` | Sensor placement prims |
+| `sound_location_layer.usda` | Sound NavMesh area location Xforms (`sound_location_01`–`sound_location_04`); inputs to the sound-area NavMesh modifier |
+| `spatial_sound_locations_layer.usda` | Spatial Sound Overlay trigger locations (`spatial_sound_NN` bare Xforms). The `icon_spatial_sound` iconGroup template in `interactions.json` auto-discovers them and runtime-attaches the headphones payload + Collider via session-layer override; wav file binds by matching `NN` prefix in `nucleus/sounds/`. See `topics/interactions.mdc` § iconGroup template. |
+
+## Caveats
+
+- Sublayer order in the `subLayers` list determines opinion strength (first = strongest). For non-overlapping prims this doesn't matter; for overrides, put the stronger opinion first.

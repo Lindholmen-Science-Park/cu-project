@@ -1,0 +1,221 @@
+---
+description: Globe "Space" view — CesiumJS/Resium globe overlay, cinematic fly-in with cloud layer, waypoint flight mechanics, view transition back to Kit. Read when working on the globe view, space camera mode, fly-in animation, cloud effects, or adding new globe locations.
+alwaysApply: false
+---
+
+# Globe Space View
+
+A CesiumJS-powered 3D globe overlay accessible as a third camera mode (`space`) alongside `first_person` and `bird_eye`. Available only in **dev mode** via the hamburger menu. The Kit streaming instance stays alive in the background throughout.
+
+---
+
+## Architecture
+
+```
+web-viewer-sample-main/src/
+├── config/
+│   └── globe-locations.json          # Data-driven config: initial view + locations
+├── features/streaming/overlays/globeView/
+│   ├── GlobeViewOverlay.tsx          # Main overlay: Resium Viewer, atmosphere, transitions
+│   ├── GlobeViewOverlay.css          # Overlay, back button, hint, cloud layer styles
+│   ├── GlobeLocationPin.tsx          # Clickable pin entity (SVG billboard + label)
+│   └── useGlobeCameraFlight.ts       # Flight hook: chained flyTo, altitude reporting
+├── features/streaming/types.ts       # CameraType union includes 'space'
+├── features/dev/controls/UIControls.tsx           # beginViewTransition for space entry
+└── features/dev/controls/submenus/CamerasSubmenu.tsx  # Space button in dev menu
+```
+
+**Dependencies**: `cesium`, `resium`, `vite-plugin-cesium` (Vite plugin for Cesium asset handling).
+
+**Cesium Ion token**: stored in repo-root `.env` as `CESIUM_ION_TOKEN` (the same env var the Kit-side Cesium tile orchestrator and the `startstream*.bat` wrappers read). It's exposed to the web bundle via `vite.config.ts` → `envPrefix: ['VITE_', 'CESIUM_']` and read as `import.meta.env.CESIUM_ION_TOKEN`. If the token is missing the overlay logs a warning at module load and the default Cesium imagery + terrain (both Ion-backed) will silently fail to render — you get a black globe. The same token is used by Cesium for Omniverse in `main_scene.usda`.
+
+---
+
+## Config Schema — `globe-locations.json`
+
+```jsonc
+{
+  "globe": {
+    "initialView": {
+      "lat": 55.0,       // Camera latitude
+      "lon": 14.0,       // Camera longitude
+      "alt": 4500000,    // Altitude in meters (4,500 km)
+      "heading": 0,      // Degrees from north, clockwise
+      "pitch": -90       // Degrees from horizontal (-90 = straight down)
+    }
+  },
+  "locations": [
+    {
+      "id": "gothenburg",
+      "labelKey": "globe.gothenburg",      // i18n key
+      "fallbackLabel": "Gothenburg",       // Fallback if key missing
+      "lat": 57.69924,                     // Pin position (Skandinavium)
+      "lon": 11.98767,
+      "targetView": "bird_eye",            // CameraType to switch to on exit
+      "scene": "main_scene",
+      "transitionMessageKey": "streaming.enteringGothenburg",
+      "cameraFlight": {
+        "waypoints": [
+          // Each waypoint triggers a camera.flyTo() call
+          { "lat": 57.75, "lon": 12.0, "alt": 15000, "duration": 5,
+            "heading": 0, "pitch": -85, "maxHeight": 4500000 },
+          { "lat": 57.732, "lon": 11.930, "alt": 3500, "duration": 3,
+            "heading": 137, "pitch": -35, "maxHeight": 15000 },
+          { "lat": 57.7012, "lon": 11.9842, "alt": 212, "duration": 2.5,
+            "heading": 137, "pitch": -35, "maxHeight": 3500 }
+        ]
+      }
+    }
+  ]
+}
+```
+
+### Waypoint fields
+
+| Field | Description |
+|---|---|
+| `lat`, `lon`, `alt` | Camera destination position |
+| `duration` | Seconds for this flight segment |
+| `heading` | Degrees clockwise from north (0 = north, 90 = east, 137 = SE) |
+| `pitch` | Degrees from horizontal (-90 = straight down, -35 = shallow angle) |
+| `maxHeight` | Max altitude during the flyTo arc (prevents Cesium's default parabolic overshoot) |
+
+---
+
+## Flight Mechanics
+
+### Waypoint design (3 phases)
+
+1. **Zoom** (WP1): fly from initial view straight down to cloud layer top (15 km). No rotation — same heading/pitch as initial view. `maxHeight` set to initial altitude to prevent arcing up.
+
+2. **Turn in clouds** (WP2): descend through cloud layer (15 km → 3.5 km) while rotating heading from 0° to 137° and pitch from -85° to -35°. The cloud overlay masks the rotation so it feels seamless. **Position must be on the approach line** — see Approach Line Geometry below.
+
+3. **Final descent** (WP3): pure zoom from 3.5 km to 212 m with identical heading/pitch as WP2 — no orientation change, just getting closer. Skandinavium stays centered.
+
+### Native flyTo vs manual animation
+
+The hook uses Cesium's native `camera.flyTo()` rather than `requestAnimationFrame` + `camera.setView()`. The native approach is GPU-optimized and runs inside Cesium's render loop. Manual `setView()` calls 60x/sec cause significant lag because each call forces full scene recalculation.
+
+### Altitude reporting
+
+A `scene.preUpdate` event listener tracks the camera altitude every frame during flight. This drives the cloud layer opacity without React re-renders (direct DOM manipulation via ref).
+
+---
+
+## Cloud Layer Effect
+
+A CSS overlay (`globe-cloud-layer`) simulates flying through clouds during the descent. Opacity is driven by camera altitude:
+
+| Altitude | Cloud opacity |
+|---|---|
+| > 15 km | 0% — clear space |
+| 15 km → 9 km | 0% → 92% — entering clouds |
+| 9 km (peak) | 92% — densest |
+| 9 km → 4 km | 92% → 0% — breaking through |
+| < 4 km | 0% — clear terrain |
+
+The cloud div uses layered `radial-gradient` ellipses for organic, uneven texture. The rotation waypoint (WP2) is positioned inside this altitude range so the heading change is visually hidden by the clouds.
+
+### Cloud layer constants
+
+Defined in `GlobeViewOverlay.tsx` `handleFlightProgress`:
+```
+TOP = 15000, PEAK = 9000, BOTTOM = 4000, MAX_OP = 0.92
+```
+
+---
+
+## Approach Line Geometry
+
+For the camera to point at Skandinavium after rotation, the waypoint must be on the correct **approach line** — the line extending backwards from the target along the opposite heading.
+
+Given: target at (57.69924, 11.98767), heading 137°, pitch -35°, altitude H:
+
+```
+ground_distance = H / tan(35°)
+back_direction  = heading + 180° = 317° (northwest)
+
+camera_lat = target_lat + ground_distance × cos(317°) / 111300
+camera_lon = target_lon + ground_distance × sin(317°) / (111300 × cos(lat))
+```
+
+For H = 3500 m: ground_distance ≈ 5000 m → camera at (57.732, 11.930).
+For H = 212 m: ground_distance ≈ 303 m → camera at (57.7012, 11.9842).
+
+Both positions are on the same approach line, so the final descent (WP2 → WP3) is a pure zoom with no orientation change.
+
+---
+
+## View Transition Flow
+
+```
+Dev menu → "Space" button
+  → beginViewTransition (fade out)
+    → env.handleCameraChange('space')
+      → StreamOnlyWindow renders <GlobeViewOverlay>
+        → notifyViewTransitionKitReady() (fade in, globe visible)
+          → User explores globe freely
+            → Clicks pin → startFlight()
+              → Waypoints fly through cloud layer
+                → flightComplete → beginViewTransition (fade out)
+                  → onExitToView('bird_eye')
+                    → Kit resumes in bird's eye view
+```
+
+Key details:
+- `handleCameraChange('space')` skips sending `cameraViewSwitchRequest` to Kit (Kit doesn't know about space mode)
+- `DevViewLayer` is suppressed when `currentCamera === 'space'`
+- Pin visibility is kept as `flyingIn` state — pins hidden during flight, hidden until fade-out completes via `setFlyingIn(false)` inside `onFadeOutComplete`
+
+### Pre-space FP state capture (`playerStateCaptureRequest`)
+
+When entering Space from first-person, `UIControls.handleCameraChangeForUi` sends `sendMessage('playerStateCaptureRequest', {})` **before** `beginViewTransition`. This snapshots and stores the player's current FP pose via `FpStateStore` on Kit, **without** switching views or teleporting.
+
+Why it's needed: a normal First Person → Bird's Eye toggle goes through `cameraViewSwitchRequest`, where `ViewSwitcher.on_camera_view_switch` captures FP state automatically. The Space → globe pin → bird_eye path skips that step entirely (Kit never sees the FP→space transition), so without an explicit pre-capture, the eventual exit to bird-eye would land with no stored FP state — the wayfinding "current location" and the bird-eye user-location arrow would snap to the bird-eye spawn instead of where the user actually was on the ground.
+
+The Kit handler (`ViewSwitcher.on_player_state_capture_request`) uses the same FP-only guard as `on_camera_view_switch`, so it's safe to send unconditionally — it never overwrites a stored FP pose with a non-FP one. See `camera-teleport.mdc` § "FP state capture/restore".
+
+### Web-side `'space'` guards (worldState / scene handlers)
+
+Kit doesn't know about the `'space'` camera type — when the globe is up, Kit still believes the camera is in `birdEye` (its last known state) and may emit `worldStateSync.cameraViewType = 'birdEye'` or `scene.loaded.viewType = 'birdEye'` echoes from late init or stage events. Without protection, those echoes would call `setCurrentCamera('bird_eye')` and unmount `<GlobeViewOverlay>` mid-flight.
+
+Both `worldStateHandlers.ts` and `sceneHandlers.ts` therefore use the functional `setCurrentCamera((cur) => cur === 'space' ? cur : mapped)` form so a Kit-driven `birdEye` echo is silently dropped while the web is intentionally in `'space'`. The actual exit to bird-eye is driven entirely by the globe's own `onFadeOutComplete → onExitToView('bird_eye') → handleCameraChange('bird_eye')`.
+
+### Bird-eye exit clears autoMove
+
+When the globe's exit calls `handleCameraChange('bird_eye')`, the centralised `navigationStateSet { autoMove: false }` dispatch fires (see `camera-teleport.mdc` § "Centralized bird-eye autoMove clear"). This is the only thing that lets POI map markers and the user-location arrow appear after a direct `street → space → bird_eye` sequence — without it, the projectables loop in the interactions extension stays gated by `_auto_move_active = True` and no `uiInteractionBoxesUpdate` ever reaches the web. See `map-markers.mdc` § "Visibility gotcha".
+
+---
+
+## Atmosphere Enhancements
+
+Enabled in `handleViewerReady`:
+- `globe.enableLighting` — sun/moon-based terrain shading
+- `globe.showGroundAtmosphere` — subtle atmospheric haze on terrain
+- `skyAtmosphere.perFragmentAtmosphere` — higher quality edge scattering
+- `fog.enabled` with `density: 2.0e-4` — distance-based depth haze
+
+No native volumetric clouds in CesiumJS — the cloud pass-through is a CSS overlay effect.
+
+---
+
+## Adding a New Location
+
+1. Add entry to `locations` array in `globe-locations.json`
+2. Set `lat`/`lon` for the pin position
+3. Calculate waypoint positions using the approach line geometry (see above)
+4. Set `targetView` to the Kit camera mode to enter after fly-in
+5. Add i18n keys to all locale files (`labelKey`, `transitionMessageKey`)
+6. The pin, flight, and transition are all data-driven — no code changes needed
+
+---
+
+## Localization Keys
+
+| Key | Usage |
+|---|---|
+| `streaming.enteringSpace` | Fade-out message when entering globe |
+| `streaming.enteringGothenburg` | Fly-in hint + transition message |
+| `globe.gothenburg` | Pin label |
+| `globe.clickPinHint` | Bottom hint on globe |
+| `common.back` | Back button |

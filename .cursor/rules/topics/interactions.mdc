@@ -1,0 +1,292 @@
+---
+description: Interactions extension — spatial triggers, click detection, Collider convention, projectable overlays, web action registry, approach-before-action, interactions.json schema; `services/kit_services/` + `config_loader` + `extension_handlers`
+---
+
+# Interactions Extension
+
+Unified spatial interaction system: proximity triggers, projectable overlays, click detection with parent-path traversal, and web-side action dispatch. Data-driven via `interactions.json` — new interaction points require no code changes.
+
+**Extension**: `younite.interactions_extension`
+**Config**: `source/data/interactions.json` (hot-reloaded every ~1s when file hash changes)
+**Depends on**: `younite.picking_extension`, `younite.messaging_core_extension`, `younite.usd_viewer_player_core_extension`
+**Frontend**: `InteractionBoxesOverlay.tsx` (projectable overlays), `useInteractionActions.ts` (action registry)
+
+## interactions.json schema
+
+```json
+{
+  "id": "unique_id",
+  "label": "Display Name",
+  "interactionType": "npc | area | object",
+  "category": "interactive",
+  "scene": "main_scene" | ["main_scene", "main_scene_light"],
+  "position": {
+    "type": "xform | coordinates | volume",
+    "primName": "MyPrim",
+    "primPath": "/World/MyPrim",
+    "positionOffset": [0, 200, 0],
+    "min": [-100, 0, -100], "max": [100, 300, 100]
+  },
+  "trigger": {
+    "type": "proximity | click | volume",
+    "radiusMeters": 10,
+    "activation": "always | once"
+  },
+  "approach": { "distanceMeters": 3.0 },
+  "behaviors": [
+    { "type": "projectable", "ui": { "title": "Hello!", "style": "speechBubble" } },
+    { "type": "action", "action": "myAction.open", "payload": { ... } }
+  ]
+}
+```
+
+Key fields:
+- **`position.type`**: `"xform"` (USD prim transform), `"coordinates"` (fixed world pos), `"volume"` (AABB trigger)
+- **`position.primPath`** or **`position.primName`**: prim reference. `primName` resolves to `/World/<primName>` via `_resolve_prim_path_from_config()`
+- **`position.positionOffset`**: optional `[x, y, z]` added after resolving world position
+- **`interactionType`**: semantic tag — `"npc"`, `"icon"`, `"iconGroup"`, `"area"`, `"object"`. Drives type-specific behavior (e.g. NPCs face player on click, icons open videobook, iconGroup fans out across many prims). See topic guides for type-specific details.
+- **`trigger.type`**: `"proximity"` (range-gated per frame), `"click"` (PhysX raycast hit), `"volume"` (AABB overlap)
+- **`approach`**: optional object — if present, player walks to the target before actions fire. See § Approach before action.
+- **`behaviors[].type`**: `"projectable"` (screen-projected overlay), `"action"` (dispatch to web/Kit)
+- **`ui.style`**: selects renderer from `STYLE_RENDERERS` map — `"speechBubble"`, `"infoCard"`, etc.
+
+### Localization of interaction strings
+
+User-facing text in `npcConfig` and `iconConfig` entries (greetings, titles, subtitles, quick action labels, chapter labels) are stored as **i18n key references**, not literal text:
+
+```json
+"greeting": "interactions.avatar_red.greeting",
+"title": "interactions.icon_ipad.title",
+"chapters": [{ "id": "queues", "label": "interactions.icon_ipad.chapter_queues", ... }]
+```
+
+Translations live in the `"interactions"` section of each locale file (`en.json`, `sv.json`, etc.). Frontend components resolve them via `t(key)`. See `.cursor/rules/topics/localization.mdc` § Interaction locale keys.
+
+Area/object interactions still use the `title_{lang}` inline pattern with `resolveLocalized()` on the frontend.
+
+## Collider convention (clickable prims)
+
+Every interactive prim that needs click detection must have a child `Cube "Collider"`:
+
+```usda
+def Cube "Collider" (
+    prepend apiSchemas = ["PhysicsCollisionAPI", "PhysxCollisionAPI"]
+)
+{
+    float3 xformOp:scale = (30, 90, 20)
+    double3 xformOp:translate = (0, 90, 0)
+    uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+    token visibility = "invisible"
+    bool physics:collisionEnabled = 1
+}
+```
+
+- Sized to encompass the interactive object
+- `visibility = "invisible"` — not rendered, only used for PhysX raycasting
+- Lives in the **same layer** as the interactive prim, not in `collider_layer.usda`
+- The Collider's local-space top `(0, 1, 0)` is also used by `_resolve_prim_top()` to anchor overlays above the prim
+
+**Do NOT use mesh colliders on individual sub-parts.** A single invisible box per interactive prim is the standard pattern. This applies to NPCs, doors, interactive objects — anything clickable.
+
+## Click detection flow
+
+1. User clicks in viewport → web sends `younite.pick.request` with `intent: "pointClick"`
+2. `younite.picking_extension` → PhysX `raycast_closest` → `younite.pick.response` with `hit.primPath`
+3. `InteractionsExtension._on_pick_response` (from `_InteractionEventHandler`) receives the hit path (e.g. `/World/Red/Collider`)
+4. Any pending approach is **cancelled** (new click supersedes)
+5. **Parent-path traversal** walks up the path hierarchy checking `_click_points_by_path`:
+   - `/World/Red/Collider` → not registered
+   - `/World/Red` → matched to `avatar_red_chat` entry
+6. If the entry has `"approach"` config and the player is far: walk the player first, defer actions (see § Approach before action)
+7. Otherwise `ActionHandlerService.execute_onclick()` dispatches the configured actions immediately
+
+PhysX raycast meta keys checked: `primPath`, `collider`, `rigidBody`, `colliderPrimPath`, `bodyPrimPath`, `rigidBodyPrimPath` (handles multiple naming conventions across Kit versions).
+
+## iconGroup template (one entry → many icons)
+
+`interactionType: "iconGroup"` is a template entry that fans out across every Xform under `/World` whose name matches a glob, producing one fully-formed icon interaction per match. Use this when several locations share the same icon, range, onboarding, and behavior but bind to different media files.
+
+```json
+{
+  "id": "icon_spatial_sound",
+  "interactionType": "iconGroup",
+  "scene": ["main_scene", "main_scene_light"],
+  "primNamePattern": "spatial_sound_*",
+  "trigger": { "type": "proximity", "radiusMeters": 3, "activation": "always" },
+  "position": { "type": "xform", "positionOffset": [0, 50, 0] },
+  "iconConfig": {
+    "iconId": "headphones",
+    "iconImage": "headphones_avatar.svg",
+    "mediaType": "spatialSound",
+    "iconAsset": "interaction_icons/headphones.usd",
+    "soundsDir": "${NUCLEUS_SPATIAL_SOUNDS_FOLDER}",
+    "i18nKeyPattern": "interactions.{id}"
+  }
+}
+```
+
+Expansion (`ConfigLoader._expand_icon_group_entry` in `services/kit_services/config_loader/loader.py`; NPC/icon synthetic points in `expansion.py`):
+
+1. **Discover** matching Xforms via `fnmatch.fnmatch` against `primNamePattern` (recursive walk under `/World`).
+2. **Resolve media** from `soundsDir` / `videosDir` (relative to `source/data/`) — files indexed by leading numeric prefix (`02_*.wav` → key `"02"`). The trailing digits of each prim name (`spatial_sound_02` → `"02"`) select the file. Missing prefix → warning, skip.
+3. **Attach payload + Collider** at runtime via session-layer override: `iconAsset` is added as a payload on the Xform, and a standard invisible `Cube "Collider"` child is defined. Idempotent on hot-reload (skips re-add if payload/Collider already present). This means the source sublayer can keep bare Xforms — no per-location boilerplate.
+4. **Synthesise** a normal icon entry per match with `id = "icon_<primName>"`, the resolved media URL, and i18n keys derived from `i18nKeyPattern` (the `{id}` placeholder is replaced with the synthesised id; e.g. `interactions.icon_spatial_sound_02.title`). The synth entry then passes through the regular `_expand_icon_entry` flow, producing pointer + click points just like a hand-authored icon.
+
+The `mediaType` field on `iconConfig` selects the click action (`spatialSound.open` vs `videobook.open`) and the media field name (`soundUrl` vs `videoUrl`). To use the same template for videobooks, swap `mediaType` to `"videobook"` and provide `videosDir` instead of `soundsDir`.
+
+## Approach before action
+
+The `"approach"` key on an interaction entry makes the player walk to the target before actions fire. Works with any `interactionType` — not limited to NPCs.
+
+```json
+"approach": { "distanceMeters": 3.0 }
+```
+
+- **`distanceMeters`**: how far from the target the player should stop (approach position is computed along the player→target direction)
+
+### How it works
+
+1. `_on_pick_response` finds a clickable with an `"approach"` config
+2. `ApproachService.request()` checks XZ distance — if the player is already within `distanceMeters + 1.0m` buffer, returns `False` → actions fire immediately
+3. Otherwise, computes an approach position (target + offset toward player) and dispatches `younite.navigation.requestPoint` — reusing the existing navmesh auto-move pipeline
+4. Per-frame `ApproachService.update()` checks XZ distance from player to target
+5. On arrival: fires the `on_arrival` callback which (for NPCs) re-rotates the NPC toward the player's final position, then calls `execute_onclick` to dispatch the deferred actions
+6. 30-second timeout safeguard — if the player never arrives, the pending approach is silently dropped
+
+### Cancellation
+
+A pending approach is cancelled when:
+- The player clicks **anywhere** (any new `pointClick` cancels the current approach)
+- This includes clicking the ground (navigation), another NPC, or the same NPC again
+
+### NPC-specific behavior with approach
+
+When `interactionType == "npc"` and `approach` is set:
+1. **Initial click**: NPC rotates toward the player (immediate), player starts walking
+2. **On arrival**: NPC re-rotates toward the player's new (closer) position, then actions fire (e.g. chat opens)
+
+### Adding approach to an interaction
+
+Data-driven — add `"approach": { "distanceMeters": X }` to any click-triggered entry in `interactions.json`. No code changes needed.
+
+## Projectable overlay anchoring
+
+For `ui.style == "speechBubble"`, the overlay anchors at the **top of the Collider child**:
+
+1. `_resolve_prim_top()` finds `{primPath}/Collider` on the stage
+2. Gets local-to-world transform via `UsdGeom.XformCache`
+3. Transforms `(0, 1, 0)` to world space → screen projection anchor
+
+**Range gating vs display anchor**: proximity triggers use the prim's **root transform** for distance checking. The Collider-top position is only used for screen projection after range gating passes. This ensures triggers fire at the correct distance while overlays render at the correct height.
+
+## Web-side action registry
+
+`useInteractionActions.ts` provides a pluggable action dispatch registry:
+
+```typescript
+const interactionActions = useInteractionActions();
+interactionActions.register('avatarChat.open', (interactableId, payload) => { ... });
+interactionActions.register('door.toggle', (interactableId, payload) => { ... });
+```
+
+- `register(action, handler)` / `unregister(action)` / `dispatch(interactableId, action, payload)`
+- `useCustomEventHandler` delegates `interactionTriggered` events to this registry
+- New interaction types register handlers in `StreamOnlyWindow.tsx` via `useEffect`
+
+To add a new web-side interaction: register a handler for a new action string, then reference that action in `interactions.json` behaviors.
+
+## UI styles (InteractionBoxesOverlay)
+
+Renderers selected via `STYLE_RENDERERS` map in `InteractionBoxesOverlay.tsx`:
+
+| Style | CSS class | Use case |
+|-------|-----------|----------|
+| `infoCard` | `.ibox-card` | Info panels with title/subtitle/body/severity badge |
+| `speechBubble` | `.ibox-speech-bubble` | Speech — white bg, dark text, pointer arrow below |
+| `mapMarker` | `.ibox-map-marker` | Bird's eye map markers with icon + teleport click |
+| `videoTrigger` | `.ibox-video-trigger` | Video prompt bubble with title + green "Watch" button |
+
+Add new styles by adding an entry to `STYLE_RENDERERS` and corresponding CSS in `InteractionBoxesOverlay.css`.
+
+### Seat navigation overlay collision avoidance
+
+When the seat navigation overlay is active (`seatStreamOverlayActive` — valid seat route calculated, play/pause button visible at bottom of stream), two adjustments prevent overlapping the play/pause button:
+
+1. **`speechBubbleBottom` raised**: CSS rule `.ibox-overlay-root--automove .ibox-speech-bottom-wrap` bumps `bottom` from 76px to 156px (+ 80px), keeping the static bottom bubble above the play/pause button.
+2. **Projected items filtered from bottom zone**: Any non-`speechBubbleBottom` item whose computed screen `y` falls within `AUTOMOVE_BOTTOM_EXCLUSION_PX` (220px) of the viewport bottom is hidden. This prevents location-based overlays (e.g. `speechBubble`, `interactivePointer`) from rendering over the play/pause controls.
+
+Both behaviors are driven by the `autoMoveActive` prop on `InteractionBoxesOverlay`, set to `seatStreamOverlayActive` in `StreamOnlyWindow.tsx`. The trigger is the **visibility of the seat route overlay** (not just whether the player is actively moving).
+
+### onAction callback
+
+`InteractionBoxesOverlay` accepts an `onAction(action, payload)` prop for styles that need to dispatch actions from UI buttons (e.g. `videoTrigger`). The callback is wired in `StreamOnlyWindow.tsx` to the interaction action registry:
+
+```tsx
+onAction={(action, payload) => interactionActions.dispatch('overlay', action, payload)}
+```
+
+Styles that use `onAction` read `ui.action` and `ui.actionPayload` from the interaction config and pass them to `onAction` when the user clicks. This allows data-driven action dispatch from projectable overlays without separate click entries in `interactions.json`.
+
+## Key files
+
+The extension uses a **thin** `extension.py` (`IExt` entrypoint only: `on_startup` / `on_shutdown`, event-name constants, service wiring). Behaviour lives under **`services/kit_services/`** (mirrors the pattern in `younite.navmesh_route_extension`). All `interactions.json` loading and types live in the **`config_loader/`** subpackage only (`import` from `younite.interactions_extension.services.kit_services.config_loader`, e.g. `from .services.kit_services.config_loader import ConfigLoader, LoadedConfig`). Events 2.0 wiring and frame updates use **handler base classes** in **`extension_handlers/`** (`_ConfigHandler`, `_InteractionEventHandler`, `_UpdateHandler` — merged into `InteractionsExtension` via multiple inheritance). There is no `config_loader` at the package root.
+
+### Package layout (`younite.interactions_extension/`)
+
+```
+younite/interactions_extension/
+├── extension.py                 # IExt: startup/shutdown, compose services, subscribe
+├── usd_helpers.py
+├── dev_locale_io.py
+└── services/
+    └── kit_services/
+        ├── action_handler_service.py
+        ├── approach_service.py
+        ├── click_router.py
+        ├── interaction_marker_service.py
+        ├── nearest_entity_tracker.py
+        ├── projectables_loop.py
+        ├── projection_service.py
+        ├── rotation_service.py
+        ├── spatial_trigger_service.py
+        ├── extension_handlers/         # _ConfigHandler, _InteractionEventHandler, _UpdateHandler
+        │   ├── config_handler.py
+        │   ├── event_handler.py
+        │   └── update_handler.py
+        └── config_loader/
+            ├── __init__.py             # public exports
+            ├── types.py                # LoadedConfig, SpatialTriggerSpec, BoundsType
+            ├── constants.py            # NPC kit-only keys, media/caption extensions, env fallbacks
+            ├── expansion.py            # expand_npc_entry, expand_icon_entry, npc_config_for_web
+            ├── session_authoring.py    # payload + Collider attach, NPC PlayerSpawnPoint child
+            └── loader.py               # ConfigLoader, maybe_reload, _parse, iconGroup fan-out
+```
+
+### Role summary
+
+| Area | Role |
+|------|------|
+| `extension.py` | Constructs services, registers outbound events, calls `_subscribe_events`, `_subscribe_stage_events`, `_start_update_loop` |
+| `extension_handlers/*.py` | Config apply + web sync, Carb/stage event handlers, per-frame update (base classes for `InteractionsExtension`) |
+| `config_loader/*` | Single source for `interactions.json`: discovery, expansion, session-layer USD side-effects |
+| `usd_helpers.py` | Stateless USD helpers — `resolve_prim_position`, `resolve_prim_bounds`, `resolve_prim_top`, `resolve_prim_path_from_config`, `get_stage_meters_per_unit`, `stage_has_world_children`, `find_xforms_by_glob` |
+| `services/kit_services/*.py` | Same classes as pre-refactor (`RotationService`, `ClickRouter`, `SpatialTriggerService`, `ApproachService`, `ProjectionService`, `ActionHandlerService`, `InteractionMarkerService`, `NearestEntityTracker`, `ProjectablesLoop`); paths now live under `services/kit_services/` |
+
+### Config + web
+
+| File | Purpose |
+|------|---------|
+| `source/data/interactions.json` | Interaction point definitions (hot-reloaded) |
+| `InteractionBoxesOverlay.tsx` + `.css` | Projectable overlay rendering |
+| `useInteractionActions.ts` | Web-side pluggable action registry |
+| `useCustomEventHandler.ts` | Routes `interactionTriggered` events to action registry |
+| `StreamOnlyWindow.tsx` | Wires action handlers + renders overlays |
+
+## Related topics
+
+- NPC avatars (face-player, chat overlay, avatar images): `.cursor/rules/topics/interactions-avatars.mdc`
+- POI coins (round-sign 3D markers using a coin-flavored `iconGroup` template and the `coinPoi.open` action): `.cursor/rules/topics/poi-coins.mdc`
+- Video playback (videoTrigger overlay, video player, Kit catalog): `.cursor/rules/topics/video-playback.mdc`
+- Picking extension: `younite.picking_extension` — PhysX + RTX raycasting
+- Messaging: `younite.messaging_core_extension` — `interactionTriggered` event dispatch to web
+- Player location: `younite.usd_viewer_player_core_extension` — `PlayerLocationService.get_player_world_position()`

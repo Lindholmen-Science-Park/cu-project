@@ -1,0 +1,235 @@
+#usda 1.0
+
+over "World"
+{
+    over "Skandinavium"
+    {
+        token visibility = "inherited"
+        float3 xformOp:rotateXYZ = (0, -81.4, 0)
+        float3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (427756.37692004564, 699.7269597310427, 208843.87674693167)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+
+        over "SC_Foyer"
+        {
+            over "FOYER_NULL"
+            {
+                over "MEZZNORTH_NULL"
+                {
+                    over "SC_White_Mezz_Wall" (
+                        active = false
+                    )
+                    {
+                    }
+
+                    over "SC_White_Mezz_Doors"
+                    {
+                        token visibility = "inherited"
+                    }
+                }
+            }
+        }
+    }
+
+    over "CU_DT_8km2_Project_Scene"
+    {
+        over "Geometry"
+        {
+            over "_00070_CU_DT_8km2"
+            {
+                over "_00070_CU_DT_8km2_Buildings"
+                {
+                    over "A4264a2219" (
+                        active = false
+                    )
+                    {
+                    }
+                }
+
+                over "_00070_CU_DT_8km2_Terrain"
+                {
+                    over "Misc" (
+                        active = false
+                    )
+                    {
+                    }
+                }
+            }
+
+            over "_00071_CU_DT_8km2"
+            {
+                over "_00071_CU_DT_8km2_Buildings"
+                {
+                    over "A4256a2161" (
+                        active = false
+                    )
+                    {
+                    }
+
+                    over "A4264a2219" (
+                        active = false
+                    )
+                    {
+                    }
+
+                    over "_113" (
+                        active = false
+                    )
+                    {
+                    }
+                }
+
+                over "_00071_CU_DT_8km2_Terrain"
+                {
+                    over "Misc" (
+                        active = false
+                    )
+                    {
+                    }
+
+                    over "VG_Kantsten" (
+                        active = false
+                    )
+                    {
+                    }
+                }
+            }
+
+            over "_00087_CU_DT_8km2"
+            {
+                over "_00087_CU_DT_8km2_Buildings"
+                {
+                    over "A4256a2161" (
+                        active = false
+                    )
+                    {
+                    }
+
+                    over "A4264a2219" (
+                        active = false
+                    )
+                    {
+                    }
+
+                    over "A4283a2145" (
+                        active = false
+                    )
+                    {
+                    }
+
+                    over "A4304a2164" (
+                        active = false
+                    )
+                    {
+                    }
+
+                    over "_42" (
+                        active = false
+                    )
+                    {
+                    }
+
+                    over "_44" (
+                        active = false
+                    )
+                    {
+                    }
+                }
+
+                over "_00087_CU_DT_8km2_Terrain"
+                {
+                    over "Misc" (
+                        active = false
+                    )
+                    {
+                    }
+
+                    over "VG_Kantsten" (
+                        active = false
+                    )
+                    {
+                    }
+                }
+            }
+
+            over "_00086_CU_DT_8km2"
+            {
+                over "_00086_CU_DT_8km2_Terrain"
+                {
+                    over "Misc" (
+                        active = false
+                    )
+                    {
+                    }
+                }
+            }
+
+            over "_00090_CU_DT_8km2"
+            {
+                over "_00090_CU_DT_8km2_Buildings"
+                {
+                    over "_31" (
+                        active = false
+                    )
+                    {
+                        token visibility = "inherited"
+                    }
+
+                    over "A4141a1472" (
+                        active = false
+                    )
+                    {
+                    }
+                }
+            }
+
+            over "_00073_CU_DT_8km2"
+            {
+                over "_00073_CU_DT_8km2_Buildings"
+                {
+                    over "A4141a1472" (
+                        active = false
+                    )
+                    {
+                    }
+                }
+            }
+
+            over "_00089_CU_DT_8km2"
+            {
+                over "_00089_CU_DT_8km2_Buildings"
+                {
+                    over "A4141a1472" (
+                        active = false
+                    )
+                    {
+                    }
+                }
+            }
+
+            over "_00072_CU_DT_8km2"
+            {
+                over "_00072_CU_DT_8km2_Buildings"
+                {
+                    over "A4105a1986"
+                    {
+                        token visibility = "inherited"
+                    }
+                }
+            }
+        }
+    }
+
+    over "Symbolbyggnader"
+    {
+        over "Symbolobjekt"
+        {
+            over "x149000y6398000_SymbolicObjects_004" (
+                active = false
+            )
+            {
+            }
+        }
+    }
+}
+

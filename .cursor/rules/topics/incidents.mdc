@@ -1,0 +1,91 @@
+---
+description: Incident creator extension — placing NavMesh-blocking obstacles from web UI, shape selection, size presets, area slots
+---
+
+# Incidents (NavMesh-blocking obstacles)
+
+Place incident obstacles from the web UI that block NavMesh pathfinding after rebake. Supports multiple shapes (cube, cone, torus) for testing different obstacle footprints.
+
+**Extension**: `younite.incident_extension` (order 1210, after picking at 1200)
+**Depends on**: `younite.picking_extension` (raycasts click → 3D position), `younite.messaging_core_extension`
+**Placement service**: `younite.incident_extension/.../incident_placement_service.py`
+**Frontend**: floating "Add incident" button + shape/size selectors in `PlacementButtons.tsx`
+
+## Architecture
+
+Each incident creates two child prims under `/World/Incidents/<name>`:
+
+- **`/Shape`** — visible geometry (cube, cone, or torus), offset up so it clips into the ground. Shared orange emissive material. Has `UsdPhysics.CollisionAPI` for PhysX raycasting.
+- **`/Area`** — flat `Mesh` at ground level with `NavMeshAreaAPI` + `nav:area = "incident_blocked"` (the single shared non-walkable area name — see `INCIDENT_AREA_NAME` in `incident_placement_service.py`). Rectangular for cubes, circular (16-sided polygon) for cones/tori. This is what the NavMesh baker reads.
+
+Both prims are written to the **navigation sublayer** (`navigation_layer.usda`) using `Usd.EditContext`.
+
+## Shapes
+
+| Shape | Visual prim | NavMesh area | Sizing |
+|-------|------------|--------------|--------|
+| **Cube** | `UsdGeom.Cube` scaled to W×H×D | Rectangle (W×D) | Width × Depth from preset |
+| **Cone** | `UsdGeom.Cone` with base radius, point up | Circle (r = max(W,D)/2) | Diameter from max(W,D) |
+| **Torus** | Procedural mesh (24 segments × 12 sides) | Circle (r = max(W,D)/2) | Major R = 65%, minor R = 35% of footprint radius |
+
+All shapes receive the same orange emissive material and `CollisionAPI`.
+
+## NavMesh area name
+
+A single entry `incident_blocked` is pre-registered in `main_scene.usda` under `customLayerData.navmeshSettings.areas` with `defaultCost = -1` (non-walkable). All incident `Area` prims share that same `nav:area` name — there is no per-incident slot, and no slot limit.
+
+> **Query-time gotcha**: the non-walkable behavior depends on `_build_area_costs` (in `navmesh_route_extension/scripts/navmesh_shortest_path.py`) passing the negative `defaultCost` through to `query_shortest_path` unchanged. If a future change clamps negative costs to a positive number, the NavMesh will still bake the area as non-walkable but every route query will silently treat it as walkable at that positive cost — the visible symptom is "incident appears, NavMesh rebakes, route still cuts straight through it". See `navmesh-areas.mdc` for the cost-list contract.
+
+## Event flow
+
+### Placing an incident
+1. Web: user toggles "Create incident" in hamburger menu → `incidentPlacementToggle { enabled: true }`
+2. Web: floating "Add incident" button appears; user selects shape (Cube/Cone/Torus) and size preset (1×1m, 2×2m, 2×1m)
+3. Web: user clicks "Add incident" → arms next click (`nextClickPlacesIncident = true`)
+4. Web: user clicks ground → `younite.pick.request` with `intent: "incident"`, `incidentWidth`, `incidentDepth`, `incidentShape`
+5. Picking extension: raycasts, dispatches `younite.pick.result` (custom fields forwarded via `extra`)
+6. Incident extension: receives pick result, calls `place_incident(pos, width, depth, shape)`
+7. Incident extension: dispatches `incidentAdded` + `navmeshRebakeRequest`
+8. Orchestrator rebakes NavMesh (includes all active providers)
+
+### Disabling incidents
+1. Web: user toggles "Disable incidents" → `incidentPlacementToggle { enabled: false }`
+2. Incident extension: calls `remove_all_incidents()` — deletes all prims under `/World/Incidents` from the nav layer
+3. Incident extension: dispatches `incidentsCleared` + `navmeshRebakeRequest`
+4. Orchestrator rebakes NavMesh (incident areas no longer present)
+
+### Removing a single incident
+- `incidentRemove` event with `{ incidentPath }` → `remove_single_incident()` → `incidentRemoved` + `navmeshRebakeRequest`
+
+## Size presets (frontend)
+
+| Preset | Width (cm) | Depth (cm) | Height (cm) |
+|--------|-----------|-----------|-------------|
+| 1×1m   | 100       | 100       | 150 (fixed) |
+| 2×2m   | 200       | 200       | 150 (fixed) |
+| 2×1m   | 200       | 100       | 150 (fixed) |
+
+Width/depth are sent in the pick request payload. Height is fixed at 150 (1.5m) backend-side. For round shapes (cone, torus), `max(width, depth)` is used as the footprint diameter.
+
+## Key constants (`incident_placement_service.py`)
+
+- `INCIDENTS_PARENT_PATH = "/World/Incidents"`
+- `INCIDENT_AREA_NAME = "incident_blocked"` — single shared non-walkable area name used by every incident
+- `DEFAULT_WIDTH / DEFAULT_DEPTH / DEFAULT_HEIGHT` — fallback if web doesn't send dimensions
+- `GROUND_OFFSET = 0.5` — flat mesh sits 0.5 cm above ground
+- `VALID_SHAPES = ("cube", "cone", "torus")`
+
+## Frontend files
+
+- `PlacementButtons.tsx` — shape selector row (Cube/Cone/Torus) + size preset row (1×1/2×2/2×1)
+- `useControlHandlers.ts` — `incidentShape` and `incidentSizePreset` state
+- `AppStream.tsx` — sends `incidentShape` in `younite.pick.request` payload
+
+## Related
+
+- Camera depth capture (uses incidents for testing): `.cursor/rules/topics/camera_depth_capture.mdc`
+- NavMesh area mechanics: `.cursor/rules/topics/navmesh-areas.mdc`
+- Bake orchestrator + provider protocol: `.cursor/rules/topics/bake-orchestrator.mdc`
+- Camera frustum areas (same NavMesh pattern): `.cursor/rules/topics/camera_navmesh_areas.mdc`
+- Sound areas (same NavMesh pattern): `.cursor/rules/topics/sound-areas.mdc`
+- Picking extension: `younite.picking_extension` — forwards custom fields via `extra` dict

@@ -1,0 +1,288 @@
+---
+description: Seasonal tree textures — spring/fall/winter texture swap via session-layer overrides, block-grid texture generation, fallen leaves animation, ground leaf litter, maple leaf 3D model, nearby trees service, view-transition loading screen, localized label, adapting to different tree prototypes. Read when working on seasons, tree appearance, seasonal effects, fallen leaves, ground litter, or changing the tree model.
+---
+
+# Seasonal Tree Textures
+
+## Overview
+
+City tile trees change appearance by season. A Kit extension swaps the tree material's texture file on the **session layer** at runtime — no original assets are modified.
+
+| Season (UI) | Season (Kit) | Texture file | Visual |
+|-------------|-------------|--------------|--------|
+| Summer | summer | Original USDZ texture (override cleared) | Full green canopy |
+| Spring | spring | `Maple_Red_Field_Color_dark_spring.png` | Green with ~25 % leaf gaps |
+| Autumn | autumn → fall | `Maple_Red_Field_Color_dark_fall.png` | Yellow/orange/green mix, ~25 % leaf gaps |
+| Winter | winter | `Maple_Red_Field_Color_dark_winter.png` | No leaves (trunk only) |
+
+## Tree model structure
+
+Source USDZ: `VEG_10500_Traed_genericTree.usdz`
+
+- **Single mesh** (`Tree_mesh`): 9 911 vertices, 10 594 triangles
+- **Single material** (`Tree_material`): `UsdPreviewSurface` with `UsdUVTexture`
+- **Single texture atlas** (4096×4096 RGBA): left half = bark/trunk, right half = leaf branch sprites (alpha-masked)
+- **UV-based separation**: U < 0.5 → trunk faces (2 958), U >= 0.5 → leaf faces (7 612)
+- Opacity from the texture alpha channel (`opacityThreshold = 0.05`)
+
+The tree is instanced via `PointInstancer` in each of the 128 city tiles. Each tile's prototype lives at:
+
+```
+/World/CU_DT_8km2_Project_Scene/Geometry/_XXXXX_CU_DT_8km2/_XXXXX_CU_DT_8km2_VEG/
+  Prototypes/VEG/VEG_10500_Traed_genericTree
+```
+
+## Architecture
+
+```
+WeatherSeasonPicker (web UI button click)
+  → applySeason(s) in useEnvironmentHandlers.ts
+    → beginViewTransition({ message: t('loading.changingSeason'), onFadeOutComplete })
+      → screen fades to black (ViewTransitionOverlay)
+      → onFadeOutComplete:
+          sendMessage('seasonChangeRequest', { season: s })   ← sent FIRST
+          sendMessage('skyControlRequest', { dayOfYear: ... })
+  → SeasonsExtension._on_season_change()
+    → maps UI season to texture season (spring→spring, autumn→fall)
+    → dispatches seasonChangeStarted
+    → overrides inputs:file on all tree shader prims (session layer, batched in Sdf.ChangeBlock)
+    → waits _SETTLE_FRAMES (15) for Hydra to load textures + re-render
+    → dispatches seasonStatus { season: s }
+    → dispatches seasonChangeCompleted
+  → worldStateHandlers.ts receives seasonChangeCompleted
+    → calls notifyViewTransitionKitReady()
+    → screen fades back in
+```
+
+**Important**: `seasonChangeRequest` must be sent **before** `skyControlRequest` to avoid a race condition where the sky control dispatch pushes a stale `season` value to the web and resets the button state.
+
+## Files
+
+### Kit extension
+
+| File | Role |
+|------|------|
+| `extensions/younite.weather_and_seasons_extension/config/extension.toml` | Package metadata, depends on `omni.usd` |
+| `extensions/younite.weather_and_seasons_extension/younite/weather_and_seasons_extension/extension.py` | `SeasonsExtension` — discovers tree shaders, swaps `inputs:file` on session layer |
+| `extensions/younite.weather_and_seasons_extension/younite/weather_and_seasons_extension/_shared.py` | Common utilities: `get_stage`, `get_player_pos`, `raycast_floor_y`, `get_camera_forward_xz` |
+| `extensions/younite.weather_and_seasons_extension/younite/weather_and_seasons_extension/sky_service.py` | Sky/DomeLight control, `WEATHER_PRESETS`, `apply_sky_control()` (moved from stage_core) |
+| `extensions/younite.weather_and_seasons_extension/younite/weather_and_seasons_extension/snow_service.py` | Snow PointInstancer effect (moved from stage_core) |
+| `extensions/younite.weather_and_seasons_extension/younite/weather_and_seasons_extension/rain_service.py` | Rain PointInstancer effect (moved from stage_core) |
+| `extensions/younite.weather_and_seasons_extension/younite/weather_and_seasons_extension/fog_service.py` | RTX fog toggle via carb.settings (moved from stage_core) |
+| `extensions/younite.weather_and_seasons_extension/younite/weather_and_seasons_extension/wet_ground_service.py` | Paved-surface wet texture overrides, multi-source reason tracking (weather vs season) |
+
+The extension lazily scans the composed stage on first request, matching prims ending with `_TREE_SHADER_SUFFIX`.
+
+### Texture generation
+
+| File | Role |
+|------|------|
+| `data/Assets/Tools/generate_seasonal_textures.py` | One-time offline script (git-tracked): extracts texture from USDZ, generates spring + fall + winter variants |
+| `data/Assets/SeasonalTextures/` | Output directory for generated PNGs (gitignored via `*.png`, `.gitkeep` tracked) |
+
+The output directory deliberately lives outside the Nucleus sync tree (`data/nucleus/`). This means a `pullnucleus.bat` run — even a full clean + re-pull — will never destroy the generated textures. The source USDZ is still read from `data/nucleus/` (where it belongs as Nucleus-synced content).
+
+**Setup for new developers**: run `preinstall.bat` (pulls Nucleus content + generates textures automatically). Alternatively, run `pullnucleus.bat` and `runscripts.bat` separately. To regenerate textures only: `runscripts.bat`. Requires `Pillow` and `numpy` (`pip install -r kit-app-template-main/source/data/Assets/Tools/requirements.txt`).
+
+#### Texture generation details
+
+The script extracts the 4096×4096 RGBA atlas from the USDZ and processes only the **right half** (x ≥ 2048 — the leaf sprites). The left half (bark/trunk) is always kept untouched.
+
+| Variant | Technique |
+|---------|-----------|
+| **Spring** | Block-grid removal: divide leaf region into 64×64 px blocks; randomly remove 25 % of blocks (zero RGBA). Keeps original green colour. Different random seed from fall so the gap pattern differs. |
+| **Fall** | Block-grid removal + colour mix: each 64×64 block is randomly assigned a role — remove (25 %), stay green (7.5 %), turn orange (7.5 %), or turn golden yellow (60 %). Transparent pixels have RGB zeroed to prevent mipmap bleed. |
+| **Winter** | All RGBA channels zeroed on the right half. Leaf geometry becomes invisible via alpha cutout. |
+
+Key constants in the script:
+
+| Constant | Value | Purpose |
+|----------|-------|---------|
+| `SPLIT_X` | 2048 | Left/right boundary in the atlas |
+| `BLOCK_SIZE` | 64 | Spatial grid block size (px) |
+| `FALL_LEAF_REMOVE_FRACTION` | 0.25 | Fraction of leaf blocks removed |
+| `FALL_COLOR_YELLOW` | 0.80 | Dominant autumn colour |
+| `FALL_COLOR_GREEN` | 0.10 | Untouched green blocks |
+| `FALL_COLOR_ORANGE` | 0.10 | Deep orange blocks |
+
+**Mipmap bleed prevention**: transparent pixels must have all four channels (RGBA) set to zero, not just alpha. Otherwise, at distance the GPU averages coloured-but-transparent texels into visible mip levels, causing "ghost" green hazes around winter/fall trees.
+
+**Missing textures fallback**: if the generated PNGs are absent (script not yet run), the extension logs `[seasons] texture missing for '<season>' — keeping current appearance`, dispatches both `seasonChangeStarted` and `seasonChangeCompleted` (so the view transition overlay fades back in immediately), and returns without modifying any shaders. Trees remain in their current appearance — no crash, no stuck overlay.
+
+### Web frontend
+
+| File | Role |
+|------|------|
+| `useEnvironmentHandlers.ts` | `applySeason` wraps the season change in `beginViewTransition` and sends `seasonChangeRequest` once the screen is fully black. `applyWeather` wraps weather preset changes the same way (500ms timer-based fade-in). Both `setWeather` and `setSeason` state updates fire inside `onFadeOutComplete` so the UI doesn't change during fade-out. |
+| `worldStateHandlers.ts` | Handles `seasonChangeStarted` (no-op) and `seasonChangeCompleted` (triggers `notifyViewTransitionKitReady` to fade back in); also handles `season` key from `worldStateSync` for reconnect state restore |
+| `WeatherSeasonPicker.tsx` | CU season/weather button row, calls `applySeason(s)` / `applyWeather(w)` (currently hidden behind `SHOW_WEATHER_SEASON_PICKER = false`) |
+| `DevWeatherSeasonPicker.tsx` | Dev-mode weather & season picker widget (toggle via Scene submenu in hamburger menu) |
+| `DevWeatherSeasonPicker.css` | Dark-themed styles matching dev UI aesthetic |
+
+### Loading screen
+
+Both season and weather changes use the **shared `ViewTransitionOverlay`** — the same fade-in/fade-out mechanism used by seat teleportation, POI teleport, and view switches.
+
+Season changes use a Kit-dispatched `seasonChangeCompleted` event to trigger fade-in (after `_SETTLE_FRAMES`). Weather changes use a frontend-only 500ms `setTimeout` → `notifyViewTransitionKitReady()` since the preset application is synchronous.
+
+Localized labels:
+
+| Language | `loading.changingSeason` | `loading.changingWeather` |
+|----------|--------------------------|---------------------------|
+| English | Changing season… | Changing weather… |
+| Swedish | Byter årstid… | Byter väder… |
+| French | Changement de saison… | Changement de météo… |
+| Spanish | Cambiando de estación… | Cambiando el clima… |
+
+### WorldStateSyncService
+
+| File | Change |
+|------|--------|
+| `world_state_sync_service.py` | `"season": "summer"` in defaults; observes `seasonStatus` event and dispatches immediately |
+
+## Event contract
+
+| Event | Direction | Payload |
+|-------|-----------|---------|
+| `seasonChangeRequest` | web → Kit | `{ season: "summer" \| "spring" \| "autumn" \| "winter" }` |
+| `seasonChangeStarted` | Kit → web (outbound) | `{ season }` — screen is already black |
+| `seasonChangeCompleted` | Kit → web (outbound) | `{ season }` — triggers fade-in |
+| `seasonStatus` | Kit → web (outbound) | `{ season }` — used by WorldStateSyncService for reconnect |
+| `worldStateSync` | Kit → web | Includes `season` key for reconnect restore |
+
+## Session-layer override pattern
+
+The extension overrides `inputs:file` on each tile's tree `Image_Texture` shader:
+
+- **Spring/fall/winter**: `Usd.EditContext(stage, session_layer)` → `attr.Set(Sdf.AssetPath(absolute_path))`
+- **Summer**: `attr.Clear()` removes the session-layer opinion → original USDZ texture reappears
+
+All overrides are batched in a single `Sdf.ChangeBlock` for performance (one Hydra notice instead of one per shader).
+
+Texture path is resolved from the stage root layer: `<root_layer_dir>/../Assets/SeasonalTextures/<file>.png`.
+
+## Adapting to a different tree prototype
+
+If the tree USDZ file name, texture name, or atlas layout changes, update these constants:
+
+### In `generate_seasonal_textures.py`
+
+| Constant | Current value | What to change |
+|----------|--------------|----------------|
+| `USDZ_PATH` | `…/VEG_10500_Traed_genericTree.usdz` | Point to the new USDZ file |
+| `TEX_NAME_IN_USDZ` | `SubUSDs/textures/Maple_Red_Field_Color_dark.png` | Path of the texture **inside** the USDZ zip archive (inspect with `zipfile.namelist()`) |
+| `SPLIT_X` | `2048` | If the new atlas has a different bark/leaf split boundary |
+| `OUT_DIR` | `data/Assets/SeasonalTextures` | Directory for generated PNGs (outside Nucleus sync tree) |
+| Output filenames in `main()` | `Maple_Red_Field_Color_dark_*.png` | Must match `_TEXTURE_FILES` in the extension |
+
+### In `extension.py`
+
+| Constant | Current value | What to change |
+|----------|--------------|----------------|
+| `_TREE_SHADER_SUFFIX` | `VEG_10500_Traed_genericTree/_materials/Tree_material/Image_Texture` | Prim path suffix that identifies the tree shader in the composed stage |
+| `_TEXTURE_FILES` | `Maple_Red_Field_Color_dark_*.png` | Must match the output filenames from the script |
+
+### Checklist for a tree swap
+
+1. Inspect the new USDZ: `python -c "import zipfile; print(zipfile.ZipFile('new_tree.usdz').namelist())"` to find the texture path inside
+2. Open the texture to verify the bark/leaf split column (`SPLIT_X`) and confirm alpha masking
+3. Update the five constants listed above
+4. Re-run `generate_seasonal_textures.py`
+5. In a Kit session, verify shader paths: `print([str(p.GetPath()) for p in stage.Traverse() if str(p.GetPath()).endswith('Image_Texture')])`
+
+## Adding a new season texture
+
+1. Add a `make_<season>` function in `generate_seasonal_textures.py` (only process the right half — leaf sprites)
+2. Add the `save()` call in `main()`
+3. Run the script to generate the PNG
+4. Add the filename to `_TEXTURE_FILES` in `extension.py`
+5. Add the UI season → texture season mapping to `_SEASON_TO_TEXTURE`
+6. Add a localized label in `src/i18n/locales/*.json` if the loading message should differ
+
+## Fallen Leaves & Ground Litter (fall season only)
+
+When the fall season is active, two independent PointInstancer-based systems add fallen leaf effects using a real 3D maple leaf mesh (`data/Assets/Maple_leaf/Leaf.usd`).
+
+### Architecture
+
+```
+SeasonsExtension._update_fallen_leaves("fall")
+  → ground_litter_service.start()     ← static ground scatter (instant)
+  → fallen_leaves_service.start()     ← animated canopy drops (gradual)
+```
+
+Both services share `nearby_trees_service` for tree position data, but each creates its own USD instancer on the session layer.
+
+### Files
+
+| File | Role |
+|------|------|
+| `nearby_trees_service.py` | Precomputes world-space positions for all ~26 000 trees from tile VEG PointInstancers. Idempotent `initialize()` — called by both leaf services. Provides `get_nearby_trees(radius)` and `get_player_pos()`. |
+| `fallen_leaves_service.py` | Animated falling leaves. 100 leaves in a pool, staggered over 180 s, fall from canopy height with gravity/wind/flutter/tumble. PhysX raycast for ground collision. Linger 45–90 s then respawn after 5–15 s delay. Distance-culled at 60 m. |
+| `ground_litter_service.py` | Static ground scatter. 2 400 leaves placed in concentric rings around nearby trees (0–3 m dense, 3–8 m moderate, 8–15 m sparse). Refreshes every 2 s: culls beyond 90 m, repopulates within 80 m. No timer-based expiry. |
+| `data/Assets/Maple_leaf/Leaf.usd` | Real 3D maple leaf mesh (OmniPBR material, ~1 100 triangles). Source: external FBX→USD import. |
+| `data/Assets/Maple_leaf/textures/leaf_Base_color.png` | Base color texture (not currently wired — solid color tinting used instead). |
+
+### Leaf model & prototypes
+
+The leaf USD (`defaultPrim = "World"`) contains a detailed mesh under `World/leaf_001/leaf_006` with an internal 100× scale and axis-swap rotation. Each service creates 4 prototype variants by referencing the leaf USD and overriding the OmniPBR shader:
+
+| Prototype | Color (R, G, B) | Weight |
+|-----------|-----------------|--------|
+| LeafYellow | (0.55, 0.40, 0.08) | 40 % |
+| LeafOrange | (0.50, 0.25, 0.05) | 30 % |
+| LeafBrown | (0.35, 0.20, 0.05) | 18 % |
+| LeafRed | (0.45, 0.15, 0.04) | 12 % |
+
+Each prototype also applies:
+- `xformOp:rotateXYZ = (0, 0, 96.93)` — lays the leaf flat (verified in Composer)
+- `xformOp:scale = (0.004, 0.004, 0.004)` — final leaf size ~6 cm
+- `inputs:metallic_constant = 0.0`, `inputs:reflection_roughness_constant = 1.0` — fully matte to prevent dome light washout
+
+Color overrides must be applied in a **second pass** after the reference edit context closes, so the composed shader prim is accessible via `stage.GetPrimAtPath()`.
+
+### Nearby trees service
+
+Discovers tree instancers by matching shader paths ending with `VEG_10500_Traed_genericTree/_materials/Tree_material/Image_Texture`, then reads each instancer's `positions` attribute (tries time codes 1.0, startTimeCode, Default). Positions are transformed to world space via the instancer's `GetLocalToWorldTransform` (accounts for the 100× unitsResolve scale on city tiles).
+
+### Key constants
+
+| Constant | fallen_leaves | ground_litter | Unit |
+|----------|--------------|---------------|------|
+| Pool size | 100 | 2 400 | leaves |
+| Spawn/populate radius | 100 | 80 | m |
+| Cull radius | 60 | 90 | m |
+| Ground Y offset | 3.0 | 3.0 | wu (~3 cm) |
+| Refresh interval | 3.0 | 2.0 | s |
+
+### Coordinate system
+
+City tiles use `metersPerUnit = 1`; the main scene uses `metersPerUnit = 0.01` (centimetres). The city scene prim has `xformOp:scale:unitsResolve = (100, 100, 100)`, so **1 tile unit = 100 world units**. All radii, speeds, and sizes in the leaf services are in world units (wu). `WU_PER_M = 100.0`.
+
+### Tuning notes
+
+- Leaf colors are deliberately dark/muted because the dome light washes out bright values significantly. If lighting is adjusted in the future, revisit `LEAF_COLORS`.
+- `GROUND_Y_OFFSET = 3.0` wu lifts leaves above the raycast floor to prevent mesh clipping through the ground.
+- Falling leaf rhythm: `INITIAL_SPREAD = 180 s` ensures only 1–2 leaves in the air at any moment. `RESPAWN_DELAY = 5–15 s` keeps gaps between consecutive falls.
+
+## Terrain winter textures (winter season)
+
+In addition to tree textures, the extension handles **terrain material overrides** during winter:
+
+- **Paved surfaces** (roads, concrete, cobblestone): delegated to `wet_ground_service.py` via `set_wet("season", True/False)`. These same textures are also applied when rain or snow weather effects are active (any season).
+- **Natural terrain** (grass, soil, forest): snow-cover textures applied directly by `SeasonsExtension._apply_snow_terrain()` — winter only.
+
+Both use the same session-layer `inputs:file` override pattern as tree textures. See `.cursor/rules/topics/wet-ground.mdc` for full details.
+
+### Original texture caching (anti-flash fix)
+
+Both `wet_ground_service._discover()` and `SeasonsExtension._discover_terrain_shaders()` cache the original `inputs:file` path for each shader prim during their initial stage traversal. When clearing overrides, the services restore the original path via `attr.Set(Sdf.AssetPath(original))` instead of `attr.Clear()`. This prevents a neon-blue flash from the RTX renderer's missing-texture fallback colour that can appear when `attr.Clear()` momentarily leaves Hydra without a resolved texture. See `.cursor/rules/topics/wet-ground.mdc` § "Restore-on-clear pattern".
+
+## Related
+
+- All weather and season services (sky, rain, snow, fog, leaves, litter, wet ground) live in `younite.weather_and_seasons_extension`, sharing `_shared.py` utilities
+- Sky control dispatching: `sky_control_service.py` in `younite.usd_viewer_stage_core_extension` forwards `skyControlRequest` to `sky_service.apply_sky_control()` via cross-extension import
+- Snow effect: `.cursor/rules/topics/snow-effect.mdc`
+- Rain effect: `.cursor/rules/topics/rain-effect.mdc`
+- View transition overlay: z-index 10100 (above CU controls at 10050/10051)
+- Localization: `.cursor/rules/topics/localization.mdc`

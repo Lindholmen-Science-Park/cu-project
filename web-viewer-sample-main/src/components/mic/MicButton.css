@@ -1,0 +1,67 @@
+/* Single source of truth for mic / voice-input chrome (light theme baseline). */
+
+.mic-button {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    width: 40px;
+    height: 40px;
+    min-width: 40px;
+    margin: 0;
+    padding: 0;
+    aspect-ratio: 1 / 1;
+    border-radius: 80px;
+    border: 1px solid #351a84;
+    background: transparent;
+    box-shadow: none;
+    color: #351a84;
+    cursor: pointer;
+    transition:
+        background 0.18s ease,
+        transform 0.15s ease,
+        border-color 0.18s ease,
+        box-shadow 0.18s ease;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.mic-button:hover:not(:disabled) {
+    background: rgba(53, 26, 132, 0.08);
+}
+
+.mic-button:active:not(:disabled) {
+    background: rgba(53, 26, 132, 0.12);
+    transform: scale(0.96);
+}
+
+.mic-button:focus {
+    outline: none;
+}
+
+.mic-button:focus-visible {
+    outline: 2px solid var(--Dark-Purple, #351a84);
+    outline-offset: 2px;
+}
+
+.mic-button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.mic-button__icon {
+    display: block;
+    flex-shrink: 0;
+    width: 20px;
+    height: 20px;
+    object-fit: contain;
+    pointer-events: none;
+    user-select: none;
+}
+
+.mic-button[aria-pressed='true'] {
+    background: var(--Lemon, #dcff7d);
+    border-color: rgba(53, 26, 132, 0.45);
+}

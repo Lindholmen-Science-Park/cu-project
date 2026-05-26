@@ -1,0 +1,20 @@
+[package]
+title = "Younite Sound Emitter Extension"
+description = "Discovers sound_emitter_* prims in the scene and publishes a browser-side emitter list for the ambient sound engine"
+version = "0.1.0"
+authors = ["Younite"]
+keywords = ["sound", "ambient", "emitter"]
+category = "Feature"
+
+[dependencies]
+"younite.messaging_core_extension" = {}
+"omni.usd" = {}
+
+[[python.module]]
+name = "younite.sound_emitter_extension"
+
+[build]
+include = [
+    "younite/**/*.py",
+    "*.toml",
+]

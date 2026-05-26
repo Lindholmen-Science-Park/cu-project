@@ -1,0 +1,143 @@
+---
+description: Dual-mode NavMesh cache — walking + wheelchair meshes baked side-by-side, instant mode switch via cached INavMesh handles, navmesh_override threading, orchestrator fan-out. Read when working on mode switching, multi-mesh caching, or any feature that queries a NavMesh.
+---
+
+# Dual-mode NavMesh (walking + wheelchair)
+
+Goteverse keeps **two fully-baked NavMeshes in memory at the same time** (walking + wheelchair) so the user can toggle accessibility mode instantly — no 10–20 s rebake. A mode switch is a pointer swap, not a pipeline operation.
+
+**File**: `younite.navmesh_route_extension/.../services/kit_services/navmesh_mode_cache.py`
+**Orchestrator fan-out**: `younite.navmesh_route_extension/extension.py` (wraps `do_rebake` / `do_settings_rebake`).
+
+## Why we can hold both in memory
+
+Kit exposes a single "active" NavMesh via `inav.get_navmesh()`. That handle is **reference-counted**: as long as Python keeps a reference the underlying mesh data stays alive in memory even after a new bake overwrites the active mesh. `NavMeshModeCache` exploits this:
+
+1. Bake with wheelchair agent settings → grab handle → store in `_wheelchair_handle`.
+2. Bake with walking agent settings → grab handle → store in `_walking_handle`.
+3. Both meshes now coexist in memory. `inav.get_navmesh()` returns whichever was baked last — **always walking** under Goteverse's ordering (see below).
+
+Route queries pass the selected handle as `navmesh_override` into `calculate_path_points` / `navmesh_path_length_cm`, so switching mode becomes an instant handle swap instead of a rebake.
+
+## Bake ordering: wheelchair → walking
+
+**Walking is always baked last** so `inav.get_navmesh()` ends up pointing at the walking mesh. Several code paths (ground-snap, maintenance bot travel estimates, `waypoint_router._navmesh_distance`, geo-teleport height sampling) still query the active mesh directly — walking-as-default is the safe fallback for those.
+
+## Startup flow
+
+1. `younite.player.ready` fires.
+2. Unless starting in bird's-eye, `navmesh_route_extension._on_player_ready` kicks off `self._orchestrator.request_rebake()` and stores the task on `self._initial_bake_task` (fire-and-forget, but tracked).
+3. Stage core's `_finalize_scene_load` dispatches loading phase `preparing_navmesh` and awaits `await_first_person_navmesh_prepare()` via the first-person navmesh bridge.
+4. The bridge calls `NavMeshRouteExtension._ensure_dual_mode_ready()`, which:
+   - Returns immediately if `mode_cache.is_ready()`.
+   - Otherwise awaits the tracked `_initial_bake_task` (never triggers a second bake).
+   - Falls through to `orchestrator.request_rebake()` only if no bake is in flight (cold bird's-eye → first-person entry).
+5. Once both handles are cached, stage core dispatches `loading.phase: ready` + `scene.loaded`. **The onboarding overlay cannot open until both meshes are cached** — this prevents the user from rushing through intro and clicking ground before a valid mesh exists.
+
+## Mode switch flow (`navmeshModeSet`)
+
+Handled in `navmesh_route_extension/extension.py::_on_mode_set`:
+
+1. Validate mode (`walking` / `wheelchair`).
+2. Reject with `navmeshModeStatus: error` if `mode_cache.is_ready()` is false.
+3. Call `mode_cache.set_active_mode(mode)` — updates `_active_mode` string only.
+4. Call `self._svc.recalc_all_routes()` — every `RouteInstance` re-runs its pathfinder against the new cached handle.
+5. Dispatch `navmeshModeStatus: ready` to the web.
+
+**Web-side note**: `useCuModeSwitching` historically waited for a `navmeshBaking` true→false pulse to clear its "busy" flag. The dual-mode path emits no such pulse; the hook now also clears busy when `accessibilityMode === cuTabMode` (the Kit ack arriving via `navmeshModeStatus: ready`).
+
+## Orchestrator-driven rebakes fan out to both modes
+
+Incidents, camera areas, sound areas, camera depth obstacles — all go through `NavMeshBakeOrchestrator.request_rebake`. The orchestrator's `do_rebake` / `do_settings_rebake` callbacks are **both** wrapped to call `mode_cache.bake_both_modes()` (see `extension.py`):
+
+```python
+async def _orchestrator_dual_bake(*_args, **_kwargs) -> bool:
+    return await self._mode_cache.bake_both_modes()
+```
+
+Sequence inside one `request_rebake`:
+
+1. `prepare_for_bake()` runs once on active providers (stamps NavMeshAPI, shows visuals).
+2. `_orchestrator_dual_bake` — wheelchair bake, then walking bake. Both see the same prepared stage state.
+3. `after_bake()` runs once on active providers.
+4. `recalc_all_routes` picks up whichever handle the user's current mode selects.
+
+## RouteConfig integration
+
+Every `RouteInstance` receives two callbacks on its `RouteConfig`:
+
+```python
+RouteConfig(
+    ...,
+    get_navmesh_override=lambda _rid=rid: self._navmesh_override_for_route(_rid),
+    get_navmesh_mode=lambda: self._navmesh_mode_name(),
+)
+```
+
+- `get_navmesh_override` returns `mode_cache.get_active_navmesh()` — resolved lazily at query time so a mode switch mid-route picks up the new mesh on recalc.
+- `get_navmesh_mode` returns the mode name string, used only for `mesh=<mode>` logging suffixes in `[NAVMESH_ROUTE:*]` lines.
+
+`_initial_calc` skips `wait_for_navmesh_ready()` entirely when the override resolves to a non-None handle — the cached mesh is still valid even if a concurrent orchestrator rebake is in flight.
+
+## `navmesh_override` threading
+
+All path query entry points accept `navmesh_override: Optional[INavMesh] = None`:
+
+| Function | File | Purpose |
+|---|---|---|
+| `calculate_path_points` | `scripts/navmesh_shortest_path.py` | Full pathfinder pipeline (called by `RouteComposer._navmesh_leg`) |
+| `navmesh_path_length_cm` | `scripts/navmesh_shortest_path.py` | Lightweight length-only query |
+| `RouteComposer.compose` / `compose_with_measure` | `services/kit_services/route_composer/` | Single composer-driven entry for all polylines + measurements |
+| `compute_routes_to_exits` | `services/kit_services/route_measure/exits.py` | One-shot exit list (legacy `compute_route_measure` in `compute_single.py` for the primary path; `RouteComposer.compose(enable_shortcuts=True)` fallback when the dev shortcuts toggle is on, so wheelchair-mode discovery surfaces destinations behind stairs via lifts) |
+
+Inside `calculate_path_points` the override is passed down to `_straighten_path` (which takes `navmesh` as a positional argument) so even the validated XZ straightening runs on the correct mesh.
+
+## Coverage of wayfinding features
+
+| Feature | Route ID / entry | Uses mode cache |
+|---|---|---|
+| Point-and-click | `player` | ✓ |
+| Find seat | `seat_nav` | ✓ |
+| Find exit (widget) | `exit_nav` | ✓ |
+| Exit distance list | `compute_routes_to_exits` | ✓ (explicit override) |
+| Find restroom | `restroom_nav` | ✓ |
+| Quiet zone nav | `quiet_zone_nav` | ✓ |
+| Legacy dev route | `default` | ✓ |
+| OSM city navigation | `younite.osm_navigation_extension` | N/A (own Dijkstra graph) |
+
+## Places that still query the active mesh (by design or known gap)
+
+These are mode-agnostic or use walking-as-fallback (since walking is last baked):
+
+- `geo_teleport_transform._navmesh_ground_y_*` — ground-height sampling for lat/lon teleport.
+- `physx_bootstrap._navmesh_ground_y` — player ground snap.
+- `navmesh_bake_orchestrator.log_baked_navmesh_areas` — diagnostic log of baked area names.
+- `maintenance_bot_extension._estimate_travel_time` — bots use walking estimates (semantically correct — bots aren't wheelchair users).
+- `waypoint_router._navmesh_distance` — stadium entrance / ring-join picking. Minor gap: wheelchair users may pick a "walking-optimal" entrance. Route *legs* are still computed on the wheelchair mesh.
+
+## Failure handling
+
+- `_bake_mode_with_retries` retries each mode up to `_BAKE_RETRY_COUNT` (3) times.
+- `bake_both_modes` retains the **previous** handle on failure so routing can continue on the last-known-good mesh.
+- `bake_both_modes` returns True only when BOTH modes produce a handle in the current call.
+- If dual-bake fails at startup, `is_ready()` stays False → `navmeshModeSet` is rejected with `status: error` → the CU mode-switch busy flag clears via the fallback timer (12 s).
+
+## Agent settings: single source of truth
+
+The mode cache relies on the orchestrator's `get_agent_settings_for_mode(mode)` to resolve per-mode bake parameters. Walking parameters come from `main_scene.usda` → `customLayerData.navmeshSettings` (scene defaults). Wheelchair parameters are the module-level `_WHEELCHAIR_SETTINGS` constant in `navmesh_bake_orchestrator.py`. See `bake-orchestrator.mdc`.
+
+## Adding a new feature that queries the NavMesh
+
+1. Call `calculate_path_points` or `navmesh_path_length_cm` with the `navmesh_override` parameter.
+2. If the feature is per-user and has a `routeId`, let `NavMeshRouteService.set_route_for_id` build the `RouteConfig` — the override is wired automatically.
+3. If the feature is one-shot (like exit distances), resolve the override explicitly: `self._navmesh_override_for_route("some_route_id")`.
+4. If the feature should ignore the user's mode (e.g. NPC bot travel), pass `navmesh_override=None` (falls back to walking).
+
+## Related
+
+- **Seat navigation** (wheelchair vs walking `seat_nav` payloads, ticket-style seat ids, `extract_cad_seats.py` → optional `postprocess_wheelchair_wc_to_row6.py` → instancer / lookup / `build_seat_hierarchy.py`): `seat-navigation.mdc`
+- **NavMesh dev overlays** (full mesh + stair diff in Kit viewport, dev Tools menu): `navmesh-dev-overlays.mdc`
+- **Bake orchestrator** (provider protocol, rebake lifecycle, agent-settings source of truth): `bake-orchestrator.mdc`
+- **NavMesh areas** (cost modifiers, area registration): `navmesh-areas.mdc`
+- **Path refinement** (threaded player pipeline, straightening, smoothing): `navmesh-path-refinement.mdc`
+- **Stage init** (loading phases, `preparing_navmesh`, first-person navmesh bridge): `stage-init.mdc`

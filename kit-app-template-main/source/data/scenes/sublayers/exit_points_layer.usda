@@ -1,0 +1,96 @@
+#usda 1.0
+(
+    defaultPrim = "World"
+)
+
+over "World"
+{
+    def Xform "exit_point_01"
+    {
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (4340.474216485803, 2385.6822271824617, -2749.991686250394)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+    }
+
+    def Xform "exit_point_02"
+    {
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (4782.6382789858135, 2371.801025390627, -2122.158068086308)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+    }
+
+    def Xform "exit_point_03"
+    {
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (5420.611911798323, 2385.7660167578333, -773.5011466994783)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+    }
+
+    def Xform "exit_point_04"
+    {
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (4722.854587579558, 2374.3635704502326, 3583.460279082039)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+    }
+
+    def Xform "exit_point_05"
+    {
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (-1150.987453436117, 2372.9016992388824, 5842.428052519686)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+    }
+
+    def Xform "exit_point_06"
+    {
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (-3290.370815252525, 2372.6428930377147, 4710.923657988329)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+    }
+
+    def Xform "exit_point_07"
+    {
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (-3938.0783958189313, 2373.2448537760265, 4000.0774665820627)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+    }
+
+    def Xform "exit_point_08"
+    {
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (-4394.574733709553, 2373.546682770345, 3362.787915800747)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+    }
+
+    def Xform "exit_point_09"
+    {
+        float3 xformOp:rotateXYZ = (0, -315, 0)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (-4244.6410178892365, 2373.849486191965, -2198.787599946637)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale", "xformOp:rotateXYZ"]
+    }
+
+    def Xform "exit_point_10"
+    {
+        float3 xformOp:rotateXYZ = (0, 36, 0)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (-2528.551967596255, 2265.8359010740814, -6015.25749435601)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale", "xformOp:rotateXYZ"]
+    }
+
+    def Xform "exit_point_11"
+    {
+        float3 xformOp:rotateXYZ = (0, 0, 0)
+        float3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (5485.22802734375, 2371.801025390625, 701.8230590820312)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "exit_point_12"
+    {
+        float3 xformOp:rotateXYZ = (0, 0, 0)
+        float3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (3112.149658203125, 2371.801025390625, 5176.5615234375)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+}
+

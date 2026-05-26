@@ -1,0 +1,3 @@
+Keeps this empty data/ folder tracked by git so premake5.lua's
+`repo_build.prebuild_link { "data", ... }` step can symlink it
+into the build output. Add real asset files here as needed.

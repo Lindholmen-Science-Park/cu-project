@@ -1,0 +1,31 @@
+#usda 1.0
+(
+    defaultPrim = "Material__2147483409"
+    upAxis = "Z"
+)
+
+def Material "Material__2147483409"
+{
+    token outputs:surface.connect = </Material__2147483409/SurfaceShader.outputs:surface>
+    token outputs:unreal:surface.connect = </Material__2147483409/UnrealShader.outputs:out>
+
+    def Shader "UnrealShader"
+    {
+        uniform token info:implementationSource = "sourceAsset"
+        uniform asset info:unreal:sourceAsset = @/Game/2_Geometry/Scandinavium/SC_FBX/Material__2147483409.Material__2147483409@
+        token outputs:out
+    }
+
+    def Shader "SurfaceShader"
+    {
+        uniform token info:id = "UsdPreviewSurface"
+        float inputs:anisotropy = 0
+        color3f inputs:diffuseColor = (0.59061885, 0.5520114, 0.6866853)
+        float inputs:metallic = 0
+        float inputs:occlusion = 1
+        float inputs:roughness = 0.49803925
+        float inputs:specular = 0.49803925
+        token outputs:surface
+    }
+}
+

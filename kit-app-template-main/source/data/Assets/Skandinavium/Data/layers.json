@@ -1,0 +1,2212 @@
+{
+  "layers": [
+    {
+      "name": "0",
+      "color": 7,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-44B---E-N",
+      "color": 1,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-27C---EJN",
+      "color": 1,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-43CB--EJN",
+      "color": 1,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-27D---E-N",
+      "color": 7,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A--VE---E-N",
+      "color": 1,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-27B---EJN",
+      "color": 1,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-42D--BE-N",
+      "color": 1,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-45BY--E-N",
+      "color": 1,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-42D--FE-N",
+      "color": 1,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-42D--CE-N",
+      "color": 1,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-45CA--E-N",
+      "color": 1,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-5-----E-N",
+      "color": 1,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-46C---E-N",
+      "color": 1,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-42E---E-N",
+      "color": 7,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-46B--BE-N",
+      "color": 1,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-46B--CE-N",
+      "color": 1,
+      "linetype": "1 Prickad",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-27----",
+      "color": 1,
+      "linetype": "3 Punktstreckad",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-43CB--E-N",
+      "color": 3,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A----004E-N",
+      "color": 4,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-27C---E-N",
+      "color": 7,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-42D--CE-E",
+      "color": 1,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-27B---E-N",
+      "color": 7,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-13G---EDN",
+      "color": 1,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-B-B-EI-60",
+      "color": 6,
+      "linetype": "Brand EI 60",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-45C---",
+      "color": 1,
+      "linetype": "2 Streckad kort",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-46B--BEMN",
+      "color": 1,
+      "linetype": "3 Punktstreckad kort",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-45CA--EMN",
+      "color": 4,
+      "linetype": "Overhead",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-B-B-EI-30",
+      "color": 7,
+      "linetype": "Brand EI 30",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-43----",
+      "color": 1,
+      "linetype": "3 Punktstreckad",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-42----",
+      "color": 1,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-3552-EA-",
+      "color": 1,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-3551-EA-",
+      "color": 1,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-3652-EA-",
+      "color": 1,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-3320-EA-",
+      "color": 3,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A030",
+      "color": 7,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A045",
+      "color": 1,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A046",
+      "color": 1,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A050",
+      "color": 1,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A050-B",
+      "color": 1,
+      "linetype": "IMPORT-DASHED_2",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A042",
+      "color": 1,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-STOMME",
+      "color": 3,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-YTTER",
+      "color": 3,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-13G---ED-",
+      "color": 1,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A042-1",
+      "color": 1,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A030-1",
+      "color": 1,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A040-O",
+      "color": 1,
+      "linetype": "IMPORT-A_PSTRECK_4",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A040",
+      "color": 3,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-3360----",
+      "color": 1,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-B-G---T1-",
+      "color": 1,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A095T",
+      "color": 3,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A095-7",
+      "color": 7,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-43CC-CE-E",
+      "color": 10,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-43CB--E-E",
+      "color": 3,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A055-LS",
+      "color": 130,
+      "linetype": "IMPORT-DASHED_1",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A036-R",
+      "color": 1,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A036-O",
+      "color": 1,
+      "linetype": "IMPORT-A_PSTRECK_4",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A055-O",
+      "color": 12,
+      "linetype": "IMPORT-A_PSTRECK_4",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A046-O",
+      "color": 1,
+      "linetype": "IMPORT-A_PSTRECK_4",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A050T",
+      "color": 1,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A085-O",
+      "color": 1,
+      "linetype": "IMPORT-A_PSTRECK_4",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A036-B",
+      "color": 1,
+      "linetype": "IMPORT-DASHED_2",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A036",
+      "color": 1,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A050-O",
+      "color": 1,
+      "linetype": "IMPORT-A_PSTRECK_4",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A055",
+      "color": 12,
+      "linetype": "IMPORT-DASHED_1",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A080",
+      "color": 1,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": true
+    },
+    {
+      "name": "A061-O",
+      "color": 1,
+      "linetype": "IMPORT-A_PSTRECK_4",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A040-R",
+      "color": 1,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A030-R",
+      "color": 1,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A061",
+      "color": 90,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A035",
+      "color": 3,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A037",
+      "color": 1,
+      "linetype": "IMPORT-A_PSTRECK_4",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A032",
+      "color": 3,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A030-O",
+      "color": 1,
+      "linetype": "IMPORT-A_PSTRECK_4",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A030-B",
+      "color": 1,
+      "linetype": "IMPORT-DASHED",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-3311-EA-",
+      "color": 3,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-33121---",
+      "color": 1,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-3312-EA-",
+      "color": 3,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A------D1-",
+      "color": 1,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "TRAPPSTEG",
+      "color": 254,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A003",
+      "color": 4,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "DEFPOINTS",
+      "color": 7,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A120-300",
+      "color": -1,
+      "linetype": "Continuous",
+      "is_off": true,
+      "is_frozen": false
+    },
+    {
+      "name": "A120-NR",
+      "color": 9,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A120",
+      "color": 9,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-------EKN",
+      "color": 1,
+      "linetype": "2 Streckad",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-1020-----",
+      "color": 1,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-U-----T1-",
+      "color": 1,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-------T--",
+      "color": 1,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-------T2N",
+      "color": 1,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "P-------W--",
+      "color": 7,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "P-------W1-",
+      "color": 1,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-B-U------",
+      "color": 3,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": true
+    },
+    {
+      "name": "A-U-----T1-200",
+      "color": -3,
+      "linetype": "Continuous",
+      "is_off": true,
+      "is_frozen": false
+    },
+    {
+      "name": "A-43E---E--",
+      "color": 12,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": true
+    },
+    {
+      "name": "A-43E---T2-",
+      "color": 4,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": true
+    },
+    {
+      "name": "A-B-A---T--",
+      "color": 1,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": true
+    },
+    {
+      "name": "A-43----EM-",
+      "color": 130,
+      "linetype": "IMPORT-A_PSTRECK_4",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-A-NTA-T2N",
+      "color": 1,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-------EMN",
+      "color": 10,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A----003E-N",
+      "color": 10,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-42D--CT2N",
+      "color": 20,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-46B---E--",
+      "color": 1,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-71----E--",
+      "color": 1,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "G-Anno-Stnd-Nplt",
+      "color": 140,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-73----E--",
+      "color": 1,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A042-O",
+      "color": 1,
+      "linetype": "A_PSTRECK_2",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-------AA-",
+      "color": 1,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-27----E-N",
+      "color": 7,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-43CC-CE-N",
+      "color": 1,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-------T2-",
+      "color": 3,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "Kulör_skraff",
+      "color": 251,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "Kulör",
+      "color": 1,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-A-BTA-E-A",
+      "color": 4,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "_Gardin",
+      "color": 130,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A061-CL",
+      "color": 130,
+      "linetype": "IMPORT-A_PSTRECK_2",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "Skiss",
+      "color": 6,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-43CB--H-E",
+      "color": 4,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A skiss",
+      "color": 4,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A-44B---E-N",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A-27C---EJN",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A-43CB--EJN",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A-27D---E-N",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A--VE---E-N",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A-27B---EJN",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A-42D--BE-N",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A-45BY--E-N",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A-42D--FE-N",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A-42D--CE-N",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A-45CA--E-N",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A-5-----E-N",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A-46C---E-N",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A-42E---E-N",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A-46B--BE-N",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A-46B--CE-N",
+      "color": 8,
+      "linetype": "A-40_P0010|1 Prickad",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A-27----",
+      "color": 8,
+      "linetype": "A-40_P0010|3 Punktstreckad",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A-43CB--E-N",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A----004E-N",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A-27C---E-N",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A-42D--CE-E",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A-27B---E-N",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A-13G---EDN",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A-B-B-EI-60",
+      "color": 8,
+      "linetype": "A-40_P0010|Brand EI 60",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A-45C---",
+      "color": 8,
+      "linetype": "A-40_P0010|2 Streckad kort",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A-46B--BEMN",
+      "color": 8,
+      "linetype": "A-40_P0010|3 Punktstreckad kort",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A-45CA--EMN",
+      "color": 8,
+      "linetype": "A-40_P0010|Overhead",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A-B-B-EI-30",
+      "color": 8,
+      "linetype": "A-40_P0010|Brand EI 30",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A-43----",
+      "color": 8,
+      "linetype": "A-40_P0010|3 Punktstreckad",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A-42----",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A-3552-EA-",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A-3551-EA-",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A-3652-EA-",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A-3320-EA-",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A030",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A045",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A046",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A050",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A050-B",
+      "color": 8,
+      "linetype": "A-40_P0010|IMPORT-DASHED_2",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A042",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A-SKRAF",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A-STOMME",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A-YTTER",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A-13G---ED-",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A042-1",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A030-1",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A040-O",
+      "color": 8,
+      "linetype": "A-40_P0010|IMPORT-A_PSTRECK_4",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A040",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A-3360----",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A-B-G---T1-",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A095T",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A095-7",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A-43CC-CE-E",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A-43CB--E-E",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A055-LS",
+      "color": 8,
+      "linetype": "A-40_P0010|IMPORT-DASHED_1",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A036-R",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A036-O",
+      "color": 8,
+      "linetype": "A-40_P0010|IMPORT-A_PSTRECK_4",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A055-O",
+      "color": 8,
+      "linetype": "A-40_P0010|IMPORT-A_PSTRECK_4",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A046-O",
+      "color": 8,
+      "linetype": "A-40_P0010|IMPORT-A_PSTRECK_4",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A050T",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A085-O",
+      "color": 8,
+      "linetype": "A-40_P0010|IMPORT-A_PSTRECK_4",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A036-B",
+      "color": 8,
+      "linetype": "A-40_P0010|IMPORT-DASHED_2",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A036",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A050-O",
+      "color": 8,
+      "linetype": "A-40_P0010|IMPORT-A_PSTRECK_4",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A055",
+      "color": 8,
+      "linetype": "A-40_P0010|IMPORT-DASHED_1",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A080",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": true
+    },
+    {
+      "name": "A-40_P0010|A061-O",
+      "color": 8,
+      "linetype": "A-40_P0010|IMPORT-A_PSTRECK_4",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A061-CL",
+      "color": 8,
+      "linetype": "A-40_P0010|IMPORT-A_PSTRECK_2",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A040-R",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A030-R",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A061",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A035",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A037",
+      "color": 8,
+      "linetype": "A-40_P0010|IMPORT-A_PSTRECK_4",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A032",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A043",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A030-O",
+      "color": 8,
+      "linetype": "A-40_P0010|IMPORT-A_PSTRECK_4",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A030-B",
+      "color": 8,
+      "linetype": "A-40_P0010|IMPORT-DASHED",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A-3311-EA-",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A-33121---",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A-3312-EA-",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A------D1-",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|TRAPPSTEG",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A003",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A120-300",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": true
+    },
+    {
+      "name": "A-40_P0010|A120-NR",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A120",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A-------EKN",
+      "color": 8,
+      "linetype": "A-40_P0010|2 Streckad",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A-1020-----",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A-U-----T1-",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A-------T--",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A-------T2N",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|P-------W--",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|P-------W1-",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A-B-U------",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": true
+    },
+    {
+      "name": "A-40_P0010|A-U-----T1-200",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": true
+    },
+    {
+      "name": "A-40_P0010|A-43E---E--",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": true
+    },
+    {
+      "name": "A-40_P0010|A-43E---T2-",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": true
+    },
+    {
+      "name": "A-40_P0010|A-B-A---T--",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": true
+    },
+    {
+      "name": "A-40_P0010|A-43----EM-",
+      "color": 8,
+      "linetype": "A-40_P0010|IMPORT-A_PSTRECK_4",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A-A-NTA-T2N",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A-------G1-",
+      "color": 8,
+      "linetype": "A-40_P0010|IMPORT-3 Punktstreckad lång _4_",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A-------EMN",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A----003E-N",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A-42D--CT2N",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A-46C---T2N",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A-46B---E--",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A-71----E--",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|G-Anno-Dims",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|G-Anno-Stnd-Nplt",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A-73----E--",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A042-O",
+      "color": 8,
+      "linetype": "A-40_P0010|A_PSTRECK_2",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A-Door",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|P040",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|P030",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A-------T1-",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A-------D2-",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A-43CC-----",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|Foliering",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A skiss",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|Kulör",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A-43CC-CT--",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": true
+    },
+    {
+      "name": "A-40_P0010|A-3764-EA-",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A-------AA-",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-40_P0010|A-44B-----N",
+      "color": 8,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-43CC-CT--",
+      "color": 1,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "_LS skiss",
+      "color": 6,
+      "linetype": "CONTINU",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "_LS SKISS RÖD",
+      "color": 1,
+      "linetype": "CONTINU",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-46B--B--N",
+      "color": 1,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-------D1-",
+      "color": 1,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-46B--BEK-",
+      "color": 4,
+      "linetype": "DASHED_3",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-5-----E--",
+      "color": 1,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "människor",
+      "color": 1,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-Wall",
+      "color": 113,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-Door",
+      "color": 31,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    },
+    {
+      "name": "A-------N--",
+      "color": 6,
+      "linetype": "Continuous",
+      "is_off": false,
+      "is_frozen": false
+    }
+  ],
+  "layer_usage_in_modelspace": [
+    [
+      "A-44B---E-N",
+      1461
+    ],
+    [
+      "A-45CA--E-N",
+      1425
+    ],
+    [
+      "A050",
+      1306
+    ],
+    [
+      "A-42D--CE-N",
+      1118
+    ],
+    [
+      "A-43CB--E-N",
+      1046
+    ],
+    [
+      "A-U-----T1-200",
+      949
+    ],
+    [
+      "A-43E---E--",
+      872
+    ],
+    [
+      "A-B-U------",
+      817
+    ],
+    [
+      "A-42D--FE-N",
+      738
+    ],
+    [
+      "A-27C---EJN",
+      532
+    ],
+    [
+      "A-27D---E-N",
+      514
+    ],
+    [
+      "A-27C---E-N",
+      487
+    ],
+    [
+      "0",
+      372
+    ],
+    [
+      "A-45CA--EMN",
+      300
+    ],
+    [
+      "A-43CB--EJN",
+      272
+    ],
+    [
+      "A045",
+      267
+    ],
+    [
+      "A-3652-EA-",
+      181
+    ],
+    [
+      "A055",
+      176
+    ],
+    [
+      "A-43E---T2-",
+      149
+    ],
+    [
+      "A----004E-N",
+      137
+    ],
+    [
+      "A-45C---",
+      128
+    ],
+    [
+      "A-3311-EA-",
+      127
+    ],
+    [
+      "A120-300",
+      118
+    ],
+    [
+      "A-B-B-EI-60",
+      118
+    ],
+    [
+      "A046",
+      116
+    ],
+    [
+      "A037",
+      116
+    ],
+    [
+      "A-27B---E-N",
+      103
+    ],
+    [
+      "A-3360----",
+      97
+    ],
+    [
+      "A--VE---E-N",
+      96
+    ],
+    [
+      "A-42E---E-N",
+      74
+    ],
+    [
+      "A035",
+      62
+    ],
+    [
+      "A-27B---EJN",
+      60
+    ],
+    [
+      "A-46B--BE-N",
+      60
+    ],
+    [
+      "A-27----",
+      53
+    ],
+    [
+      "A-5-----E-N",
+      50
+    ],
+    [
+      "A-46B---E--",
+      50
+    ],
+    [
+      "A-42D--BE-N",
+      45
+    ],
+    [
+      "A120",
+      44
+    ],
+    [
+      "A050-B",
+      43
+    ],
+    [
+      "A030",
+      43
+    ],
+    [
+      "A-------T--",
+      43
+    ],
+    [
+      "A080",
+      40
+    ],
+    [
+      "A120-NR",
+      36
+    ],
+    [
+      "A-A-NTA-T2N",
+      35
+    ],
+    [
+      "A-46B--CE-N",
+      34
+    ],
+    [
+      "A-3551-EA-",
+      34
+    ],
+    [
+      "A042",
+      32
+    ],
+    [
+      "A-B-A---T--",
+      32
+    ],
+    [
+      "A030-O",
+      29
+    ],
+    [
+      "A061",
+      27
+    ],
+    [
+      "A-46C---E-N",
+      26
+    ],
+    [
+      "A-71----E--",
+      25
+    ],
+    [
+      "A030-B",
+      25
+    ],
+    [
+      "A-73----E--",
+      25
+    ],
+    [
+      "A-------T2N",
+      22
+    ],
+    [
+      "A-13G---EDN",
+      22
+    ],
+    [
+      "A030-R",
+      20
+    ],
+    [
+      "A-3552-EA-",
+      20
+    ],
+    [
+      "A050T",
+      19
+    ],
+    [
+      "A036",
+      19
+    ],
+    [
+      "A040",
+      19
+    ],
+    [
+      "A-45BY--E-N",
+      17
+    ],
+    [
+      "A-43----",
+      17
+    ],
+    [
+      "A061-O",
+      17
+    ],
+    [
+      "A-3312-EA-",
+      17
+    ],
+    [
+      "A003",
+      15
+    ],
+    [
+      "A046-O",
+      14
+    ],
+    [
+      "A-1020-----",
+      13
+    ],
+    [
+      "A055-O",
+      13
+    ],
+    [
+      "A-43----EM-",
+      12
+    ],
+    [
+      "A036-O",
+      10
+    ],
+    [
+      "A042-O",
+      10
+    ],
+    [
+      "A-13G---ED-",
+      9
+    ],
+    [
+      "A095T",
+      9
+    ],
+    [
+      "A-------EMN",
+      9
+    ],
+    [
+      "A-43CC-CE-E",
+      8
+    ],
+    [
+      "A-STOMME",
+      8
+    ],
+    [
+      "A-B-B-EI-30",
+      8
+    ],
+    [
+      "A036-R",
+      7
+    ],
+    [
+      "A032",
+      7
+    ],
+    [
+      "A-27----E-N",
+      7
+    ],
+    [
+      "A-------EKN",
+      6
+    ],
+    [
+      "A-A-BTA-E-A",
+      6
+    ],
+    [
+      "A030-1",
+      5
+    ],
+    [
+      "A040-O",
+      5
+    ],
+    [
+      "A-33121---",
+      5
+    ],
+    [
+      "A-42----",
+      4
+    ],
+    [
+      "A-B-G---T1-",
+      4
+    ],
+    [
+      "A095-7",
+      4
+    ],
+    [
+      "A036-B",
+      4
+    ],
+    [
+      "A-3320-EA-",
+      4
+    ],
+    [
+      "A----003E-N",
+      4
+    ],
+    [
+      "A-43CC-CE-N",
+      4
+    ],
+    [
+      "A050-O",
+      3
+    ],
+    [
+      "A040-R",
+      3
+    ],
+    [
+      "A042-1",
+      3
+    ],
+    [
+      "TRAPPSTEG",
+      3
+    ],
+    [
+      "A-43CB--E-E",
+      2
+    ],
+    [
+      "A085-O",
+      2
+    ],
+    [
+      "DEFPOINTS",
+      2
+    ],
+    [
+      "Skiss",
+      2
+    ],
+    [
+      "A skiss",
+      2
+    ],
+    [
+      "A055-LS",
+      1
+    ],
+    [
+      "A-YTTER",
+      1
+    ],
+    [
+      "A------D1-",
+      1
+    ],
+    [
+      "A-42D--CT2N",
+      1
+    ],
+    [
+      "A-------AA-",
+      1
+    ]
+  ]
+}

@@ -1,0 +1,26 @@
+[
+	{
+		"xform_id": "quiet_zone_01",
+		"in_use": true,
+		"display_name": "Restaurant Slottet",
+		"is_accessible": true,
+		"fee": 0,
+		"cleaning_schedule": "once_daily"
+	},
+	{
+		"xform_id": "quiet_zone_02",
+		"in_use": true,
+		"display_name": "Resting room",
+		"is_accessible": true,
+		"fee": 0,
+		"cleaning_schedule": "once_daily"
+	},
+	{
+		"xform_id": "quiet_zone_03",
+		"in_use": true,
+		"display_name": "Quiet area 01",
+		"is_accessible": true,
+		"fee": 0,
+		"cleaning_schedule": "once_daily"
+	}
+]

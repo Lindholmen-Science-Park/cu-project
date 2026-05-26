@@ -1,0 +1,15 @@
+#usda 1.0
+(
+    defaultPrim = "physicsScene"
+    metersPerUnit = 0.01
+    upAxis = "Y"
+)
+
+# Physics Scene (like USD Composer)
+def PhysicsScene "physicsScene"
+{
+    float3 physics:gravityDirection = (0, -1, 0)
+    float physics:gravityMagnitude = 981.0
+    float physics:timeStepsPerSecond = 60.0
+    bool physics:simulationEnabled = 1
+}

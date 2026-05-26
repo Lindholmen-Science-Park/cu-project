@@ -1,0 +1,26 @@
+[package]
+title = "Younite USD Viewer Player Core Extension"
+description = "PlayerCharacter + on-demand PhysX CCT + movement update loop"
+version = "0.1.0"
+authors = ["Younite"]
+keywords = ["player", "cct", "physx", "movement"]
+category = "Core"
+
+[dependencies]
+"younite.usd_viewer_stage_core_extension" = {}
+"omni.usd" = {}
+"omni.physx" = {}
+"omni.physx.bundle" = {}
+"omni.timeline" = {}
+"omni.kit.viewport.utility" = {}
+
+[[python.module]]
+name = "younite.usd_viewer_player_core_extension"
+
+[build]
+include = [
+    "younite/**/*.py",
+    "*.md",
+    "*.toml",
+]
+

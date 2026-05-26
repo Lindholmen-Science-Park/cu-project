@@ -1,0 +1,134 @@
+/* Event dropdown — reuses LanguageDropdown shell; calendar icon + single-column options */
+
+.cu-event-dropdown-icon {
+    flex-shrink: 0;
+    display: block;
+    width: 18px;
+    height: 20px;
+    color: var(--Dark-Purple, #351a84);
+    overflow: hidden;
+}
+
+.cu-event-dropdown-value-row {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+/* Trigger row: icon + label share one vertical center (SVG bbox sits low vs Lexend caps). */
+.cu-quick-settings-event .cu-lang-dropdown-trigger-main {
+    align-items: center;
+    min-width: 0;
+}
+
+.cu-quick-settings-event .cu-event-dropdown-value-row {
+    display: flex;
+    align-items: center;
+    min-height: 20px;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.cu-quick-settings-event .cu-lang-dropdown-value {
+    flex: 1 1 auto;
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    line-height: 20px;
+}
+
+.cu-quick-settings-event .cu-event-dropdown-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: -2px;
+}
+
+.cu-event-dropdown-option {
+    justify-content: flex-start;
+}
+
+/* Options are <button> so Tab can move between choices (WCAG keyboard). */
+button.cu-lang-dropdown-option.cu-event-dropdown-option {
+    appearance: none;
+    -webkit-appearance: none;
+    font: inherit;
+    text-align: left;
+}
+
+/*
+ * Quick settings: same inner card as time / seasons / camera (#FFFFFF80, #2117404D, 12px radius/pad).
+ * Not the lavender language-dropdown treatment used in Settings.
+ */
+.cu-quick-settings-event .cu-event-dropdown-wrap .cu-lang-dropdown-trigger {
+    border-radius: 12px;
+    border: 1px solid var(--cu-qs-card-stroke, #2117404d);
+    background: var(--cu-qs-card-fill, #ffffff80);
+    box-shadow: none;
+    padding: 12px;
+}
+
+.cu-quick-settings-event .cu-event-dropdown-wrap .cu-lang-dropdown-trigger:hover {
+    border-color: rgba(33, 23, 64, 0.45);
+    background: var(--cu-qs-card-fill, #ffffff80);
+}
+
+/*
+ * Open state: put horizontal inset on the trigger + list, not only on the anchor.
+ * Anchor padding + trigger width:100% in a flex column can swallow horizontal inset (icon flush left).
+ */
+.cu-quick-settings-event .cu-event-dropdown-wrap .cu-lang-dropdown-anchor--open {
+    border-radius: 12px;
+    border: 1px solid var(--cu-qs-card-stroke, #2117404d);
+    background: var(--cu-qs-card-fill, #ffffff80);
+    box-shadow: none;
+    padding: 0;
+    gap: 16px;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    /* LanguageDropdown uses z-index:10060 when open — stacks above sibling cards and leaks visually */
+    z-index: auto;
+    overflow: hidden;
+}
+
+.cu-quick-settings-event .cu-event-dropdown-wrap .cu-lang-dropdown-anchor--open .cu-lang-dropdown-trigger {
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    padding: 12px;
+}
+
+.cu-quick-settings-event .cu-event-dropdown-wrap .cu-lang-dropdown-anchor--open .cu-lang-dropdown-trigger:hover {
+    border-color: transparent;
+    background: transparent;
+}
+
+.cu-quick-settings-event .cu-event-dropdown-wrap .cu-lang-dropdown-anchor--open .cu-lang-dropdown-list {
+    background: transparent;
+    padding: 0 12px 12px;
+    box-sizing: border-box;
+    min-width: 0;
+    width: 100%;
+}
+
+/* Long event names: ellipsis in option rows (flex child must shrink). */
+.cu-quick-settings-event .cu-lang-dropdown-option.cu-event-dropdown-option {
+    min-width: 0;
+}
+
+.cu-quick-settings-event .cu-lang-dropdown-option.cu-event-dropdown-option .cu-lang-dropdown-option-name {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.cu-quick-settings-event .cu-event-dropdown-wrap .cu-lang-dropdown-caret {
+    color: var(--Dark-Purple, #351a84);
+}
+
+.cu-settings-frost--dark .cu-event-dropdown-icon {
+    color: var(--Off-white, #f6f6f6);
+}

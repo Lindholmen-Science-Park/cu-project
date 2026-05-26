@@ -1,0 +1,296 @@
+---
+description: POI coins (round-sign 3D markers) — data-driven floating coin tokens placed near restrooms / kiosks / exits / etc., proximity speech-bubble label, click-to-open info card, dynamic coin-asset registry. Read when adding new coin types, new coin xForms, or changing the click info card.
+globs:
+  - "**/coins_layer.usda"
+  - "**/coins_registry.json"
+  - "**/coins_loader.py"
+  - "**/PoiInfoCard.*"
+  - "**/CoinPoiOverlay.*"
+alwaysApply: false
+---
+
+# POI Coins (round signs)
+
+3D coin tokens floating near points of interest (restrooms, kiosks, cafes, exits, ticket office, etc.). Each coin uses a per-type 3D model, surfaces a bottom-screen **IconBubble pill** (same pill UX as spatial-sound and 360° video icons) showing the POI's name + a coin-type icon when the player is within range, and on click opens an **info-only** detail card showing the linked POI's metadata (fee, accessibility, cleaning schedule, seat count, etc.).
+
+The whole feature plugs into the existing **`younite.interactions_extension`** as a new `iconGroup` template variant — no extension wiring, no separate Kit code, no new outbound events.
+
+**Rendering is name-driven.** A coin appears whenever its xform name resolves through `coins_registry.json` (see naming below). POI JSON rows (`restroom_data.json`, `kiosk_data.json`, …) are **optional metadata** for the info card and never gate rendering. `in_use: false` is metadata for the toilet/quiet-zone state (e.g. out of order); the coin keeps rendering and the web side decides how to surface the flag.
+
+## Naming convention
+
+Coin xForms in `source/data/scenes/sublayers/coins_layer.usda` (already a sublayer of `main_scene.usda`). Two forms are supported by `_resolve_coin_name` in `coins_loader.py` — both consult **only** the xform name + the registry, never the POI JSON.
+
+### 1. Variant form — `coin_<poi_id_hint>_<coin_type>`
+
+The trailing token must equal a key in `coins_registry.json`. Resolution uses **longest-suffix match** so multi-word coin types (`changing_table`, `emergency_exit`) win over their single-word substrings.
+
+```
+coin_restroom_02_accessible      → asset: accessible
+coin_restroom_12_changing_table  → asset: changing_table   (beats _table)
+coin_restroom_05_unisex          → asset: unisex
+coin_anywhere_unisex             → asset: unisex (renders even with no 'anywhere' POI row)
+```
+
+Use this form for any POI category where one location can have multiple coin variants (restrooms = unisex / women / accessible / changing_table; quiet zones similar).
+
+### 2. Simple form — `coin_<category>_<digits>`
+
+Trailing token is digits; the leading category token must be a key in `_CATEGORY_TO_COIN_TYPE` (in `coins_loader.py`). Current map:
+
+| Category prefix | Registry coin_type |
+|---|---|
+| `kiosk` | `kiosk` |
+| `elevator` | `elevator` |
+| `ticket_office` | `ticket_office` |
+| `exit_point` | `emergency_exit` |
+
+```
+coin_kiosk_01           → asset: kiosk
+coin_elevator_02        → asset: elevator
+coin_ticket_office_01   → asset: ticket_office
+coin_exit_point_05      → asset: emergency_exit  (note: 'exit_point' → 'emergency_exit')
+```
+
+`restroom` and `quiet_zone` are intentionally **not** in `_CATEGORY_TO_COIN_TYPE` — they always need the explicit variant form because one location can host multiple coin variants.
+
+### Optional metadata lookup
+
+After resolution, the loader looks up the resolved hint (`<poi_id_hint>` for variant, full `<category>_<digits>` for simple) in the union of POI data files. If a row exists it becomes `iconConfig.metadata` and `PoiInfoCard` renders the per-`poiType` rows. If no row exists the coin still renders; the info card just shows the leaf name as title.
+
+Bad / unparseable xForms (trailing token is neither a registry key nor digits, or the category prefix is unknown) are logged as `[interactions] coins: ...` and skipped — they will not crash startup but will not display either.
+
+## Coin-type registry
+
+`source/data/coins_registry.json` — central map of coin-type code -> 3D asset:
+
+```json
+{
+    "version": 1,
+    "spinEnabled": false,
+    "coinTypes": {
+        "unisex": {
+            "asset": "Assets/Coins/coin_toilet_unisex.usd",
+            "labelIcon": "icon_unisex.svg",
+            "modelRotation": [0, 270, 0],
+            "modelScale": 0.25,
+            "spinAxis": "z"
+        }
+    }
+}
+```
+
+| Field | Required | Meaning |
+|---|---|---|
+| `spinEnabled` (root) | no, default `true` | Global default for **per-frame coin spin**. Set to `false` to stop all coins unless a type sets `spinEnabled: true`. |
+| `spinEnabled` (per type) | no | Overrides the root default for that coin type only. |
+| `asset` | yes | Path relative to `source/data/` (matches the convention used by `iconAsset` for spatial-sound headphones, etc.). |
+| `labelIcon` | yes | Basename of the SVG/PNG shown inside the bottom-pill IconBubble next to the POI name. Resolved from `web-viewer-sample-main/src/icons/Coins/` (and falls back to `icons/map-markers/`). |
+| `modelRotation` | no, default `[0, 90, 0]` | XYZ degrees on session-layer `CoinModel` (`xformOp:rotateXYZ`). **Up-axis matters**: Y-up `.usd` (e.g. unisex) often uses `[0, 270, 0]`; Z-up `.usdc` under `other_coins/` typically `[-90, 270, 0]`. Parent anchor rotation stays **world arrow direction**. |
+| `modelScale` | no, default uniform `0.25` | Uniform number or `[sx,sy,sz]`. Authored as suffixed `xformOp:scale:registry` on `CoinModel` so it **multiplies** baked asset scale (do not use plain `xformOp:scale` here — `.usdc` coins would vanish). |
+| `spinAxis` | no, default `"z"` | `"x"` / `"y"` / `"z"` — CoinModel-local spin axis after `modelRotation`. Use `"none"` / `"off"` to disable spin for that type. Period 6 s in `InteractionMarkerService` mode `"coin"`. |
+
+### Anchor xForm rules (`coins_layer.usda`)
+
+- **Translate + rotate only**, no `xformOp:scale` on the anchor — `modelScale` on `CoinModel` is the single size knob.
+- `xformOp:rotateXYZ` on the anchor expresses **arrow direction in world space** (the registry's `modelRotation` corrects asset-axis offsets so this stays meaningful per-instance).
+- For exit coins, anchor sits ~150 cm above the floor `exit_point_*` in `exit_points_layer.usda` (Y + 150 in scene units).
+
+See **Workflows** at the bottom for step-by-step recipes (add a coin, mark a POI out-of-order, add a new coin type, add a new POI category).
+
+## Kit pipeline
+
+```mermaid
+flowchart TD
+  Layer["coins_layer.usda<br/>coin_restroom_05_unisex Xform"] --> Loader[coins_loader.expand_coin_group_entry]
+  Registry["coins_registry.json"] --> Loader
+  POIData["restroom_data.json + quiet_zone_data.json + exit_data.json"] --> Loader
+  Loader -->|"attach_coin_payload"| SessionLayer[Session-layer payload + Cube Collider]
+  Loader -->|"synth icon entry (mediaType: coinPoi)"| ExpandIcon["expansion.expand_icon_entry()<br/>(shared with spatialSound / video360)"]
+  ExpandIcon --> Parse[ConfigLoader._parse]
+  Parse --> IconReg["icon_registry → NearestEntityTracker<br/>(one loop: dist_m → coin 50 m visibility + nearest pill)"]
+  Parse --> Click["click_points_by_path (coinPoi.open)"]
+  IconReg -->|"iconNearestUpdate"| Bubble[IconBubbleOverlay bottom-pill]
+  Bubble -->|"pill click"| Web2
+  Click -->|"3D click + approach"| Action["interactionTriggered<br/>action: coinPoi.open"]
+  Action --> Web2[ChatContext handler]
+  Web2 -->|"set ctrl.coinPoiPayload + open"| Overlay[CoinPoiOverlay -> PoiInfoCard]
+```
+
+### Proximity: one player–icon distance pass
+
+Each frame, **one** iteration over `icon_registry` runs in `nearest_entity_tracker.py` (`NearestEntityTracker.update()`): for each entry it resolves the prim once and computes **one** `dist_m`. That number drives:
+
+1. **Coin draw distance** — the icon tracker is constructed with `coin_poi_max_visible_m` (50 m in `extension.py`). For `icon_config.mediaType == "coinPoi"`, the same `dist_m` toggles the coin anchor via `younite.payload_orchestrator_core_extension.batch_show_hide` (no second loop over coins).
+2. **Bottom pill** — entries outside their interaction `radius_meters` (horizontal XZ distance for `coinPoi`) or above `maxVerticalMeters` (default 1.5 m, from `trigger.maxVerticalMeters` in `interactions.json`) are skipped for “nearest”; the closest remaining candidate triggers `iconNearestUpdate` when its identity changes (unchanged contract for the web). This prevents the pill on an upper floor when standing above a coin on a lower level (3D sphere alone would still fit inside the horizontal radius).
+
+**Rule for future work:** do **not** add another Kit-side pass that recomputes player ↔ the same icon/coin prims for range. If you need more behaviour (extra Kit effects, richer web state), extend this single pass—e.g. more keyed side effects inside `NearestEntityTracker.update()` from the same `dist_m`, or one outbound event with a larger payload and fan-out on the web.
+
+### `interactions.json` template (single entry covers all coins)
+
+```json
+{
+    "id": "coin_pois",
+    "interactionType": "iconGroup",
+    "scene": ["main_scene", "main_scene_light"],
+    "primNamePattern": "coin_*",
+    "trigger": { "type": "proximity", "radiusMeters": 3, "maxVerticalMeters": 1.5, "activation": "always" },
+    "position": { "type": "xform", "positionOffset": [0, 80, 0] },
+    "approach": { "distanceMeters": 2.0 },
+    "iconConfig": { "kind": "coin" }
+}
+```
+
+The `kind: "coin"` flag in `iconConfig` is the dispatch key in `ConfigLoader._expand_icon_group_entry` — it routes the entry to `coins_loader.expand_coin_group_entry()` instead of the standard spatial-sound / video / videobook icon expansion.
+
+### `coins_loader.expand_coin_group_entry`
+
+For each xForm matched by `primNamePattern: "coin_*"`:
+
+1. **Resolve name** → `(poi_id_hint, coin_type)` via `_resolve_coin_name(leaf_name, registry)` — variant form (longest-suffix registry key) first, then simple form (`_CATEGORY_TO_COIN_TYPE` + trailing digits). Failure logs and skips. POI JSON is **not** required for the coin to exist.
+2. **Attach asset + Collider + scale + optional spin** via `session_authoring.attach_coin_payload()` — session-layer `CoinModel`, `modelRotation`, suffixed `xformOp:scale:registry` for `modelScale`, optional `xformOp:rotate*:spin` when spin is enabled (`spinAxis` not `none`/`off`). Invisible `Cube "Collider"` on the **parent** anchor for picking.
+3. **Optional metadata** — `poi_entries.get(poi_id_hint) or {}` → `iconConfig.metadata` for the info card (empty dict if no row).
+4. **Synthesise icon entry** (`interactionType: "icon"`, `iconConfig.mediaType: "coinPoi"`) and run `expansion.expand_icon_entry()` — registers in `icon_registry`, adds `coinPoi.open` click handling, skips green pyramid markers. **`loader.py`** adds `(coin_xform_path, spin_axis)` to `coin_marker_paths` only when `spinEnabled` is true so `InteractionMarkerService` can drive mode `"coin"` (6 s); otherwise no spin registration.
+
+The full POI metadata is **embedded in the iconConfig payload** so both the bottom-pill click handler and the `coinPoi.open` action handler render the info card without an extra Kit round-trip.
+
+### Files
+
+| File | Role |
+|---|---|
+| `source/extensions/younite.interactions_extension/younite/interactions_extension/services/kit_services/config_loader/coins_loader.py` | Coin name parsing, registry + POI data loading, per-coin synthesis + payload attach (`spinEnabled` / `spinAxis` resolution) |
+| `source/extensions/younite.interactions_extension/younite/interactions_extension/services/kit_services/config_loader/session_authoring.py` | `attach_coin_payload` — session `CoinModel` + payload + optional spin op + Collider |
+| `source/extensions/younite.interactions_extension/younite/interactions_extension/services/kit_services/config_loader/loader.py` | Dispatch for `iconConfig.kind == "coin"`; builds `coin_marker_paths` gated on `spinEnabled` |
+| `source/extensions/younite.interactions_extension/younite/interactions_extension/services/kit_services/interaction_marker_service.py` | `register_coin_spinners` / per-frame `"coin"` mode spin driver |
+| `source/extensions/younite.interactions_extension/younite/interactions_extension/services/kit_services/extension_handlers/config_handler.py` | Always reapplies `register_coin_spinners` on config load so empty `coin_marker_paths` clears spinners |
+| `source/extensions/younite.interactions_extension/younite/interactions_extension/services/kit_services/nearest_entity_tracker.py` | Per-frame `icon_registry` walk: one `dist_m` per entry → `coin_poi_max_visible_m` payload visibility + nearest `iconNearestUpdate` |
+| `source/data/coins_registry.json` | Coin type -> asset map |
+| `source/data/scenes/sublayers/coins_layer.usda` | Bare anchor xForms |
+| `source/data/elevator_data.json` | Per-coin metadata + `shortcut_group_id` / `shortcut_node_id` for elevator ride |
+| `source/data/shortcuts.json` | NavShortcuts nodes (prim paths, `labelEn`, `i18nKey`) — shared with nav shortcut router |
+| `source/data/Assets/Coins/coin_toilet_unisex.usd` | First coin model (more arrive over time) |
+| `navmesh_route_extension/.../events/poi_routes.py` | `poiTeleport` + `poiTeleportResult` arrival labels from shortcuts / POI JSON |
+
+## Web pipeline
+
+Two entry points lead to the same `PoiInfoCard`:
+
+**A. 3D click on the coin** (or its invisible Collider child) — standard interaction action path:
+
+```
+[click in 3D] -> picking_extension -> interactions click_router
+   -> ActionHandlerService._run_web_action -> dispatch_event("interactionTriggered", { action: "coinPoi.open", payload })
+[useCustomEventHandler -> useInteractionActions registry]
+   -> ChatContext registered handler
+   -> ctrl.setCoinPoiPayload(payload); ctrl.setCoinPoiOpen(true)
+[CuViewLayer mounts CoinPoiOverlay -> renders PoiInfoCard]
+```
+
+**B. Bottom-pill `IconBubbleOverlay` click** — when the player is within the icon's `radiusMeters`, Kit dispatches `iconNearestUpdate` with the iconConfig and the pill renders the POI name + coin icon (resolved from `web-viewer-sample-main/src/icons/Coins/`). Tapping the pill skips the Kit round-trip and writes the iconConfig directly into `ControlContext`'s coinPoi slice (`mediaType: "coinPoi"` branch in `IconBubbleOverlay.handleClick`). Same overlay opens.
+
+### State on `ControlContext`
+
+Mirrors the videobook / video player pattern (see `react-contexts.mdc`):
+
+| Field | Type | Purpose |
+|---|---|---|
+| `coinPoiOpen` | `boolean` | Card visibility |
+| `coinPoiPayload` | `CoinPoiPayload \| null` | `{ poiType, xformId, coinType, primPath?, displayName?, labelIcon?, metadata }` |
+| `setCoinPoiOpen`, `setCoinPoiPayload` | setters | |
+
+Defined in `web-viewer-sample-main/src/features/streaming/hooks/useControlHandlers.ts` (`CoinPoiPayload` exported from the same file).
+
+### `coinPoi.open` action handler (ChatContext)
+
+Registered alongside `videobook.open` / `spatialSound.open` etc. — pure thin shim that copies the payload onto `ControlContext`. ChatContext sits **outside** AppUIContext but inside ControlContext, so it can read/write the slice via `useControl()` (same pattern videobook uses). See `web-viewer-sample-main/src/features/streaming/contexts/ChatContext.tsx`.
+
+### `PoiInfoCard.tsx` (info + elevator ride)
+
+`web-viewer-sample-main/src/features/cu/widgets/PoiInfoCard.tsx`
+
+- Bottom-sheet layout cribbed from the existing `RestroomWidget` detail sheet — same handle, head, info rows, close button, animation, accessibility shape (`role=dialog`, `aria-modal`, `Escape` to close, focus-visible on close button).
+- **No route buttons** (no Take Me There / Get directions) for static POIs — the user is already at the coin.
+- **`poiType === 'elevator'`** with `metadata.elevator_ride.destinations`: shows localized **Use elevator** (`coin.elevatorUse`) and one **44×44 px** button per other floor in the same `shortcuts.json` group. Labels use `destinations[].i18n_key` → `shortcuts.sectionA.floor*` / `shortcuts.sectionR.floor*` (see `web-viewer-sample-main/src/i18n/locales/*.json`).
+- Other types render a **per-poiType subset** of info rows only:
+   - **`restroom`**: fee, accessibility, cleaning schedule, toilet seats
+   - **`quiet_zone`**: fee, accessibility, cleaning schedule
+   - **`exit`**: title only
+- Uses the same shared `formatFee` / `formatCleaning` semantics as the widget detail sheets (kept inlined for now — the helpers are tiny pure functions).
+
+### `CoinPoiOverlay.tsx` + `elevatorRideTypes.ts`
+
+`web-viewer-sample-main/src/features/cu/overlays/CoinPoiOverlay.tsx` reads `ControlContext`, passes `onElevatorRide` → `NavigationContext.handlePoiTeleport(primPath, { transitionMessageKey: 'coin.elevatorRiding' })`. Parses `metadata.elevator_ride` via `elevatorRideTypes.ts`. Mounted from `CuViewLayer.tsx`.
+
+## Workflows
+
+### Add a coin to an existing POI
+
+Just add the xForm. No JSON edit. Coin renders immediately on hot-reload.
+
+```
+coin_restroom_03_women      ← uses 'women' asset; metadata pulled from restroom_03 row
+coin_kiosk_04               ← uses 'kiosk' asset; renders even if kiosk_04 row doesn't exist yet
+coin_exit_point_11          ← uses 'emergency_exit' asset; renders without an exit_point_11 row
+```
+
+### Same elevator (or POI) on another floor — second coin
+
+Use the **variant** form with a unique middle token and the registry suffix `_elevator` (or other `coinTypes` key). Do **not** use `coin_2_elevator_01` — the parser expects either `coin_<category>_<digits>` (e.g. `coin_elevator_01`) or `coin_<unique_hint>_<coin_type>`.
+
+```
+coin_elevator_01                    ← simple form → metadata key elevator_01 (floor 1)
+coin_elevator_01_floor0_elevator    ← variant → elevator_01_floor0
+coin_elevator_01_floor2_elevator    ← variant → elevator_01_floor2
+coin_elevator_01_floor3_elevator    ← variant → elevator_01_floor3 (add matching row in elevator_data.json)
+```
+
+Each xForm is its own icon registry entry, proximity pill, and click target; only the optional JSON `xform_id` must be unique per coin.
+
+### Elevator ride (floor teleport from coin card)
+
+Elevator coins (`poiType: elevator` in `elevator_data.json`) can link to a **shortcut group** in `shortcuts.json`:
+
+| JSON field | Example | Purpose |
+|---|---|---|
+| `shortcut_group_id` | `elevator_1` | Matches `groups[].id` in `shortcuts.json` |
+| `shortcut_node_id` | `floor_1` | This coin’s floor node (`groups[].nodes[].id`) |
+
+At load time `coins_loader._elevator_ride_metadata()` embeds `metadata.elevator_ride` on the coin payload: other nodes in the same group as `destinations` (each with `prim_path` = NavShortcuts Xform, `label_en`, `i18n_key`). The web `PoiInfoCard` shows **Use elevator** and one button per destination. Tap → `handlePoiTeleport(prim_path)` → existing `poiTeleport` Kit handler + `TeleportService.teleport_to_coordinates(..., world_body_yaw_deg=…)` with facing taken from the destination NavShortcuts Xform (same pose read as spawn points via `_read_spawn_point_transform`), fade copy `coin.elevatorRiding`. CU arrival toast uses `poiTeleportResult.arrivalLabel` / `arrivalLabelI18nKey` from `shortcuts.json` (e.g. “Section R — Floor 1”, not `floor_1`). No new Kit event; not the dev-only `ShortcutTraversalService` route-hop path.
+
+Add a new lift: (1) nodes in `nav_shortcuts_layer.usda` + `shortcuts.json`, (2) one coin xForm per floor (`coin_<hint>_elevator`), (3) one `elevator_data.json` row per coin with matching `shortcut_group_id` / `shortcut_node_id`.
+
+### Mark a POI as out-of-order
+
+Set `"in_use": false` on the JSON row. The coin **keeps rendering** — `in_use` is metadata for the toilet/quiet-zone state, not a render gate. The web side (`PoiInfoCard.tsx`) decides whether to grey it out, show a banner, etc.
+
+### Add a brand-new coin type / model
+
+1. Drop the asset into `source/data/Assets/Coins/`.
+2. Add an entry to `source/data/coins_registry.json` (mind `modelRotation` — Y-up `[0, 270, 0]` vs Z-up `[-90, 270, 0]`).
+3. Drop a label icon SVG into `web-viewer-sample-main/src/icons/Coins/`.
+4. Name a coin xForm with the new suffix (variant form: `coin_<anything>_<your_type>`).
+5. No code changes.
+
+### Add a brand-new POI category (e.g. cafés, info desks) that should support simple-form coins
+
+1. Add the asset + registry entry, e.g. `"cafe": { "asset": "...", "labelIcon": "icon_cafe.svg", … }`.
+2. Add `"cafe": "cafe"` to `_CATEGORY_TO_COIN_TYPE` in `coins_loader.py`.
+3. (Optional) add a `cafe_data.json` file and register it in `_POI_DATA_FILES` for UI metadata; extend `PoiInfoCard.tsx` for any type-specific rows.
+4. Name xForms `coin_cafe_01`, `coin_cafe_02`, …
+
+`restroom` and `quiet_zone` are intentionally **not** in `_CATEGORY_TO_COIN_TYPE` because one location can host multiple coin variants — they always require the explicit variant form `coin_<id>_<type>`.
+
+## Out of scope (current cut)
+
+- "Coins only appear during wayfinding" gating — design copy hints at this; easy to add later via a `routeActive` gate on the proximity entry or by toggling the session-layer payload off. (Coins are still **hidden beyond 50 m** via the shared `NearestEntityTracker` pass; that is not wayfinding-gated.)
+- Coin-attached "arrow pointing at the POI" auto-orientation — manual today: rotate the coin xForm in `coins_layer.usda` and the asset-axis correction (`coins_registry.json` `modelRotation`) takes care of the asset's local-axis offset so the world arrow points where the xForm faces. A future enhancement could yaw the coin toward its linked POI prim at attach time without per-xForm authoring.
+- Reusing the info card for non-coin entry points (e.g. as the bird-eye click sheet for restrooms) — possible future cleanup, not done in this cut to avoid touching the existing `RestroomWidget` / `QuietZoneWidget` detail sheets.
+
+## Related topics
+
+- **Navigation shortcuts** (NavShortcuts USD + `shortcuts.json`; dev route-hop path via `ShortcutTraversalService` — **not** the coin elevator ride): `shortcuts.mdc`
+- **POI teleport** (`poiTeleport`, spawn rotation, `arrivalLabel` / `arrivalLabelI18nKey`): `poi-teleport.mdc`
+- **Interactions framework** (proximity, click, projectables, action registry, iconGroup template): `interactions.mdc`
+- **POI data pipeline** (where `restroom_data.json` etc. come from, `xform_id` schema, adding new POI types): `poi-data-pipeline.mdc`
+- **React contexts** (`ControlContext` panel-payload pattern, where `coinPoiOpen` lives): `react-contexts.mdc`
+- **USD sublayers** (`coins_layer.usda` is referenced from `main_scene.usda`): `sublayers.mdc`

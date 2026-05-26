@@ -1,0 +1,1193 @@
+/* Controls menu (hamburger) — full-screen light frost, X top-right, round actions, search dock */
+.cu-controls-menu-frost {
+    position: fixed;
+    inset: 0;
+    z-index: 10051;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    height: 100%;
+    background: #EAE7E599;
+    backdrop-filter: blur(40px);
+    -webkit-backdrop-filter: blur(40px);
+    animation: cu-fadeIn 0.22s ease;
+}
+
+.cu-controls-menu-x {
+    position: fixed;
+    top: 40px;
+    right: var(--page-edge-right);
+    z-index: 10052;
+}
+
+/* Hamburger same slot as X — search overlay (same 3-bar control as Settings header) */
+.cu-hamburger.cu-controls-menu-frost-hamburger {
+    position: fixed;
+    top: 40px;
+    right: var(--page-edge-right);
+    z-index: 10052;
+}
+
+.cu-controls-menu-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 96px var(--page-edge-right) 140px var(--page-edge-left);
+    box-sizing: border-box;
+    width: 100%;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+@media (max-height: 500px) {
+    .cu-controls-menu-body {
+        padding-top: 16px;
+        padding-bottom: 100px;
+        justify-content: flex-start;
+    }
+
+    .cu-controls-menu-actions {
+        gap: 10px;
+    }
+
+    .cu-figma-action-btn--featured {
+        padding: 4px 14px;
+    }
+
+    .cu-figma-action-btn--featured .cu-figma-action-btn-gif--featured {
+        width: 64px;
+        height: 64px;
+    }
+
+    .cu-figma-action-btn--featured .cu-figma-action-btn-title {
+        font-size: 16px;
+    }
+
+    .cu-figma-action-btn--featured .cu-figma-action-btn-sub {
+        font-size: 11px;
+    }
+
+    .cu-figma-action-btn--compact {
+        padding: 6px 14px;
+        min-height: 50px;
+    }
+
+    .cu-figma-action-btn--dev-chip {
+        padding: 6px 14px;
+    }
+}
+
+/* Controls menu — action card width (Explore, Settings, Dev) */
+.cu-controls-menu-actions {
+    --cu-action-card-width: min(560px, var(--page-max-width-gutter));
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    width: 100%;
+    max-width: var(--cu-action-card-width);
+    margin: 0 auto;
+    padding: 0 8px;
+    box-sizing: border-box;
+}
+
+.cu-figma-action-btn {
+    display: flex;
+    width: var(--cu-action-card-width);
+    max-width: 100%;
+    padding: 12px 20px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0;
+    border-radius: 24px;
+    border: 1px solid rgba(33, 23, 64, 0.3);
+    background: var(--Off-white, #f6f6f6);
+    box-shadow: 0 2px 4px 0 rgba(0, 0, 0, 0.2);
+    cursor: pointer;
+    font-family: Lexend, system-ui, sans-serif;
+    text-align: left;
+    color: var(--Dark-Purple, #351a84);
+    transform: translateY(0) scale(1);
+    transition:
+        background 0.22s ease,
+        box-shadow 0.22s ease,
+        transform 0.2s cubic-bezier(0.25, 0.8, 0.25, 1),
+        border-color 0.22s ease,
+        filter 0.2s ease;
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+}
+
+/* Shorter card (more compact vertically) */
+.cu-figma-action-btn--featured {
+    padding: 6px 18px;
+    min-height: 0;
+    justify-content: center;
+}
+
+.cu-figma-action-btn--compact {
+    padding: 10px 18px;
+    min-height: 70px;
+    justify-content: center;
+}
+
+/* Dev Mode — same full-width as Explore/Settings, text only (no icon); grayish */
+.cu-figma-action-btn--dev-chip {
+    width: var(--cu-action-card-width);
+    max-width: 100%;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 10px 20px;
+    min-height: 0;
+    text-align: center;
+    border-radius: 24px;
+    background: #e6e6ea;
+    border-color: rgba(33, 23, 64, 0.2);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.cu-figma-action-btn--dev-chip .cu-figma-action-btn-text-stack--dev-chip {
+    align-items: center;
+    gap: 3px;
+    padding-top: 0;
+    flex: 0 0 auto;
+    min-width: 0;
+    width: 100%;
+}
+
+.cu-figma-action-btn--dev-chip .cu-figma-action-btn-title {
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.15;
+    letter-spacing: -0.01em;
+    color: #393747;
+}
+
+.cu-figma-action-btn--dev-chip .cu-figma-action-btn-sub {
+    font-size: 10px;
+    font-weight: 500;
+    line-height: 1.2;
+    color: #8b8993;
+}
+
+/* Selected / toggle state (Lemon) — all devices */
+.cu-figma-action-btn--pressed {
+    background: var(--Lemon, #dcff7d);
+    border-color: rgba(33, 23, 64, 0.3);
+    box-shadow: 0 2px 4px 0 rgba(0, 0, 0, 0.2);
+}
+
+.cu-figma-action-btn--pressed .cu-figma-action-btn-sub {
+    color: #5f5875;
+}
+
+/* Hover only for precise pointer (no touch "stuck" hover). Lift + shadow + subtle border highlight. */
+@media (hover: hover) and (pointer: fine) {
+    .cu-figma-action-btn:hover:not(:active):not(:disabled) {
+        background: #fffef8;
+        border-color: rgba(33, 23, 64, 0.4);
+        box-shadow:
+            0 6px 14px rgba(33, 23, 64, 0.08),
+            0 1px 4px rgba(0, 0, 0, 0.06);
+        transform: translateY(-2px) scale(1.004);
+    }
+
+    .cu-figma-action-btn--pressed:hover:not(:active):not(:disabled) {
+        background: #d4f56d;
+        border-color: rgba(33, 23, 64, 0.34);
+        box-shadow:
+            0 6px 14px rgba(33, 23, 64, 0.1),
+            0 1px 4px rgba(0, 0, 0, 0.06);
+        transform: translateY(-2px) scale(1.004);
+    }
+
+    .cu-figma-action-btn--dev-chip:hover:not(:active):not(:disabled) {
+        background: #dcdce2;
+        border-color: rgba(33, 23, 64, 0.28);
+        box-shadow:
+            0 6px 14px rgba(33, 23, 64, 0.06),
+            0 1px 4px rgba(0, 0, 0, 0.08);
+        transform: translateY(-2px) scale(1.004);
+    }
+}
+
+.cu-figma-action-btn:active:not(:disabled) {
+    background: var(--Lemon, #dcff7d);
+    box-shadow: 0 2px 4px 0 rgba(0, 0, 0, 0.2);
+    transform: translateY(0) scale(0.988);
+    border-color: rgba(33, 23, 64, 0.3);
+    transition-duration: 0.12s;
+}
+
+.cu-figma-action-btn--dev-chip:active:not(:disabled) {
+    background: #d0d1d8;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+    border-color: rgba(33, 23, 64, 0.26);
+}
+
+/* Explore / Settings (large cards): lemon while pointer is down */
+.cu-figma-action-btn--featured:active:not(:disabled) {
+    background: #dcff7d;
+    box-shadow: 0 2px 4px 0 rgba(0, 0, 0, 0.2);
+    transform: translateY(0) scale(0.988);
+    border-color: rgba(33, 23, 64, 0.3);
+    transition-duration: 0.12s;
+}
+
+.cu-figma-action-btn--pressed:active:not(:disabled) {
+    background: var(--Lemon, #dcff7d);
+    transform: translateY(0) scale(0.988);
+}
+
+.cu-figma-action-btn:focus {
+    outline: none;
+}
+
+.cu-figma-action-btn:focus-visible {
+    outline: 2px solid var(--Dark-Purple, #351a84);
+    outline-offset: 3px;
+}
+
+.cu-figma-action-btn-row {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 16px;
+    width: 100%;
+}
+
+.cu-figma-action-btn--featured .cu-figma-action-btn-row {
+    gap: 12px;
+    align-items: center;
+}
+
+.cu-figma-action-btn-text-stack {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 6px;
+    min-width: 0;
+    flex: 1 1 auto;
+    padding-top: 2px;
+}
+
+.cu-figma-action-btn--compact .cu-figma-action-btn-text-stack {
+    gap: 4px;
+    padding-top: 4px;
+}
+
+.cu-figma-action-btn-icon-wrap {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    color: var(--Dark-Purple, #351a84);
+}
+
+.cu-figma-action-btn-icon-wrap--emoji {
+    font-size: 22px;
+    line-height: 1;
+    min-width: 24px;
+    min-height: 24px;
+}
+
+.cu-figma-action-btn-gif {
+    width: 28px;
+    height: 28px;
+    object-fit: contain;
+    display: block;
+    flex-shrink: 0;
+    pointer-events: none;
+    user-select: none;
+}
+
+.cu-figma-action-btn-gif--featured {
+    width: 96px;
+    height: 96px;
+}
+
+.cu-figma-action-btn-icon-wrap--featured {
+    align-self: center;
+}
+
+.cu-figma-action-btn-svg {
+    display: block;
+    flex-shrink: 0;
+    color: var(--Dark-Purple, #351a84);
+}
+
+.cu-figma-action-btn-svg--compact {
+    width: 40px;
+    height: 40px;
+}
+
+.cu-figma-action-btn-title {
+    font-family: Lexend, system-ui, sans-serif;
+    font-size: 17px;
+    font-weight: 500;
+    line-height: 1.25;
+}
+
+.cu-figma-action-btn--featured .cu-figma-action-btn-title {
+    font-size: 20px;
+    font-weight: 600;
+    line-height: 1.12;
+    letter-spacing: -0.02em;
+}
+
+.cu-figma-action-btn-sub {
+    font-family: Lexend, system-ui, sans-serif;
+    font-size: 12px;
+    font-weight: 400;
+    font-style: normal;
+    line-height: 1.35;
+    color: #b0a8cf;
+    max-width: 100%;
+}
+
+.cu-figma-action-btn--featured .cu-figma-action-btn-sub {
+    font-size: 13px;
+    line-height: 1.28;
+    color: #a9a1cb;
+}
+
+.cu-figma-action-btn--featured .cu-figma-action-btn-text-stack {
+    gap: 3px;
+    padding-top: 0;
+    justify-content: center;
+}
+
+/* Search bar / dock */
+.cu-controls-menu-search-dock {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 10052;
+    padding: 16px env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px)
+        env(safe-area-inset-left, 0px);
+    box-sizing: border-box;
+    background: linear-gradient(
+        180deg,
+        rgba(252, 250, 247, 0) 0%,
+        rgba(252, 250, 247, 0.75) 28%,
+        rgba(252, 250, 247, 0.92) 100%
+    );
+    pointer-events: none;
+}
+
+.cu-controls-menu-search-dock .cu-controls-menu-search-inner {
+    pointer-events: auto;
+    max-width: 560px;
+    width: 100%;
+    margin: 0 auto;
+}
+
+.cu-controls-menu-search-shell {
+    pointer-events: auto;
+    position: relative;
+    display: flex;
+    width: 100%;
+    max-width: 100%;
+    padding: 14px 14px 35px 14px;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    align-self: stretch;
+    margin: 0;
+    box-sizing: border-box;
+    border-radius: 24px 24px 0 0;
+    background: rgba(234, 231, 229, 0.9);
+    box-shadow: 0 -1px 4px 0 rgba(0, 0, 0, 0.08);
+    flex-shrink: 0;
+    overflow: hidden;
+    transform: translateY(6px);
+}
+
+.cu-controls-menu-search-inner {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 12px;
+    min-height: 56px;
+    padding: 8px 22px 8px 20px;
+    border-radius: 80px;
+    border: 1px solid rgba(33, 23, 64, 0.22);
+    background: #fff;
+    box-shadow: 0 2px 16px rgba(33, 23, 64, 0.08);
+    box-sizing: border-box;
+}
+
+.cu-controls-menu-search-icon {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #9a91c2;
+}
+
+.cu-controls-menu-search-input {
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 0;
+    height: auto;
+    padding: 10px 0;
+    border: none;
+    background: transparent;
+    font-family: Lexend, system-ui, sans-serif;
+    font-size: 16px;
+    font-style: normal;
+    font-weight: 400;
+    line-height: 130%;
+    color: var(--Dark-Purple, #351a84);
+    outline: none;
+}
+
+.cu-controls-menu-search-input::placeholder {
+    color: #9086bd;
+}
+
+.cu-controls-menu-search-input::-webkit-search-cancel-button {
+    -webkit-appearance: none;
+}
+
+/* Expanded search surface */
+.cu-controls-search-panel {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+    width: 100%;
+    padding: 48px var(--page-edge-right) calc(100px + env(safe-area-inset-bottom, 0px)) var(--page-edge-left);
+    box-sizing: border-box;
+    -webkit-overflow-scrolling: touch;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 28px;
+}
+
+/*
+ * Avatar + bubble — same max-width as .cu-controls-search-panel-inner (title row);
+ * suggestion chips sit below in .cu-controls-search-section (full width of the panel).
+ */
+.cu-controls-search-assistant-strip {
+    width: 100%;
+    max-width: 560px;
+    margin: 0 auto;
+    min-width: 0;
+    box-sizing: border-box;
+}
+
+.cu-controls-search-panel-inner {
+    max-width: 560px;
+    width: 100%;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+    align-items: center;
+}
+
+.cu-controls-search-panel-title {
+    margin: 0;
+    align-self: flex-start;
+    font-family: Lexend, system-ui, sans-serif;
+    font-size: 20px;
+    font-style: normal;
+    font-weight: 500;
+    line-height: 115%;
+    color: var(--Dark-Purple, #351a84);
+    text-align: left;
+}
+
+/* Assistant card (avatar inside bubble + Open Chat) */
+.cu-controls-search-assistant {
+    width: 100%;
+    max-width: 100%;
+}
+
+.cu-controls-search-assistant-avatar {
+    flex-shrink: 0;
+    pointer-events: none;
+    user-select: none;
+}
+
+/* 56px circle, Lemon background */
+.cu-controls-search-assistant-avatar--in-bubble {
+    width: 56px;
+    height: 56px;
+    aspect-ratio: 1 / 1;
+    border-radius: 56px;
+    overflow: hidden;
+    box-sizing: border-box;
+    background-color: var(--Lemon, #dcff7d);
+    box-shadow: 0 1px 6px rgba(53, 26, 132, 0.18);
+}
+
+.cu-controls-search-assistant-avatar-img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    object-position: center center;
+    pointer-events: none;
+    user-select: none;
+}
+
+.cu-controls-search-assistant-bubble {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 12px;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    margin: 0;
+    padding: 12px 14px 14px;
+    border-radius: 16px;
+    background: var(--Off-white, #f6f6f6);
+    border: 1px solid rgba(33, 23, 64, 0.18);
+    box-shadow: 0 2px 12px rgba(33, 23, 64, 0.06);
+    box-sizing: border-box;
+}
+
+.cu-controls-search-assistant-bubble-main {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+}
+
+.cu-controls-search-assistant-bubble-text {
+    margin: 0;
+    font-family: Lexend, system-ui, sans-serif;
+    font-size: 14px;
+    font-style: normal;
+    font-weight: 500;
+    line-height: 130%;
+    letter-spacing: -0.01em;
+    color: var(--Dark-Purple, #351a84);
+    white-space: normal;
+    overflow-wrap: break-word;
+    text-align: left;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.cu-controls-search-assistant-bubble-text--error {
+    color: #991b1b;
+}
+
+/* Typing indicator dots in search assistant bubble */
+.cu-controls-search-typing-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 0;
+}
+
+.cu-controls-search-typing-dot {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--Dark-Purple, #351a84);
+    opacity: 0.25;
+    animation: cu-search-typing-blink 1.2s ease-in-out infinite;
+}
+
+.cu-controls-search-typing-dot:nth-child(2) {
+    animation-delay: 0.2s;
+}
+
+.cu-controls-search-typing-dot:nth-child(3) {
+    animation-delay: 0.4s;
+}
+
+@keyframes cu-search-typing-blink {
+    0%, 80%, 100% {
+        opacity: 0.25;
+        transform: translateY(0);
+    }
+    40% {
+        opacity: 1;
+        transform: translateY(-2px);
+    }
+}
+
+/* Open Chat — Dark Purple button, Lemon icon + text */
+.cu-controls-search-assistant-open-chat {
+    display: inline-flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    align-self: flex-start;
+    gap: 6px;
+    margin: 0;
+    padding: 8px 12px;
+    border: none;
+    border-radius: 32px;
+    background: var(--Dark-Purple, #351a84);
+    box-shadow: 0 2px 3px 0 rgba(0, 0, 0, 0.25);
+    font-family: Lexend, system-ui, sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+    color: var(--Lemon, #dcff7d);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition:
+        background 0.2s ease,
+        box-shadow 0.2s ease,
+        transform 0.15s ease;
+}
+
+.cu-controls-search-assistant-open-chat:hover {
+    background: color-mix(in srgb, var(--Dark-Purple, #351a84) 88%, #ffffff);
+    box-shadow: 0 3px 5px 0 rgba(0, 0, 0, 0.28);
+}
+
+.cu-controls-search-assistant-open-chat:active {
+    transform: scale(0.98);
+    background: color-mix(in srgb, var(--Dark-Purple, #351a84) 82%, #000000);
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.22);
+}
+
+.cu-controls-search-assistant-open-chat:focus {
+    outline: none;
+}
+
+.cu-controls-search-assistant-open-chat:focus-visible {
+    outline: 2px solid var(--Lemon, #dcff7d);
+    outline-offset: 3px;
+    border-radius: 32px;
+}
+
+.cu-controls-search-assistant-open-chat-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.cu-controls-search-assistant-open-chat-img {
+    display: block;
+    width: 16px;
+    height: 16px;
+    object-fit: contain;
+    pointer-events: none;
+    user-select: none;
+}
+
+.cu-controls-search-assistant-open-chat-label {
+    white-space: nowrap;
+    color: var(--Lemon, #dcff7d);
+}
+
+/* Full width of search panel (same edge alignment as seat sheet); not limited to 560px column. */
+.cu-controls-search-section {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    align-self: stretch;
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    margin: 0;
+    box-sizing: border-box;
+    padding-inline: 0;
+    align-items: stretch;
+}
+
+.cu-controls-search-chips {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    justify-content: center;
+    align-items: stretch;
+    gap: clamp(8px, 2.2vw, 18px);
+    align-self: stretch;
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    margin: 0;
+    box-sizing: border-box;
+    padding-inline: max(12px, env(safe-area-inset-left, 0px)) max(12px, env(safe-area-inset-right, 0px));
+    overflow: visible;
+}
+
+/* Search suggestion chip card — equal flex columns; shrink on narrow screens, cap width on large */
+.cu-controls-search-chip {
+    display: flex;
+    box-sizing: border-box;
+    flex: 1 1 0;
+    min-width: 0;
+    width: auto;
+    max-width: 156px;
+    min-height: clamp(96px, 24vw, 188px);
+    height: auto;
+    padding: clamp(8px, 2vw, 16px);
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: clamp(6px, 1.2vw, 10px);
+    border-radius: clamp(14px, 1.8vw, 20px);
+    border: 1px solid rgba(33, 23, 64, 0.3);
+    background: var(--Secondary-colours-Light-blue, #9ecdff);
+    color: var(--Dark-Purple, #351a84);
+    font-family: Lexend, system-ui, sans-serif;
+    font-size: clamp(12px, 1.15vw, 14px);
+    font-style: normal;
+    font-weight: 500;
+    line-height: 115%;
+    align-self: auto;
+    text-align: left;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    cursor: pointer;
+    transition:
+        background 0.18s ease,
+        border-color 0.18s ease,
+        box-shadow 0.18s ease,
+        transform 0.15s ease;
+    -webkit-tap-highlight-color: transparent;
+}
+
+/* Find my seat: rest = light blue; .--pressed = filter match (electric blue) */
+.cu-controls-search-chip--find-seat {
+    background: var(--Secondary-colours-Light-blue, #9ecdff);
+    color: var(--Dark-Purple, #351a84);
+    border-color: rgba(33, 23, 64, 0.3);
+}
+
+.cu-controls-search-chip--find-seat.cu-controls-search-chip--pressed {
+    background: var(--Secondary-colours-Electric-blue, #3731e5);
+    color: var(--Off-white, #f6f6f6);
+    border-color: rgba(255, 255, 255, 0.22);
+}
+
+.cu-controls-search-chip--toilet {
+    background: #a8e0d0;
+}
+
+.cu-controls-search-chip--quiet {
+    background: #ffd6a8;
+}
+
+.cu-controls-search-chip--coming-soon {
+    opacity: 1;
+    color: #4a4860;
+    background: #b8c8d8;
+    filter: grayscale(0.75);
+    cursor: default;
+    pointer-events: none;
+}
+
+.cu-controls-search-chip--coming-soon:hover {
+    box-shadow: none;
+    border-color: rgba(33, 23, 64, 0.3);
+}
+
+/* Icon: transparent background, contain + centered = full image visible, no harsh clipping */
+.cu-controls-search-chip-icon {
+    order: 2;
+    display: block;
+    flex: 0 0 auto;
+    align-self: stretch;
+    width: 100%;
+    aspect-ratio: 73 / 61;
+    box-sizing: border-box;
+    background-color: transparent;
+    background-position: center center;
+    background-size: contain;
+    background-repeat: no-repeat;
+    pointer-events: none;
+    user-select: none;
+}
+
+.cu-controls-search-chip-label {
+    order: 1;
+    display: block;
+    flex-shrink: 0;
+    width: 100%;
+    min-width: 0;
+    text-align: left;
+    align-self: flex-start;
+}
+
+.cu-controls-search-chip:hover {
+    border-color: rgba(33, 23, 64, 0.45);
+    box-shadow: 0 2px 10px rgba(33, 23, 64, 0.12);
+}
+
+.cu-controls-search-chip--find-seat:hover {
+    border-color: rgba(33, 23, 64, 0.45);
+    box-shadow: 0 2px 10px rgba(33, 23, 64, 0.12);
+}
+
+.cu-controls-search-chip--find-seat.cu-controls-search-chip--pressed:hover {
+    border-color: rgba(255, 255, 255, 0.38);
+    box-shadow: 0 2px 12px rgba(55, 49, 229, 0.38);
+}
+
+.cu-controls-search-chip:active {
+    background: #8ab8f5;
+    border-color: rgba(33, 23, 64, 0.4);
+    transform: scale(0.98);
+}
+
+.cu-controls-search-chip--find-seat:active:not(.cu-controls-search-chip--pressed) {
+    background: #7eb8f0;
+    color: var(--Dark-Purple, #351a84);
+    border-color: rgba(33, 23, 64, 0.4);
+}
+
+.cu-controls-search-chip--find-seat.cu-controls-search-chip--pressed:active {
+    background: #2e29c9;
+    color: var(--Off-white, #f6f6f6);
+    border-color: rgba(255, 255, 255, 0.28);
+}
+
+.cu-controls-search-chip--toilet:active {
+    background: #92cbb8;
+}
+
+.cu-controls-search-chip--quiet:active {
+    background: #ffc896;
+}
+
+.cu-controls-search-chip:focus {
+    outline: none;
+}
+
+.cu-controls-search-chip:focus-visible {
+    outline: 2px solid var(--Dark-Purple, #351a84);
+    outline-offset: 2px;
+}
+
+.cu-controls-search-chip--find-seat.cu-controls-search-chip--pressed:focus-visible {
+    outline-color: rgba(246, 246, 246, 0.95);
+}
+
+.cu-controls-search-chips-empty {
+    margin: 0;
+    width: 100%;
+    padding: 12px 8px;
+    font-family: Lexend, system-ui, sans-serif;
+    font-size: 14px;
+    font-weight: 400;
+    line-height: 130%;
+    color: #a49cc8;
+    text-align: center;
+}
+
+/* Collapsed search: mic left edge, text center, search icon right */
+.cu-controls-menu-search-inner--collapsed {
+    display: flex;
+    flex-direction: row;
+    padding: 16px 12px;
+    flex: 1 0 0;
+    min-width: 0;
+    align-items: center;
+    gap: 0;
+    width: auto;
+    max-width: 100%;
+    margin: 0;
+    border-radius: 12px;
+    border: none;
+    background: var(--Off-white, #f6f6f6);
+    box-shadow: 0 4px 2px 0 rgba(0, 0, 0, 0.2) inset;
+    transition:
+        border-color 0.18s ease,
+        box-shadow 0.18s ease;
+}
+
+.cu-controls-menu-search-inner--collapsed:hover {
+    box-shadow: 0 4px 2px 0 rgba(0, 0, 0, 0.2) inset;
+}
+
+.cu-controls-menu-search-field-row {
+    display: flex;
+    flex-direction: row;
+    flex: 1 1 auto;
+    min-width: 0;
+    align-items: center;
+    gap: 10px;
+}
+
+.cu-controls-menu-search-filter-input {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: none;
+    background: transparent;
+    font-family: Lexend, system-ui, sans-serif;
+    font-size: 16px;
+    font-style: normal;
+    font-weight: 400;
+    line-height: 130%;
+    color: var(--Dark-Purple, #351a84);
+    text-align: left;
+    opacity: 1;
+    outline: none;
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+.cu-controls-menu-search-filter-input::placeholder {
+    color: #9086bd;
+}
+
+.cu-controls-menu-search-filter-input::-webkit-search-cancel-button {
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+.cu-controls-menu-search-inner--collapsed:focus-within {
+    box-shadow: 0 4px 2px 0 rgba(0, 0, 0, 0.2) inset,
+        0 0 0 2px rgba(53, 26, 132, 0.25);
+}
+
+.cu-controls-menu-search-open {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    margin: 0;
+    padding: 0 10px;
+    border: none;
+    border-radius: 40px;
+    background: transparent;
+    font: inherit;
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.cu-controls-menu-search-open-content {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.cu-controls-menu-search-open:focus {
+    outline: none;
+}
+
+.cu-controls-menu-search-open:focus-visible {
+    outline: 2px solid var(--Dark-Purple, #351a84);
+    outline-offset: 2px;
+    border-radius: 12px;
+}
+
+/* Edge mic + search icon buttons */
+.cu-controls-menu-search-edge-btn {
+    flex-shrink: 0;
+    width: 40px;
+    height: 40px;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    cursor: pointer;
+    color: var(--Dark-Purple, #351a84);
+    transition:
+        background 0.18s ease,
+        transform 0.15s ease;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.cu-controls-menu-search-edge-btn:hover {
+    background: rgba(53, 26, 132, 0.08);
+}
+
+.cu-controls-menu-search-edge-btn:active {
+    transform: scale(0.96);
+}
+
+.cu-controls-menu-search-edge-btn:focus {
+    outline: none;
+}
+
+.cu-controls-menu-search-edge-btn:focus-visible {
+    outline: 2px solid var(--Dark-Purple, #351a84);
+    outline-offset: 2px;
+}
+
+/* MicButton in CU search dock — layout only (chrome from MicButton.css) */
+.cu-controls-menu-search-mic {
+    flex-shrink: 0;
+}
+
+@keyframes cu-controls-menu-search-send-in {
+    from {
+        opacity: 0;
+        transform: scale(0.88);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+.cu-controls-menu-search-send-btn {
+    display: flex;
+    width: 40px;
+    height: 40px;
+    min-width: 40px;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    border-radius: 80px;
+    border: none;
+    background: var(--Dark-Purple, #351a84);
+    color: var(--Lemon, #dcff7d);
+    box-shadow: 0 1px 4px rgba(33, 23, 64, 0.28);
+    animation: cu-controls-menu-search-send-in 0.2s ease;
+    transition:
+        transform 0.15s ease,
+        background 0.15s ease,
+        box-shadow 0.15s ease;
+}
+
+.cu-controls-menu-search-send-btn:hover {
+    background: color-mix(in srgb, var(--Dark-Purple, #351a84) 90%, #ffffff);
+    box-shadow: 0 2px 8px rgba(33, 23, 64, 0.22);
+    transform: scale(1.05);
+}
+
+.cu-controls-menu-search-send-btn:active {
+    transform: scale(0.96);
+}
+
+.cu-controls-menu-search-send-btn:focus {
+    outline: none;
+}
+
+.cu-controls-menu-search-send-btn:focus-visible {
+    outline: 2px solid var(--Dark-Purple, #351a84);
+    outline-offset: 2px;
+}
+
+.cu-controls-menu-search-send-icon {
+    width: 17px;
+    height: 17px;
+    display: block;
+    pointer-events: none;
+    user-select: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .cu-controls-menu-search-send-btn {
+        animation: none;
+    }
+}
+
+.cu-controls-menu-search-edge-img {
+    display: block;
+    width: 20px;
+    height: 20px;
+    object-fit: contain;
+    pointer-events: none;
+    user-select: none;
+}
+
+.cu-controls-menu-search-placeholder {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-family: Lexend, system-ui, sans-serif;
+    font-size: 16px;
+    font-style: normal;
+    font-weight: 400;
+    line-height: 130%;
+    color: #9086bd;
+    text-align: left;
+    display: flex;
+    align-items: center;
+    min-height: 24px;
+}
+
+.cu-controls-menu-search-inner--expanded {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 4px;
+    min-height: 56px;
+    padding: 8px 6px 8px 4px;
+    max-width: 560px;
+    width: 100%;
+    margin: 0 auto;
+    border-radius: 80px;
+    border: 1px solid rgba(33, 23, 64, 0.22);
+    background: #fff;
+    box-shadow: 0 2px 16px rgba(33, 23, 64, 0.08);
+    box-sizing: border-box;
+    transition:
+        border-color 0.18s ease,
+        box-shadow 0.18s ease;
+}
+
+.cu-controls-menu-search-inner--expanded:focus-within {
+    border-color: rgba(33, 23, 64, 0.32);
+    box-shadow: 0 4px 20px rgba(33, 23, 64, 0.1);
+}
+
+.cu-controls-search-back {
+    flex-shrink: 0;
+    width: 40px;
+    height: 40px;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    color: #c7c2df;
+    cursor: pointer;
+    transition:
+        background 0.18s ease,
+        color 0.18s ease;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.cu-controls-search-back:hover {
+    background: rgba(53, 26, 132, 0.08);
+    color: var(--Dark-Purple, #351a84);
+}
+
+.cu-controls-search-back:focus {
+    outline: none;
+}
+
+.cu-controls-search-back:focus-visible {
+    outline: 2px solid var(--Dark-Purple, #351a84);
+    outline-offset: 2px;
+}
+
+.cu-controls-menu-search-inner--expanded .cu-controls-menu-search-input {
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 0;
+    height: auto;
+    padding: 10px 0;
+}

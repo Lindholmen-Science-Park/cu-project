@@ -1,0 +1,372 @@
+{
+  "version": 2,
+  "interactionPoints": [
+    {
+      "id": "iBox_000001",
+      "label": "Inspect box",
+      "interactionType": "area",
+      "category": "poi",
+      "scene": "test_scene_interactions",
+      "position": { "type": "xform", "primPath": "/World/iBox_000001" },
+      "trigger": { "type": "proximity", "radiusMeters": 5, "activation": "always" },
+      "behaviors": [
+        {
+          "type": "projectable",
+          "ui": {
+            "title": "Inspect box",
+            "subtitle": "uses USD prim transform (no coords in JSON)",
+            "body": "Only visible within 5m",
+            "severity": "info"
+          }
+        }
+      ]
+    },
+    {
+      "id": "iBox_000002",
+      "label": "Interact box",
+      "interactionType": "area",
+      "category": "poi",
+      "scene": "test_scene_interactions",
+      "position": { "type": "xform", "primPath": "/World/iBox_000002" },
+      "trigger": { "type": "proximity", "radiusMeters": 10, "activation": "always" },
+      "behaviors": [
+        {
+          "type": "projectable",
+          "ui": {
+            "title": "Interact box",
+            "subtitle": "uses USD prim transform (no coords in JSON)",
+            "body": "Only visible within 10m",
+            "severity": "warning"
+          }
+        }
+      ]
+    },
+    {
+      "id": "iBox_000003",
+      "label": "Virtual box A",
+      "interactionType": "area",
+      "category": "poi",
+      "scene": "test_scene_interactions",
+      "position": { "type": "coordinates", "coordinates": [1702.64, 142.75, 3336.81] },
+      "trigger": { "type": "proximity", "radiusMeters": 10, "activation": "always" },
+      "behaviors": [
+        {
+          "type": "projectable",
+          "ui": {
+            "title": "Virtual box A",
+            "subtitle": "coordinates (no Xform)",
+            "body": "Placed at recorded player_location (1702.64, 142.75, 3336.81)",
+            "severity": "info"
+          }
+        }
+      ]
+    },
+    {
+      "id": "iBox_000004",
+      "label": "Virtual box B",
+      "interactionType": "area",
+      "category": "poi",
+      "scene": "test_scene_interactions",
+      "position": { "type": "coordinates", "coordinates": [933.52, 142.75, 5040.08] },
+      "trigger": { "type": "proximity", "radiusMeters": 10, "activation": "always" },
+      "behaviors": [
+        {
+          "type": "projectable",
+          "ui": {
+            "title": "Virtual box B",
+            "subtitle": "coordinates (no Xform)",
+            "body": "Placed at recorded player_location (933.52, 142.75, 5040.08)",
+            "severity": "critical"
+          }
+        }
+      ]
+    },
+    {
+      "id": "iBox_000005",
+      "label": "Real-world POI (example)",
+      "interactionType": "area",
+      "category": "poi",
+      "scene": "test_scene_interactions",
+      "position": { "type": "geoCoords", "latitude": 60.1699, "longitude": 24.9384 },
+      "trigger": { "type": "proximity", "radiusMeters": 25, "activation": "always" },
+      "behaviors": [
+        {
+          "type": "projectable",
+          "ui": {
+            "title": "Real-world POI (example)",
+            "subtitle": "lat/lon (not rendered yet)",
+            "body": "This will be used once we have geo -> USD mapping.",
+            "severity": "info"
+          }
+        }
+      ]
+    },
+    {
+      "id": "cube1_test",
+      "label": "Clickable Cube",
+      "interactionType": "object",
+      "category": "interactive",
+      "scene": "test_scene_interactions",
+      "position": { "type": "xform", "primPath": "/World/Cube1" },
+      "trigger": { "type": "click", "activation": "always" },
+      "behaviors": [
+        {
+          "type": "action",
+          "actions": {
+            "onClick": [
+              { "target": "3d", "action": "debug.print", "params": { "message": "Cube1 clicked (Kit)" } },
+              { "target": "web", "action": "debug.consoleLog", "payload": { "message": "Cube1 clicked (web)" } }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "_comment": "Mock examples below -- update primPath when prims exist in the scene",
+      "id": "info_main_entrance",
+      "label": "Main Entrance",
+      "interactionType": "area",
+      "category": "poi",
+      "scene": ["main_scene", "main_scene_light"],
+      "position": { "type": "xform", "primPath": "/World/info_main_entrance" },
+      "trigger": { "type": "proximity", "radius": 300, "activation": "always" },
+      "behaviors": [
+        { "type": "notification", "sound": "info", "message": "Welcome to the Main Entrance" }
+      ]
+    },
+    {
+      "id": "info_stage_area",
+      "label": "Stage Area",
+      "interactionType": "area",
+      "category": "poi",
+      "scene": ["main_scene", "main_scene_light"],
+      "position": { "type": "xform", "primPath": "/World/info_stage_area" },
+      "trigger": { "type": "proximity", "radius": 400, "activation": "always" },
+      "behaviors": [
+        { "type": "notification", "sound": "info", "message": "You are near the Stage Area" }
+      ]
+    },
+    {
+      "id": "trigger_volume_example",
+      "label": "Restricted Area",
+      "interactionType": "area",
+      "category": "safety",
+      "scene": ["main_scene", "main_scene_light"],
+      "position": { "type": "volume", "primPath": "/World/TriggerVolume_RestrictedArea" },
+      "trigger": { "type": "volume", "oneShot": false, "activation": "always" },
+      "behaviors": [
+        { "type": "notification", "sound": "alert", "message": "You have entered a restricted area" }
+      ]
+    },
+    {
+      "id": "avatar_red",
+      "interactionType": "npc",
+      "scene": ["main_scene", "main_scene_light"],
+      "position": { "type": "xform", "primName": "Red", "positionOffset": [0, 170, 0] },
+      "trigger": { "type": "proximity", "radiusMeters": 4, "activation": "always" },
+      "approach": { "distanceMeters": 3.0 },
+      "npcConfig": {
+        "avatarId": "red",
+        "avatarName": "Red",
+        "avatarAsset": "Assets/Avatars/Red.usda",
+        "avatarImage": "red_image.png",
+        "chatBackgroundImage": "red.svg",
+        "greeting": "interactions.avatar_red.greeting",
+        "voice": "female",
+        "quickActions": [
+          { "id": "navigate_help", "label": "interactions.avatar_red.quickAction_navigate_help" },
+          { "id": "horseshow_info", "label": "interactions.avatar_red.quickAction_horseshow_info" }
+        ]
+      }
+    },
+    {
+      "id": "icon_ipad",
+      "interactionType": "icon",
+      "scene": ["main_scene", "main_scene_light"],
+      "position": { "type": "xform", "primName": "ipad", "positionOffset": [0, 50, 0] },
+      "trigger": { "type": "proximity", "radiusMeters": 3, "activation": "always" },
+      "iconConfig": {
+        "iconId": "ipad",
+        "iconName": "Ipad",
+        "iconImage": "group_163_avatar.svg",
+        "greeting": "interactions.icon_ipad.greeting",
+        "title": "interactions.icon_ipad.title",
+        "subtitle": "interactions.icon_ipad.subtitle",
+        "videoUrl": "security_4.mp4",
+        "chapters": [
+          { "id": "queues", "label": "interactions.icon_ipad.chapter_queues", "timestampSeconds": 0.0 },
+          { "id": "what_can_i_bring", "label": "interactions.icon_ipad.chapter_what_can_i_bring", "timestampSeconds": 16.21 },
+          { "id": "tickets", "label": "interactions.icon_ipad.chapter_tickets", "timestampSeconds": 31.16 },
+          { "id": "cloakroom", "label": "interactions.icon_ipad.chapter_cloakroom", "timestampSeconds": 42.16 },
+          { "id": "find_your_seat", "label": "interactions.icon_ipad.chapter_find_your_seat", "timestampSeconds": 55.20 }
+        ]
+      }
+    },
+    {
+      "id": "icon_spatial_sound",
+      "interactionType": "iconGroup",
+      "contentThemes": ["horseshow"],
+      "scene": ["main_scene", "main_scene_light"],
+      "primNamePattern": "spatial_sound_*",
+      "trigger": { "type": "proximity", "radiusMeters": 3, "activation": "always" },
+      "position": { "type": "xform", "positionOffset": [0, 50, 0] },
+      "iconConfig": {
+        "iconId": "headphones",
+        "iconName": "Headphones",
+        "iconImage": "headphones_avatar.svg",
+        "mediaType": "spatialSound",
+        "iconAsset": "interaction_icons/headphones.usd",
+        "_comment_soundsDir": "${NUCLEUS_SPATIAL_SOUNDS_FOLDER} resolves at scan time to the value in repo-root .env (default: `nucleus/sounds/spatial/`). Move files → edit only the .env var. Web side stays in sync automatically: the recursive `@nucleus-sounds/**` Vite glob (vite.config.ts) discovers files anywhere under `nucleus/sounds/` and resolves them by basename. If the env var is unset, the indexer falls back to the literal value `nucleus/sounds/spatial/`.",
+        "soundsDir": "${NUCLEUS_SPATIAL_SOUNDS_FOLDER}",
+        "i18nKeyPattern": "interactions.{id}"
+      }
+    },
+    {
+      "id": "icon_video_360",
+      "interactionType": "iconGroup",
+      "contentThemes": ["horseshow"],
+      "scene": ["main_scene", "main_scene_light"],
+      "primNamePattern": "video_360_*",
+      "trigger": { "type": "proximity", "radiusMeters": 3, "activation": "always" },
+      "position": { "type": "xform", "positionOffset": [0, 50, 0] },
+      "iconConfig": {
+        "iconId": "vr",
+        "iconName": "VR",
+        "iconImage": "vr_avatar.svg",
+        "mediaType": "video360",
+        "iconAsset": "interaction_icons/vr.usd",
+        "videosDir": "nucleus/videos/",
+        "i18nKeyPattern": "interactions.{id}"
+      }
+    },
+    {
+      "_comment": "POI coins (round signs). Prims coin_* in coins_layer (exit: coin_exit_point_* above floor exit_point_*). USD Edit Show Markers hides coin prims via iconGroup. See coins_loader.py.",
+      "id": "coin_pois",
+      "interactionType": "iconGroup",
+      "scene": ["main_scene", "main_scene_light"],
+      "primNamePattern": "coin_*",
+      "trigger": { "type": "proximity", "radiusMeters": 3, "maxVerticalMeters": 1.5, "activation": "always" },
+      "position": { "type": "xform", "positionOffset": [0, 80, 0] },
+      "approach": { "distanceMeters": 2.0 },
+      "iconConfig": {
+        "kind": "coin"
+      }
+    },
+    {
+      "id": "video_trigger_01_card",
+      "label": "Watch Video",
+      "interactionType": "object",
+      "category": "interactive",
+      "scene": [],
+      "position": { "type": "xform", "primName": "video_trigger_01", "positionOffset": [0, -25, 0] },
+      "trigger": { "type": "proximity", "radiusMeters": 10, "activation": "always" },
+      "behaviors": [
+        {
+          "type": "projectable",
+          "ui": {
+            "title": "Welcome to the Arena",
+            "style": "videoTrigger",
+            "action": "video.open",
+            "actionPayload": {
+              "videoId": "test_video_01",
+              "title": "Welcome to the Arena",
+              "description": "A short introduction to the venue and its facilities.",
+              "source": "test_video.mp4"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "map_marker_stadium_entrance",
+      "label": "Entrance",
+      "interactionType": "area",
+      "category": "mapMarker",
+      "scene": ["main_scene", "main_scene_light"],
+      "position": { "type": "xform", "primName": "PlayerSpawnPoint_Entrance", "positionOffset": [0, 300, 0] },
+      "trigger": { "type": "proximity", "activation": "always" },
+      "behaviors": [
+        {
+          "type": "projectable",
+          "ui": {
+            "title": "Entrance",
+            "titleI18nKey": "interactions.map_marker_stadium_entrance.title",
+            "style": "mapMarker",
+            "icon": "Entrance.svg",
+            "spawnPoint": "PlayerSpawnPoint_Entrance",
+            "is_accessible": true,
+            "markerVariant": "entrance"
+          }
+        }
+      ]
+    },
+    {
+      "id": "map_marker_foyer",
+      "label": "Foyer",
+      "interactionType": "area",
+      "category": "mapMarker",
+      "scene": ["main_scene", "main_scene_light"],
+      "position": { "type": "xform", "primName": "PlayerSpawnPoint_Foyer", "positionOffset": [0, 300, 0] },
+      "trigger": { "type": "proximity", "activation": "always" },
+      "behaviors": [
+        {
+          "type": "projectable",
+          "ui": {
+            "title": "Foyer",
+            "titleI18nKey": "interactions.map_marker_foyer.title",
+            "style": "mapMarker",
+            "icon": "arena.svg",
+            "spawnPoint": "PlayerSpawnPoint_Foyer",
+            "is_accessible": true,
+            "markerVariant": "findSeat"
+          }
+        }
+      ]
+    },
+    {
+      "id": "map_marker_arena",
+      "label": "Find my seat",
+      "interactionType": "area",
+      "category": "mapMarker",
+      "scene": ["main_scene", "main_scene_light"],
+      "position": { "type": "xform", "primName": "PlayerSpawnPoint_Arena", "positionOffset": [0, 300, 0] },
+      "trigger": { "type": "proximity", "activation": "always" },
+      "behaviors": [
+        {
+          "type": "projectable",
+          "ui": {
+            "title": "Find my seat",
+            "titleI18nKey": "search.findSeat",
+            "style": "mapMarker",
+            "icon": "Find seat.svg",
+            "spawnPoint": "PlayerSpawnPoint_Arena",
+            "markerVariant": "findSeat"
+          }
+        }
+      ]
+    },
+    {
+      "id": "map_marker_red",
+      "label": "Red",
+      "interactionType": "area",
+      "category": "mapMarker",
+      "scene": ["main_scene", "main_scene_light"],
+      "position": { "type": "xform", "primPath": "/World/Red", "positionOffset": [0, 170, 0] },
+      "trigger": { "type": "proximity", "activation": "always" },
+      "behaviors": [
+        {
+          "type": "projectable",
+          "ui": {
+            "title": "Red",
+            "style": "mapMarker",
+            "markerVariant": "pinOnly",
+            "icon": "Pin_scandinavium.svg",
+            "spawnPoint": "PlayerSpawnPoint_Red",
+            "routingPrimPath": "/World/Red/PlayerSpawnPoint_Red",
+            "is_accessible": true
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,38 @@
+#usda 1.0
+(
+    customLayerData = {
+        string description = "Seated people layer. Sourced from `Instances/seated_people.usda`, which is a single UsdGeomPointInstancer whose positions are read from the seat instancer (Assets/Seats/seats_instanced.usda) at generation time, so composer-time seat overrides flow through on regen. Prototypes reference the baked `.usdc` meshes directly (NOT the `instanceable=true` wrappers — those break GeomSubset material binding when used as a PointInstancer prototype and cause every character to render as fallback red). Crowd density is exposed via the `crowd_density` USD VariantSet on the composed `seated_people` prim (variants: none / sparse / medium / dense / full — driven at runtime by `younite.people_toggle_extension`); each variant only flips the inner instancer's `invisibleIds` array. NavMesh exclusion via NavMeshExcludeAPI on the payload root."
+    }
+)
+
+over "World"
+{
+    over "Skandinavium"
+    {
+        def "seated_people" (
+            prepend apiSchemas = ["NavMeshExcludeAPI"]
+            prepend payload = @../../Instances/seated_people.usda@
+        )
+        {
+            # Same transform stack as `seats_instanced` (defined in
+            # Assets/Skandinavium/scandinavium_project_overrides.usda) so the
+            # people land exactly on the seats. Brings mm/Z-up authoring
+            # space into the scene's cm/Y-up space and re-anchors via pivot.
+            double xformOp:rotateX:unitsResolve = -90
+            float3 xformOp:rotateXYZ = (0, 0, 0)
+            float3 xformOp:scale = (1, 1, 1)
+            double3 xformOp:scale:unitsResolve = (0.1, 0.1, 0.1)
+            double3 xformOp:translate = (-117075.48014147727, -80227.20119547844, -16920.547191656187)
+            double3 xformOp:translate:pivot = (116887.50174175948, 81818.1012191847, 17155.2002556324)
+            uniform token[] xformOpOrder = [
+                "xformOp:translate",
+                "xformOp:translate:pivot",
+                "xformOp:rotateXYZ",
+                "xformOp:scale",
+                "xformOp:rotateX:unitsResolve",
+                "xformOp:scale:unitsResolve",
+                "!invert!xformOp:translate:pivot"
+            ]
+        }
+    }
+}

@@ -1,0 +1,1847 @@
+#usda 1.0
+(
+    defaultPrim = "World"
+)
+
+over "World"
+{
+    over "Skandinavium_lights"
+    {
+        over "L_Extension_Ceiling_Downlight0"
+        {
+            float inputs:colorTemperature = 4500
+            float inputs:exposure = 15
+            float inputs:intensity = 200
+            float inputs:radius = 6
+            matrix4d xformOp:transform = ( (0, -3.3306690738754696e-16, 1, 0), (1, 0, 0, 0), (0, 0.9999999999999999, 2.2204460492503128e-16, 0), (-6612.861653805658, 1810.000000000009, 548.327707921964, 1) )
+        }
+
+        over "L_Extension_Ceiling_Downlight1"
+        {
+            float inputs:colorTemperature = 4500
+            float inputs:exposure = 15
+            float inputs:intensity = 200
+            float inputs:radius = 6
+            matrix4d xformOp:transform = ( (0, -3.3306690738754696e-16, 1, 0), (1, 0, 0, 0), (0, 0.9999999999999999, 2.2204460492503128e-16, 0), (-6282.593580948774, 1810.000000000009, 192.94634243741265, 1) )
+        }
+
+        over "L_Extension_Ceiling_Downlight2"
+        {
+            float inputs:colorTemperature = 4500
+            float inputs:exposure = 15
+            float inputs:intensity = 200
+            float inputs:radius = 6
+            matrix4d xformOp:transform = ( (0, -3.3306690738754696e-16, 1, 0), (1, 0, 0, 0), (0, 0.9999999999999999, 2.2204460492503128e-16, 0), (-6286.725705348197, 1810.000000000009, 197.65807094378997, 1) )
+        }
+
+        over "L_Extension_Ceiling_Downlight3"
+        {
+            float inputs:colorTemperature = 4500
+            float inputs:exposure = 15
+            float inputs:intensity = 200
+            float inputs:radius = 6
+            matrix4d xformOp:transform = ( (0, -3.3306690738754696e-16, 1, 0), (1, 0, 0, 0), (0, 0.9999999999999999, 2.2204460492503128e-16, 0), (-6462.865699043218, 1810.0000000000086, 925.547897083247, 1) )
+        }
+
+        over "L_Extension_Ceiling_Downlight5"
+        {
+            float inputs:colorTemperature = 4500
+            float inputs:exposure = 15
+            float inputs:intensity = 200
+            float inputs:radius = 6
+            matrix4d xformOp:transform = ( (0, -3.3306690738754696e-16, 1, 0), (1, 0, 0, 0), (0, 0.9999999999999999, 2.2204460492503128e-16, 0), (-6138.612845022047, 1810.0000000000086, -219.08510849472512, 1) )
+        }
+
+        over "L_Extension_Ceiling_Downlight4"
+        {
+            float inputs:colorTemperature = 4500
+            float inputs:exposure = 15
+            float inputs:intensity = 200
+            float inputs:radius = 6
+            matrix4d xformOp:transform = ( (0, -3.3306690738754696e-16, 1, 0), (1, 0, 0, 0), (0, 0.9999999999999999, 2.2204460492503128e-16, 0), (-6197.780079276587, 1810.000000000009, -826.6924933586967, 1) )
+        }
+
+        def SphereLight "L_Extension_Ceiling_Downlight0_01" (
+            prepend apiSchemas = ["ShapingAPI"]
+        )
+        {
+            color3f inputs:color = (1, 1, 1)
+            float inputs:colorTemperature = 4500
+            bool inputs:enableColorTemperature = 1
+            float inputs:exposure = 15
+            float inputs:intensity = 200
+            float inputs:radius = 6
+            float inputs:shaping:cone:angle = 65
+            float inputs:shaping:cone:softness = 1
+            bool treatAsPoint = 0
+            token visibility = "inherited"
+            matrix4d xformOp:transform = ( (0, -3.3306690738754696e-16, 1, 0), (1, 0, 0, 0), (0, 0.9999999999999999, 2.2204460492503128e-16, 0), (-6511.2633313706265, 1810.0000000000086, 1220.6088906661375, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+
+        def SphereLight "L_Extension_Ceiling_Downlight0_02" (
+            prepend apiSchemas = ["ShapingAPI"]
+        )
+        {
+            color3f inputs:color = (1, 1, 1)
+            float inputs:colorTemperature = 4500
+            bool inputs:enableColorTemperature = 1
+            float inputs:exposure = 15
+            float inputs:intensity = 200
+            float inputs:radius = 6
+            float inputs:shaping:cone:angle = 65
+            float inputs:shaping:cone:softness = 1
+            bool treatAsPoint = 0
+            token visibility = "inherited"
+            matrix4d xformOp:transform = ( (0, -3.3306690738754696e-16, 1, 0), (1, 0, 0, 0), (0, 0.9999999999999999, 2.2204460492503128e-16, 0), (-6344.548194330826, 1810.000000000009, 1461.8288179762337, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+
+        def SphereLight "L_Extension_Ceiling_Downlight0_03" (
+            prepend apiSchemas = ["ShapingAPI"]
+        )
+        {
+            color3f inputs:color = (1, 1, 1)
+            float inputs:colorTemperature = 4500
+            bool inputs:enableColorTemperature = 1
+            float inputs:exposure = 15
+            float inputs:intensity = 200
+            float inputs:radius = 6
+            float inputs:shaping:cone:angle = 65
+            float inputs:shaping:cone:softness = 1
+            bool treatAsPoint = 0
+            token visibility = "inherited"
+            matrix4d xformOp:transform = ( (0, -3.3306690738754696e-16, 1, 0), (1, 0, 0, 0), (0, 0.9999999999999999, 2.2204460492503128e-16, 0), (-6347.869329862753, 1810.000000000009, 1782.4029913809445, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+
+        def SphereLight "L_Extension_Ceiling_Downlight0_04" (
+            prepend apiSchemas = ["ShapingAPI"]
+        )
+        {
+            color3f inputs:color = (1, 1, 1)
+            float inputs:colorTemperature = 4500
+            bool inputs:enableColorTemperature = 1
+            float inputs:exposure = 15
+            float inputs:intensity = 200
+            float inputs:radius = 6
+            float inputs:shaping:cone:angle = 65
+            float inputs:shaping:cone:softness = 1
+            bool treatAsPoint = 0
+            token visibility = "inherited"
+            matrix4d xformOp:transform = ( (0, -3.3306690738754696e-16, 1, 0), (1, 0, 0, 0), (0, 0.9999999999999999, 2.2204460492503128e-16, 0), (-5993.475673354279, 1810.000000000009, 1749.1261895855403, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+
+        def SphereLight "L_Extension_Ceiling_Downlight0_05" (
+            prepend apiSchemas = ["ShapingAPI"]
+        )
+        {
+            color3f inputs:color = (1, 1, 1)
+            float inputs:colorTemperature = 4500
+            bool inputs:enableColorTemperature = 1
+            float inputs:exposure = 15
+            float inputs:intensity = 200
+            float inputs:radius = 6
+            float inputs:shaping:cone:angle = 65
+            float inputs:shaping:cone:softness = 1
+            bool treatAsPoint = 0
+            token visibility = "inherited"
+            matrix4d xformOp:transform = ( (0, -3.3306690738754696e-16, 1, 0), (1, 0, 0, 0), (0, 0.9999999999999999, 2.2204460492503128e-16, 0), (-6061.827782335745, 1810.0000000000086, 1415.3958426355073, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+
+        def SphereLight "L_Extension_Ceiling_Downlight0_06" (
+            prepend apiSchemas = ["ShapingAPI"]
+        )
+        {
+            color3f inputs:color = (1, 1, 1)
+            float inputs:colorTemperature = 4500
+            bool inputs:enableColorTemperature = 1
+            float inputs:exposure = 15
+            float inputs:intensity = 200
+            float inputs:radius = 6
+            float inputs:shaping:cone:angle = 65
+            float inputs:shaping:cone:softness = 1
+            bool treatAsPoint = 0
+            token visibility = "inherited"
+            matrix4d xformOp:transform = ( (0, -3.3306690738754696e-16, 1, 0), (1, 0, 0, 0), (0, 0.9999999999999999, 2.2204460492503128e-16, 0), (-6213.7175698642895, 1810.0000000000086, 1100.457876705861, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+
+        def SphereLight "L_Extension_Ceiling_Downlight0_07" (
+            prepend apiSchemas = ["ShapingAPI"]
+        )
+        {
+            color3f inputs:color = (1, 1, 1)
+            float inputs:colorTemperature = 4500
+            bool inputs:enableColorTemperature = 1
+            float inputs:exposure = 15
+            float inputs:intensity = 200
+            float inputs:radius = 6
+            float inputs:shaping:cone:angle = 65
+            float inputs:shaping:cone:softness = 1
+            bool treatAsPoint = 0
+            token visibility = "inherited"
+            matrix4d xformOp:transform = ( (0, -3.3306690738754696e-16, 1, 0), (1, 0, 0, 0), (0, 0.9999999999999999, 2.2204460492503128e-16, 0), (-6242.410904139254, 1810.000000000009, 779.0379511281061, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+
+        def SphereLight "L_Extension_Ceiling_Downlight0_08" (
+            prepend apiSchemas = ["ShapingAPI"]
+        )
+        {
+            color3f inputs:color = (1, 1, 1)
+            float inputs:colorTemperature = 4500
+            bool inputs:enableColorTemperature = 1
+            float inputs:exposure = 15
+            float inputs:intensity = 200
+            float inputs:radius = 6
+            float inputs:shaping:cone:angle = 65
+            float inputs:shaping:cone:softness = 1
+            bool treatAsPoint = 0
+            token visibility = "inherited"
+            matrix4d xformOp:transform = ( (0, -3.3306690738754696e-16, 1, 0), (1, 0, 0, 0), (0, 0.9999999999999999, 2.2204460492503128e-16, 0), (-6315.565409666309, 1810.000000000009, 511.18540017824193, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+
+        def SphereLight "L_Extension_Ceiling_Downlight0_09" (
+            prepend apiSchemas = ["ShapingAPI"]
+        )
+        {
+            color3f inputs:color = (1, 1, 1)
+            float inputs:colorTemperature = 4500
+            bool inputs:enableColorTemperature = 1
+            float inputs:exposure = 15
+            float inputs:intensity = 200
+            float inputs:radius = 6
+            float inputs:shaping:cone:angle = 65
+            float inputs:shaping:cone:softness = 1
+            bool treatAsPoint = 0
+            token visibility = "inherited"
+            matrix4d xformOp:transform = ( (0, -3.3306690738754696e-16, 1, 0), (1, 0, 0, 0), (0, 0.9999999999999999, 2.2204460492503128e-16, 0), (-6631.143325341032, 1810.000000000009, 118.44178746932968, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+
+        def SphereLight "L_Extension_Ceiling_Downlight0_10" (
+            prepend apiSchemas = ["ShapingAPI"]
+        )
+        {
+            color3f inputs:color = (1, 1, 1)
+            float inputs:colorTemperature = 4500
+            bool inputs:enableColorTemperature = 1
+            float inputs:exposure = 15
+            float inputs:intensity = 200
+            float inputs:radius = 6
+            float inputs:shaping:cone:angle = 65
+            float inputs:shaping:cone:softness = 1
+            bool treatAsPoint = 0
+            token visibility = "inherited"
+            matrix4d xformOp:transform = ( (0, -3.3306690738754696e-16, 1, 0), (1, 0, 0, 0), (0, 0.9999999999999999, 2.2204460492503128e-16, 0), (-6401.933859504807, 1810.0000000000086, -140.13685486558168, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+
+        def SphereLight "L_Extension_Ceiling_Downlight0_11" (
+            prepend apiSchemas = ["ShapingAPI"]
+        )
+        {
+            color3f inputs:color = (1, 1, 1)
+            float inputs:colorTemperature = 4500
+            bool inputs:enableColorTemperature = 1
+            float inputs:exposure = 15
+            float inputs:intensity = 200
+            float inputs:radius = 6
+            float inputs:shaping:cone:angle = 65
+            float inputs:shaping:cone:softness = 1
+            bool treatAsPoint = 0
+            token visibility = "inherited"
+            matrix4d xformOp:transform = ( (0, -3.3306690738754696e-16, 1, 0), (1, 0, 0, 0), (0, 0.9999999999999999, 2.2204460492503128e-16, 0), (-6646.309080915669, 1810.000000000009, -536.8423217889017, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+
+        def SphereLight "L_Extension_Ceiling_Downlight0_12" (
+            prepend apiSchemas = ["ShapingAPI"]
+        )
+        {
+            color3f inputs:color = (1, 1, 1)
+            float inputs:colorTemperature = 4500
+            bool inputs:enableColorTemperature = 1
+            float inputs:exposure = 15
+            float inputs:intensity = 200
+            float inputs:radius = 6
+            float inputs:shaping:cone:angle = 65
+            float inputs:shaping:cone:softness = 1
+            bool treatAsPoint = 0
+            token visibility = "inherited"
+            matrix4d xformOp:transform = ( (0, -3.3306690738754696e-16, 1, 0), (1, 0, 0, 0), (0, 0.9999999999999999, 2.2204460492503128e-16, 0), (-6485.166435532085, 1810.000000000009, -779.0902176132336, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+
+        def SphereLight "L_Extension_Ceiling_Downlight0_13" (
+            prepend apiSchemas = ["ShapingAPI"]
+        )
+        {
+            color3f inputs:color = (1, 1, 1)
+            float inputs:colorTemperature = 4500
+            bool inputs:enableColorTemperature = 1
+            float inputs:exposure = 15
+            float inputs:intensity = 200
+            float inputs:radius = 6
+            float inputs:shaping:cone:angle = 65
+            float inputs:shaping:cone:softness = 1
+            bool treatAsPoint = 0
+            token visibility = "inherited"
+            matrix4d xformOp:transform = ( (0, -3.3306690738754696e-16, 1, 0), (1, 0, 0, 0), (0, 0.9999999999999999, 2.2204460492503128e-16, 0), (-6532.67522683245, 1810.000000000009, -1105.1326533013023, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+
+        def SphereLight "L_Extension_Ceiling_Downlight0_14" (
+            prepend apiSchemas = ["ShapingAPI"]
+        )
+        {
+            color3f inputs:color = (1, 1, 1)
+            float inputs:colorTemperature = 4500
+            bool inputs:enableColorTemperature = 1
+            float inputs:exposure = 15
+            float inputs:intensity = 200
+            float inputs:radius = 6
+            float inputs:shaping:cone:angle = 65
+            float inputs:shaping:cone:softness = 1
+            bool treatAsPoint = 0
+            token visibility = "inherited"
+            matrix4d xformOp:transform = ( (0, -3.3306690738754696e-16, 1, 0), (1, 0, 0, 0), (0, 0.9999999999999999, 2.2204460492503128e-16, 0), (-6196.60002816595, 1810.000000000009, -828.0547294918301, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+
+        def SphereLight "L_Extension_Ceiling_Downlight0_15" (
+            prepend apiSchemas = ["ShapingAPI"]
+        )
+        {
+            color3f inputs:color = (1, 1, 1)
+            float inputs:colorTemperature = 4500
+            bool inputs:enableColorTemperature = 1
+            float inputs:exposure = 15
+            float inputs:intensity = 200
+            float inputs:radius = 6
+            float inputs:shaping:cone:angle = 65
+            float inputs:shaping:cone:softness = 1
+            bool treatAsPoint = 0
+            token visibility = "inherited"
+            matrix4d xformOp:transform = ( (0, -3.3306690738754696e-16, 1, 0), (1, 0, 0, 0), (0, 0.9999999999999999, 2.2204460492503128e-16, 0), (-6101.841032349944, 1810.000000000009, -1076.3649562525059, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+
+        def SphereLight "L_Extension_Ceiling_Downlight0_16" (
+            prepend apiSchemas = ["ShapingAPI"]
+        )
+        {
+            color3f inputs:color = (1, 1, 1)
+            float inputs:colorTemperature = 4500
+            bool inputs:enableColorTemperature = 1
+            float inputs:exposure = 15
+            float inputs:intensity = 200
+            float inputs:radius = 6
+            float inputs:shaping:cone:angle = 65
+            float inputs:shaping:cone:softness = 1
+            bool treatAsPoint = 0
+            token visibility = "inherited"
+            matrix4d xformOp:transform = ( (0, -3.3306690738754696e-16, 1, 0), (1, 0, 0, 0), (0, 0.9999999999999999, 2.2204460492503128e-16, 0), (-6848.086503446341, 1810.000000000009, -1239.404284317529, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+
+        def SphereLight "L_Extension_Ceiling_Downlight0_17" (
+            prepend apiSchemas = ["ShapingAPI"]
+        )
+        {
+            color3f inputs:color = (1, 1, 1)
+            float inputs:colorTemperature = 4500
+            bool inputs:enableColorTemperature = 1
+            float inputs:exposure = 15
+            float inputs:intensity = 200
+            float inputs:radius = 6
+            float inputs:shaping:cone:angle = 65
+            float inputs:shaping:cone:softness = 1
+            bool treatAsPoint = 0
+            token visibility = "inherited"
+            matrix4d xformOp:transform = ( (0, -3.3306690738754696e-16, 1, 0), (1, 0, 0, 0), (0, 0.9999999999999999, 2.2204460492503128e-16, 0), (-6884.25993702363, 1810.000000000009, -1003.0097531012777, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+
+        def SphereLight "L_Extension_Ceiling_Downlight0_18" (
+            prepend apiSchemas = ["ShapingAPI"]
+        )
+        {
+            color3f inputs:color = (1, 1, 1)
+            float inputs:colorTemperature = 4500
+            bool inputs:enableColorTemperature = 1
+            float inputs:exposure = 15
+            float inputs:intensity = 200
+            float inputs:radius = 6
+            float inputs:shaping:cone:angle = 65
+            float inputs:shaping:cone:softness = 1
+            bool treatAsPoint = 0
+            token visibility = "inherited"
+            matrix4d xformOp:transform = ( (0, -3.3306690738754696e-16, 1, 0), (1, 0, 0, 0), (0, 0.9999999999999999, 2.2204460492503128e-16, 0), (-6932.667184988262, 1810.000000000009, -758.4644969239966, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+
+        def SphereLight "L_Extension_Ceiling_Downlight0_19" (
+            prepend apiSchemas = ["ShapingAPI"]
+        )
+        {
+            color3f inputs:color = (1, 1, 1)
+            float inputs:colorTemperature = 4500
+            bool inputs:enableColorTemperature = 1
+            float inputs:exposure = 15
+            float inputs:intensity = 200
+            float inputs:radius = 6
+            float inputs:shaping:cone:angle = 65
+            float inputs:shaping:cone:softness = 1
+            bool treatAsPoint = 0
+            token visibility = "inherited"
+            matrix4d xformOp:transform = ( (0, -3.3306690738754696e-16, 1, 0), (1, 0, 0, 0), (0, 0.9999999999999999, 2.2204460492503128e-16, 0), (-6993.8650751847335, 1810.0000000000086, -358.5343511305273, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+
+        def SphereLight "L_Extension_Ceiling_Downlight0_20" (
+            prepend apiSchemas = ["ShapingAPI"]
+        )
+        {
+            color3f inputs:color = (1, 1, 1)
+            float inputs:colorTemperature = 4500
+            bool inputs:enableColorTemperature = 1
+            float inputs:exposure = 15
+            float inputs:intensity = 200
+            float inputs:radius = 6
+            float inputs:shaping:cone:angle = 65
+            float inputs:shaping:cone:softness = 1
+            bool treatAsPoint = 0
+            token visibility = "inherited"
+            matrix4d xformOp:transform = ( (0, -3.3306690738754696e-16, 1, 0), (1, 0, 0, 0), (0, 0.9999999999999999, 2.2204460492503128e-16, 0), (-7033.238995045752, 1810.000000000009, -101.22454094067203, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+
+        def SphereLight "L_Extension_Ceiling_Downlight0_21" (
+            prepend apiSchemas = ["ShapingAPI"]
+        )
+        {
+            color3f inputs:color = (1, 1, 1)
+            float inputs:colorTemperature = 4500
+            bool inputs:enableColorTemperature = 1
+            float inputs:exposure = 15
+            float inputs:intensity = 200
+            float inputs:radius = 6
+            float inputs:shaping:cone:angle = 65
+            float inputs:shaping:cone:softness = 1
+            bool treatAsPoint = 0
+            token visibility = "inherited"
+            matrix4d xformOp:transform = ( (0, -3.3306690738754696e-16, 1, 0), (1, 0, 0, 0), (0, 0.9999999999999999, 2.2204460492503128e-16, 0), (-7070.968081421497, 1810.000000000009, 145.33623045956458, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+
+        def SphereLight "L_Extension_Ceiling_Downlight0_22" (
+            prepend apiSchemas = ["ShapingAPI"]
+        )
+        {
+            color3f inputs:color = (1, 1, 1)
+            float inputs:colorTemperature = 4500
+            bool inputs:enableColorTemperature = 1
+            float inputs:exposure = 15
+            float inputs:intensity = 200
+            float inputs:radius = 6
+            float inputs:shaping:cone:angle = 65
+            float inputs:shaping:cone:softness = 1
+            bool treatAsPoint = 0
+            token visibility = "inherited"
+            matrix4d xformOp:transform = ( (0, -3.3306690738754696e-16, 1, 0), (1, 0, 0, 0), (0, 0.9999999999999999, 2.2204460492503128e-16, 0), (-7102.13488494324, 1810.000000000009, 349.01227609369107, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+
+        def SphereLight "L_Extension_Ceiling_Downlight0_23" (
+            prepend apiSchemas = ["ShapingAPI"]
+        )
+        {
+            color3f inputs:color = (1, 1, 1)
+            float inputs:colorTemperature = 4500
+            bool inputs:enableColorTemperature = 1
+            float inputs:exposure = 15
+            float inputs:intensity = 200
+            float inputs:radius = 6
+            float inputs:shaping:cone:angle = 65
+            float inputs:shaping:cone:softness = 1
+            bool treatAsPoint = 0
+            token visibility = "inherited"
+            matrix4d xformOp:transform = ( (0, -3.3306690738754696e-16, 1, 0), (1, 0, 0, 0), (0, 0.9999999999999999, 2.2204460492503128e-16, 0), (-6952.037840002197, 1810.000000000009, 549.8080108559861, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+
+        def SphereLight "L_Extension_Ceiling_Downlight0_24" (
+            prepend apiSchemas = ["ShapingAPI"]
+        )
+        {
+            color3f inputs:color = (1, 1, 1)
+            float inputs:colorTemperature = 4500
+            bool inputs:enableColorTemperature = 1
+            float inputs:exposure = 15
+            float inputs:intensity = 200
+            float inputs:radius = 6
+            float inputs:shaping:cone:angle = 65
+            float inputs:shaping:cone:softness = 1
+            bool treatAsPoint = 0
+            token visibility = "inherited"
+            matrix4d xformOp:transform = ( (0, -3.3306690738754696e-16, 1, 0), (1, 0, 0, 0), (0, 0.9999999999999999, 2.2204460492503128e-16, 0), (-6991.213744755171, 1810.000000000009, 805.8237860592828, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+
+        def SphereLight "L_Extension_Ceiling_Downlight0_25" (
+            prepend apiSchemas = ["ShapingAPI"]
+        )
+        {
+            color3f inputs:color = (1, 1, 1)
+            float inputs:colorTemperature = 4500
+            bool inputs:enableColorTemperature = 1
+            float inputs:exposure = 15
+            float inputs:intensity = 200
+            float inputs:radius = 6
+            float inputs:shaping:cone:angle = 65
+            float inputs:shaping:cone:softness = 1
+            bool treatAsPoint = 0
+            token visibility = "inherited"
+            matrix4d xformOp:transform = ( (0, -3.3306690738754696e-16, 1, 0), (1, 0, 0, 0), (0, 0.9999999999999999, 2.2204460492503128e-16, 0), (-7031.054837615127, 1810.0000000000086, 1066.1865865561972, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+
+        def SphereLight "L_Extension_Ceiling_Downlight0_26" (
+            prepend apiSchemas = ["ShapingAPI"]
+        )
+        {
+            color3f inputs:color = (1, 1, 1)
+            float inputs:colorTemperature = 4500
+            bool inputs:enableColorTemperature = 1
+            float inputs:exposure = 15
+            float inputs:intensity = 200
+            float inputs:radius = 6
+            float inputs:shaping:cone:angle = 65
+            float inputs:shaping:cone:softness = 1
+            bool treatAsPoint = 0
+            token visibility = "inherited"
+            matrix4d xformOp:transform = ( (0, -3.3306690738754696e-16, 1, 0), (1, 0, 0, 0), (0, 0.9999999999999999, 2.2204460492503128e-16, 0), (-6993.751482512914, 1810.0000000000086, 1278.2384926892819, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+
+        def SphereLight "L_Extension_Ceiling_Downlight0_27" (
+            prepend apiSchemas = ["ShapingAPI"]
+        )
+        {
+            color3f inputs:color = (1, 1, 1)
+            float inputs:colorTemperature = 4500
+            bool inputs:enableColorTemperature = 1
+            float inputs:exposure = 15
+            float inputs:intensity = 200
+            float inputs:radius = 6
+            float inputs:shaping:cone:angle = 65
+            float inputs:shaping:cone:softness = 1
+            bool treatAsPoint = 0
+            token visibility = "inherited"
+            matrix4d xformOp:transform = ( (0, -3.3306690738754696e-16, 1, 0), (1, 0, 0, 0), (0, 0.9999999999999999, 2.2204460492503128e-16, 0), (-6814.534890541158, 1810.000000000009, 1455.4102939445143, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+
+        def SphereLight "L_Extension_Ceiling_Downlight0_28" (
+            prepend apiSchemas = ["ShapingAPI"]
+        )
+        {
+            color3f inputs:color = (1, 1, 1)
+            float inputs:colorTemperature = 4500
+            bool inputs:enableColorTemperature = 1
+            float inputs:exposure = 15
+            float inputs:intensity = 200
+            float inputs:radius = 6
+            float inputs:shaping:cone:angle = 65
+            float inputs:shaping:cone:softness = 1
+            bool treatAsPoint = 0
+            token visibility = "inherited"
+            matrix4d xformOp:transform = ( (0, -3.3306690738754696e-16, 1, 0), (1, 0, 0, 0), (0, 0.9999999999999999, 2.2204460492503128e-16, 0), (-6854.722300899176, 1810.000000000009, 1718.036290232111, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+
+        def SphereLight "L_Extension_Ceiling_Downlight0_29" (
+            prepend apiSchemas = ["ShapingAPI"]
+        )
+        {
+            color3f inputs:color = (1, 1, 1)
+            float inputs:colorTemperature = 4500
+            bool inputs:enableColorTemperature = 1
+            float inputs:exposure = 15
+            float inputs:intensity = 200
+            float inputs:radius = 6
+            float inputs:shaping:cone:angle = 65
+            float inputs:shaping:cone:softness = 1
+            bool treatAsPoint = 0
+            token visibility = "inherited"
+            matrix4d xformOp:transform = ( (0, -3.3306690738754696e-16, 1, 0), (1, 0, 0, 0), (0, 0.9999999999999999, 2.2204460492503128e-16, 0), (-6767.569841857305, 1810.000000000009, 1964.0862389366118, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+
+        def SphereLight "L_Extension_Ceiling_Downlight0_30" (
+            prepend apiSchemas = ["ShapingAPI"]
+        )
+        {
+            color3f inputs:color = (1, 1, 1)
+            float inputs:colorTemperature = 4500
+            bool inputs:enableColorTemperature = 1
+            float inputs:exposure = 15
+            float inputs:intensity = 200
+            float inputs:radius = 6
+            float inputs:shaping:cone:angle = 65
+            float inputs:shaping:cone:softness = 1
+            bool treatAsPoint = 0
+            token visibility = "inherited"
+            matrix4d xformOp:transform = ( (0, -3.3306690738754696e-16, 1, 0), (1, 0, 0, 0), (0, 0.9999999999999999, 2.2204460492503128e-16, 0), (-5554.781878144379, 1810.0000000000277, 1675.9046526833974, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+
+        def SphereLight "L_Extension_Ceiling_Downlight0_31" (
+            prepend apiSchemas = ["ShapingAPI"]
+        )
+        {
+            color3f inputs:color = (1, 1, 1)
+            float inputs:colorTemperature = 4500
+            bool inputs:enableColorTemperature = 1
+            float inputs:exposure = 15
+            float inputs:intensity = 200
+            float inputs:radius = 6
+            float inputs:shaping:cone:angle = 65
+            float inputs:shaping:cone:softness = 1
+            bool treatAsPoint = 0
+            token visibility = "inherited"
+            matrix4d xformOp:transform = ( (0, -3.3306690738754696e-16, 1, 0), (1, 0, 0, 0), (0, 0.9999999999999999, 2.2204460492503128e-16, 0), (-5515.647055712324, 1810.0000000000268, 1420.1573517452548, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+
+        def SphereLight "L_Extension_Ceiling_Downlight0_32" (
+            prepend apiSchemas = ["ShapingAPI"]
+        )
+        {
+            color3f inputs:color = (1, 1, 1)
+            float inputs:colorTemperature = 4500
+            bool inputs:enableColorTemperature = 1
+            float inputs:exposure = 15
+            float inputs:intensity = 200
+            float inputs:radius = 6
+            float inputs:shaping:cone:angle = 65
+            float inputs:shaping:cone:softness = 1
+            bool treatAsPoint = 0
+            token visibility = "inherited"
+            matrix4d xformOp:transform = ( (0, -3.3306690738754696e-16, 1, 0), (1, 0, 0, 0), (0, 0.9999999999999999, 2.2204460492503128e-16, 0), (-5471.737556378546, 1810.0000000000268, 1133.2073864130607, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+
+        def SphereLight "L_Extension_Ceiling_Downlight0_33" (
+            prepend apiSchemas = ["ShapingAPI"]
+        )
+        {
+            color3f inputs:color = (1, 1, 1)
+            float inputs:colorTemperature = 4500
+            bool inputs:enableColorTemperature = 1
+            float inputs:exposure = 15
+            float inputs:intensity = 200
+            float inputs:radius = 6
+            float inputs:shaping:cone:angle = 65
+            float inputs:shaping:cone:softness = 1
+            bool treatAsPoint = 0
+            token visibility = "inherited"
+            matrix4d xformOp:transform = ( (0, -3.3306690738754696e-16, 1, 0), (1, 0, 0, 0), (0, 0.9999999999999999, 2.2204460492503128e-16, 0), (-5552.145851932505, 1810.0000000000268, 884.2532798794832, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+
+        def SphereLight "L_Extension_Ceiling_Downlight0_34" (
+            prepend apiSchemas = ["ShapingAPI"]
+        )
+        {
+            color3f inputs:color = (1, 1, 1)
+            float inputs:colorTemperature = 4500
+            bool inputs:enableColorTemperature = 1
+            float inputs:exposure = 15
+            float inputs:intensity = 200
+            float inputs:radius = 6
+            float inputs:shaping:cone:angle = 65
+            float inputs:shaping:cone:softness = 1
+            bool treatAsPoint = 0
+            token visibility = "inherited"
+            matrix4d xformOp:transform = ( (0, -3.3306690738754696e-16, 1, 0), (1, 0, 0, 0), (0, 0.9999999999999999, 2.2204460492503128e-16, 0), (-5611.214691972326, 1810.0000000000273, 662.2542569113901, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+
+        def SphereLight "L_Extension_Ceiling_Downlight0_35" (
+            prepend apiSchemas = ["ShapingAPI"]
+        )
+        {
+            color3f inputs:color = (1, 1, 1)
+            float inputs:colorTemperature = 4500
+            bool inputs:enableColorTemperature = 1
+            float inputs:exposure = 15
+            float inputs:intensity = 200
+            float inputs:radius = 6
+            float inputs:shaping:cone:angle = 65
+            float inputs:shaping:cone:softness = 1
+            bool treatAsPoint = 0
+            token visibility = "inherited"
+            matrix4d xformOp:transform = ( (0, -3.3306690738754696e-16, 1, 0), (1, 0, 0, 0), (0, 0.9999999999999999, 2.2204460492503128e-16, 0), (-5572.835650595092, 1810.0000000000273, 411.4460090431005, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+
+        def SphereLight "L_Extension_Ceiling_Downlight0_36" (
+            prepend apiSchemas = ["ShapingAPI"]
+        )
+        {
+            color3f inputs:color = (1, 1, 1)
+            float inputs:colorTemperature = 4500
+            bool inputs:enableColorTemperature = 1
+            float inputs:exposure = 15
+            float inputs:intensity = 200
+            float inputs:radius = 6
+            float inputs:shaping:cone:angle = 65
+            float inputs:shaping:cone:softness = 1
+            bool treatAsPoint = 0
+            token visibility = "inherited"
+            matrix4d xformOp:transform = ( (0, -3.3306690738754696e-16, 1, 0), (1, 0, 0, 0), (0, 0.9999999999999999, 2.2204460492503128e-16, 0), (-5811.405738497733, 1810.0000000000268, 1374.8999297076123, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+
+        def SphereLight "L_Extension_Ceiling_Downlight0_37" (
+            prepend apiSchemas = ["ShapingAPI"]
+        )
+        {
+            color3f inputs:color = (1, 1, 1)
+            float inputs:colorTemperature = 4500
+            bool inputs:enableColorTemperature = 1
+            float inputs:exposure = 15
+            float inputs:intensity = 200
+            float inputs:radius = 6
+            float inputs:shaping:cone:angle = 65
+            float inputs:shaping:cone:softness = 1
+            bool treatAsPoint = 0
+            token visibility = "inherited"
+            matrix4d xformOp:transform = ( (0, -3.3306690738754696e-16, 1, 0), (1, 0, 0, 0), (0, 0.9999999999999999, 2.2204460492503128e-16, 0), (-5819.12675853342, 1810.0000000000268, 1080.0493875162003, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+
+        def SphereLight "L_Extension_Ceiling_Downlight0_38" (
+            prepend apiSchemas = ["ShapingAPI"]
+        )
+        {
+            color3f inputs:color = (1, 1, 1)
+            float inputs:colorTemperature = 4500
+            bool inputs:enableColorTemperature = 1
+            float inputs:exposure = 15
+            float inputs:intensity = 200
+            float inputs:radius = 6
+            float inputs:shaping:cone:angle = 65
+            float inputs:shaping:cone:softness = 1
+            bool treatAsPoint = 0
+            token visibility = "inherited"
+            matrix4d xformOp:transform = ( (0, -3.3306690738754696e-16, 1, 0), (1, 0, 0, 0), (0, 0.9999999999999999, 2.2204460492503128e-16, 0), (-5899.535054087481, 1810.0000000000273, 831.0952809826082, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+
+        def SphereLight "L_Extension_Ceiling_Downlight0_39" (
+            prepend apiSchemas = ["ShapingAPI"]
+        )
+        {
+            color3f inputs:color = (1, 1, 1)
+            float inputs:colorTemperature = 4500
+            bool inputs:enableColorTemperature = 1
+            float inputs:exposure = 15
+            float inputs:intensity = 200
+            float inputs:radius = 6
+            float inputs:shaping:cone:angle = 65
+            float inputs:shaping:cone:softness = 1
+            bool treatAsPoint = 0
+            token visibility = "inherited"
+            matrix4d xformOp:transform = ( (0, -3.3306690738754696e-16, 1, 0), (1, 0, 0, 0), (0, 0.9999999999999999, 2.2204460492503128e-16, 0), (-5958.60389412729, 1810.0000000000273, 609.0962580145164, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+
+        def SphereLight "L_Extension_Ceiling_Downlight0_40" (
+            prepend apiSchemas = ["ShapingAPI"]
+        )
+        {
+            color3f inputs:color = (1, 1, 1)
+            float inputs:colorTemperature = 4500
+            bool inputs:enableColorTemperature = 1
+            float inputs:exposure = 15
+            float inputs:intensity = 200
+            float inputs:radius = 6
+            float inputs:shaping:cone:angle = 65
+            float inputs:shaping:cone:softness = 1
+            bool treatAsPoint = 0
+            token visibility = "inherited"
+            matrix4d xformOp:transform = ( (0, -3.3306690738754696e-16, 1, 0), (1, 0, 0, 0), (0, 0.9999999999999999, 2.2204460492503128e-16, 0), (-5920.224852750063, 1810.0000000000273, 358.28801014622434, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+
+        def SphereLight "L_Extension_Ceiling_Downlight0_41" (
+            prepend apiSchemas = ["ShapingAPI"]
+        )
+        {
+            color3f inputs:color = (1, 1, 1)
+            float inputs:colorTemperature = 4500
+            bool inputs:enableColorTemperature = 1
+            float inputs:exposure = 15
+            float inputs:intensity = 200
+            float inputs:radius = 6
+            float inputs:shaping:cone:angle = 65
+            float inputs:shaping:cone:softness = 1
+            bool treatAsPoint = 0
+            token visibility = "inherited"
+            matrix4d xformOp:transform = ( (0.9884938948653184, -6.245004513516491e-16, 0.15126076759684967, 0), (0.15126076759685014, 2.2204460492503146e-16, -0.9884938948653215, 0), (5.689893001203932e-16, 1.0000000000000009, 3.3306690738754726e-16, 0), (-1394.7451696144271, 2246.9095105652495, 4873.825196068537, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+
+        def SphereLight "L_Extension_Ceiling_Downlight0_42" (
+            prepend apiSchemas = ["ShapingAPI"]
+        )
+        {
+            color3f inputs:color = (1, 1, 1)
+            float inputs:colorTemperature = 4500
+            bool inputs:enableColorTemperature = 1
+            float inputs:exposure = 15
+            float inputs:intensity = 200
+            float inputs:radius = 6
+            float inputs:shaping:cone:angle = 65
+            float inputs:shaping:cone:softness = 1
+            bool treatAsPoint = 0
+            token visibility = "inherited"
+            matrix4d xformOp:transform = ( (0.9884938948653172, -8.187894806610501e-16, 0.15126076759684967, 0), (0.15126076759685025, 1.110223024625157e-15, -0.988493894865321, 0), (6.522560269672809e-16, 1.0000000000000022, 1.221245327087675e-15, 0), (-1494.479806746002, 2442.5206571314893, 4336.788967194713, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+
+        def SphereLight "L_Extension_Ceiling_Downlight0_43" (
+            prepend apiSchemas = ["ShapingAPI"]
+        )
+        {
+            color3f inputs:color = (1, 1, 1)
+            float inputs:colorTemperature = 4500
+            bool inputs:enableColorTemperature = 1
+            float inputs:exposure = 15
+            float inputs:intensity = 200
+            float inputs:radius = 6
+            float inputs:shaping:cone:angle = 65
+            float inputs:shaping:cone:softness = 1
+            bool treatAsPoint = 0
+            token visibility = "inherited"
+            matrix4d xformOp:transform = ( (0.9884938948653162, -1.6792123247455418e-15, 0.1512607675968498, 0), (0.15126076759685003, 6.66133814775092e-16, -0.9884938948653177, 0), (1.5681900222830372e-15, 1.0000000000000022, 8.881784197001272e-16, 0), (-1670.5139745614965, 2867.906323706055, 4903.574182748716, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+
+        def SphereLight "L_Extension_Ceiling_Downlight0_44" (
+            prepend apiSchemas = ["ShapingAPI"]
+        )
+        {
+            color3f inputs:color = (1, 1, 1)
+            float inputs:colorTemperature = 4500
+            bool inputs:enableColorTemperature = 1
+            float inputs:exposure = 15
+            float inputs:intensity = 200
+            float inputs:radius = 6
+            float inputs:shaping:cone:angle = 65
+            float inputs:shaping:cone:softness = 1
+            bool treatAsPoint = 0
+            token visibility = "inherited"
+            matrix4d xformOp:transform = ( (0.9884938948653162, -1.8041124150158715e-15, 0.15126076759684973, 0), (0.15126076759684973, 6.66133814775091e-16, -0.9884938948653161, 0), (1.6930901125533675e-15, 1.0000000000000022, 9.99200722162643e-16, 0), (1473.3782575545974, 2873.799703520433, 4881.182318472215, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+
+        def SphereLight "L_Extension_Ceiling_Downlight0_45" (
+            prepend apiSchemas = ["ShapingAPI"]
+        )
+        {
+            color3f inputs:color = (1, 1, 1)
+            float inputs:colorTemperature = 4500
+            bool inputs:enableColorTemperature = 1
+            float inputs:exposure = 15
+            float inputs:intensity = 200
+            float inputs:radius = 6
+            float inputs:shaping:cone:angle = 65
+            float inputs:shaping:cone:softness = 1
+            bool treatAsPoint = 0
+            token visibility = "inherited"
+            matrix4d xformOp:transform = ( (0.9884938948653161, -2.1926904736346743e-15, 0.15126076759684973, 0), (0.15126076759684948, 6.661338147750898e-16, -0.9884938948653145, 0), (2.0539125955565443e-15, 1.0000000000000022, 9.99200722162643e-16, 0), (1391.0802494762816, 2557.91971744329, 4439.051196682464, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+
+        def SphereLight "L_Extension_Ceiling_Downlight0_46" (
+            prepend apiSchemas = ["ShapingAPI"]
+        )
+        {
+            color3f inputs:color = (1, 1, 1)
+            float inputs:colorTemperature = 4500
+            bool inputs:enableColorTemperature = 1
+            float inputs:exposure = 15
+            float inputs:intensity = 200
+            float inputs:radius = 6
+            float inputs:shaping:cone:angle = 65
+            float inputs:shaping:cone:softness = 1
+            bool treatAsPoint = 0
+            token visibility = "inherited"
+            matrix4d xformOp:transform = ( (0.9884938948653159, -2.220446049250302e-15, 0.15126076759684964, 0), (0.1512607675968494, 6.661338147750895e-16, -0.988493894865314, 0), (2.109423746787802e-15, 1.0000000000000022, 9.99200722162643e-16, 0), (1364.1543577630296, 2897.1276080019584, -4781.628565171581, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+
+        def SphereLight "L_Extension_Ceiling_Downlight0_47" (
+            prepend apiSchemas = ["ShapingAPI"]
+        )
+        {
+            color3f inputs:color = (1, 1, 1)
+            float inputs:colorTemperature = 4500
+            bool inputs:enableColorTemperature = 1
+            float inputs:exposure = 15
+            float inputs:intensity = 200
+            float inputs:radius = 6
+            float inputs:shaping:cone:angle = 65
+            float inputs:shaping:cone:softness = 1
+            bool treatAsPoint = 0
+            token visibility = "inherited"
+            matrix4d xformOp:transform = ( (0.9884938948653159, -2.220446049250302e-15, 0.15126076759684964, 0), (0.1512607675968494, 6.661338147750895e-16, -0.988493894865314, 0), (2.109423746787802e-15, 1.0000000000000022, 9.99200722162643e-16, 0), (1216.0100563981268, 2625.7577302091977, -4306.762852833436, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+
+        def SphereLight "L_Extension_Ceiling_Downlight0_48" (
+            prepend apiSchemas = ["ShapingAPI"]
+        )
+        {
+            color3f inputs:color = (1, 1, 1)
+            float inputs:colorTemperature = 4500
+            bool inputs:enableColorTemperature = 1
+            float inputs:exposure = 15
+            float inputs:intensity = 200
+            float inputs:radius = 6
+            float inputs:shaping:cone:angle = 65
+            float inputs:shaping:cone:softness = 1
+            bool treatAsPoint = 0
+            token visibility = "inherited"
+            matrix4d xformOp:transform = ( (0.9884938948653159, -2.220446049250302e-15, 0.15126076759684964, 0), (0.1512607675968494, 6.661338147750895e-16, -0.988493894865314, 0), (2.109423746787802e-15, 1.0000000000000022, 9.99200722162643e-16, 0), (1327.1109346123135, 2489.633672983246, -4450.901882915811, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+
+        def SphereLight "L_Extension_Ceiling_Downlight0_49" (
+            prepend apiSchemas = ["ShapingAPI"]
+        )
+        {
+            color3f inputs:color = (1, 1, 1)
+            float inputs:colorTemperature = 4500
+            bool inputs:enableColorTemperature = 1
+            float inputs:exposure = 15
+            float inputs:intensity = 200
+            float inputs:radius = 6
+            float inputs:shaping:cone:angle = 65
+            float inputs:shaping:cone:softness = 1
+            bool treatAsPoint = 0
+            token visibility = "inherited"
+            matrix4d xformOp:transform = ( (0.9884938948653159, -2.220446049250302e-15, 0.15126076759684964, 0), (0.1512607675968494, 6.661338147750895e-16, -0.988493894865314, 0), (2.109423746787802e-15, 1.0000000000000022, 9.99200722162643e-16, 0), (1025.7828345098073, 2489.6336729832465, -4497.011545258455, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+
+        def SphereLight "L_Extension_Ceiling_Downlight0_50" (
+            prepend apiSchemas = ["ShapingAPI"]
+        )
+        {
+            color3f inputs:color = (1, 1, 1)
+            float inputs:colorTemperature = 4500
+            bool inputs:enableColorTemperature = 1
+            float inputs:exposure = 15
+            float inputs:intensity = 200
+            float inputs:radius = 6
+            float inputs:shaping:cone:angle = 65
+            float inputs:shaping:cone:softness = 1
+            bool treatAsPoint = 0
+            token visibility = "inherited"
+            matrix4d xformOp:transform = ( (0.9884938948653159, -2.220446049250302e-15, 0.15126076759684964, 0), (0.1512607675968494, 6.661338147750895e-16, -0.988493894865314, 0), (2.109423746787802e-15, 1.0000000000000022, 9.99200722162643e-16, 0), (1021.2816941233292, 2529.533786979977, -4927.615172613277, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+
+        def SphereLight "L_Extension_Ceiling_Downlight0_51" (
+            prepend apiSchemas = ["ShapingAPI"]
+        )
+        {
+            color3f inputs:color = (1, 1, 1)
+            float inputs:colorTemperature = 4500
+            bool inputs:enableColorTemperature = 1
+            float inputs:exposure = 15
+            float inputs:intensity = 200
+            float inputs:radius = 6
+            float inputs:shaping:cone:angle = 65
+            float inputs:shaping:cone:softness = 1
+            bool treatAsPoint = 0
+            token visibility = "inherited"
+            matrix4d xformOp:transform = ( (0.9884938948653159, -2.220446049250302e-15, 0.15126076759684964, 0), (0.1512607675968494, 6.661338147750895e-16, -0.988493894865314, 0), (2.109423746787802e-15, 1.0000000000000022, 9.99200722162643e-16, 0), (470.13615417623134, 2500.9257416268174, -5099.762405432637, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+
+        def SphereLight "L_Extension_Ceiling_Downlight0_52" (
+            prepend apiSchemas = ["ShapingAPI"]
+        )
+        {
+            color3f inputs:color = (1, 1, 1)
+            float inputs:colorTemperature = 4500
+            bool inputs:enableColorTemperature = 1
+            float inputs:exposure = 15
+            float inputs:intensity = 200
+            float inputs:radius = 6
+            float inputs:shaping:cone:angle = 65
+            float inputs:shaping:cone:softness = 1
+            bool treatAsPoint = 0
+            token visibility = "inherited"
+            matrix4d xformOp:transform = ( (0.9884938948653159, -2.220446049250302e-15, 0.15126076759684964, 0), (0.1512607675968494, 6.661338147750895e-16, -0.988493894865314, 0), (2.109423746787802e-15, 1.0000000000000022, 9.99200722162643e-16, 0), (13.269582431356412, 2510.0251990934094, -5564.5722894752935, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+
+        def SphereLight "L_Extension_Ceiling_Downlight0_53" (
+            prepend apiSchemas = ["ShapingAPI"]
+        )
+        {
+            color3f inputs:color = (1, 1, 1)
+            float inputs:colorTemperature = 4500
+            bool inputs:enableColorTemperature = 1
+            float inputs:exposure = 15
+            float inputs:intensity = 200
+            float inputs:radius = 6
+            float inputs:shaping:cone:angle = 65
+            float inputs:shaping:cone:softness = 1
+            bool treatAsPoint = 0
+            token visibility = "inherited"
+            matrix4d xformOp:transform = ( (0.9884938948653159, -2.220446049250302e-15, 0.15126076759684964, 0), (0.1512607675968494, 6.661338147750895e-16, -0.988493894865314, 0), (2.109423746787802e-15, 1.0000000000000022, 9.99200722162643e-16, 0), (-63.17159804540688, 2510.0251990934094, -5065.026760135034, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+
+        def SphereLight "L_Extension_Ceiling_Downlight0_54" (
+            prepend apiSchemas = ["ShapingAPI"]
+        )
+        {
+            color3f inputs:color = (1, 1, 1)
+            float inputs:colorTemperature = 4500
+            bool inputs:enableColorTemperature = 1
+            float inputs:exposure = 15
+            float inputs:intensity = 200
+            float inputs:radius = 6
+            float inputs:shaping:cone:angle = 65
+            float inputs:shaping:cone:softness = 1
+            bool treatAsPoint = 0
+            token visibility = "inherited"
+            matrix4d xformOp:transform = ( (0.9884938948653159, -2.220446049250302e-15, 0.15126076759684964, 0), (0.1512607675968494, 6.661338147750895e-16, -0.988493894865314, 0), (2.109423746787802e-15, 1.0000000000000022, 9.99200722162643e-16, 0), (2.1094835859200884, 2466.1411367576925, -5491.640690951208, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+
+        def SphereLight "L_Extension_Ceiling_Downlight0_55" (
+            prepend apiSchemas = ["ShapingAPI"]
+        )
+        {
+            color3f inputs:color = (1, 1, 1)
+            float inputs:colorTemperature = 4500
+            bool inputs:enableColorTemperature = 1
+            float inputs:exposure = 15
+            float inputs:intensity = 200
+            float inputs:radius = 6
+            float inputs:shaping:cone:angle = 65
+            float inputs:shaping:cone:softness = 1
+            bool treatAsPoint = 0
+            token visibility = "inherited"
+            matrix4d xformOp:transform = ( (0.9884938948653159, -2.220446049250302e-15, 0.15126076759684964, 0), (0.1512607675968494, 6.661338147750895e-16, -0.988493894865314, 0), (2.109423746787802e-15, 1.0000000000000022, 9.99200722162643e-16, 0), (-1104.2670311950862, 2501.2241305176694, -5384.131449095706, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+
+        def SphereLight "L_Extension_Ceiling_Downlight0_56" (
+            prepend apiSchemas = ["ShapingAPI"]
+        )
+        {
+            color3f inputs:color = (1, 1, 1)
+            float inputs:colorTemperature = 4500
+            bool inputs:enableColorTemperature = 1
+            float inputs:exposure = 15
+            float inputs:intensity = 200
+            float inputs:radius = 6
+            float inputs:shaping:cone:angle = 65
+            float inputs:shaping:cone:softness = 1
+            bool treatAsPoint = 0
+            token visibility = "inherited"
+            matrix4d xformOp:transform = ( (0.9884938948653159, -2.220446049250302e-15, 0.15126076759684964, 0), (0.1512607675968494, 6.661338147750895e-16, -0.988493894865314, 0), (2.109423746787802e-15, 1.0000000000000022, 9.99200722162643e-16, 0), (-1563.069636753808, 2501.2241305176694, -5175.18950777115, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+
+        def SphereLight "L_Extension_Ceiling_Downlight0_57" (
+            prepend apiSchemas = ["ShapingAPI"]
+        )
+        {
+            color3f inputs:color = (1, 1, 1)
+            float inputs:colorTemperature = 4500
+            bool inputs:enableColorTemperature = 1
+            float inputs:exposure = 15
+            float inputs:intensity = 200
+            float inputs:radius = 6
+            float inputs:shaping:cone:angle = 65
+            float inputs:shaping:cone:softness = 1
+            bool treatAsPoint = 0
+            token visibility = "inherited"
+            matrix4d xformOp:transform = ( (0.9884938948653159, -2.220446049250302e-15, 0.15126076759684964, 0), (0.1512607675968494, 6.661338147750895e-16, -0.988493894865314, 0), (2.109423746787802e-15, 1.0000000000000022, 9.99200722162643e-16, 0), (-839.3757235937583, 2528.567938702492, -5064.448816929888, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+
+        def SphereLight "L_Extension_Ceiling_Downlight0_58" (
+            prepend apiSchemas = ["ShapingAPI"]
+        )
+        {
+            color3f inputs:color = (1, 1, 1)
+            float inputs:colorTemperature = 4500
+            bool inputs:enableColorTemperature = 1
+            float inputs:exposure = 15
+            float inputs:intensity = 200
+            float inputs:radius = 6
+            float inputs:shaping:cone:angle = 65
+            float inputs:shaping:cone:softness = 1
+            bool treatAsPoint = 0
+            token visibility = "inherited"
+            matrix4d xformOp:transform = ( (0.9884938948653159, -2.220446049250302e-15, 0.15126076759684964, 0), (0.1512607675968494, 6.661338147750895e-16, -0.988493894865314, 0), (2.109423746787802e-15, 1.0000000000000022, 9.99200722162643e-16, 0), (-801.8086579603299, 2559.263006794719, -4486.291872047911, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+
+        def SphereLight "L_Extension_Ceiling_Downlight0_59" (
+            prepend apiSchemas = ["ShapingAPI"]
+        )
+        {
+            color3f inputs:color = (1, 1, 1)
+            float inputs:colorTemperature = 4500
+            bool inputs:enableColorTemperature = 1
+            float inputs:exposure = 15
+            float inputs:intensity = 200
+            float inputs:radius = 6
+            float inputs:shaping:cone:angle = 65
+            float inputs:shaping:cone:softness = 1
+            bool treatAsPoint = 0
+            token visibility = "inherited"
+            matrix4d xformOp:transform = ( (0.9884938948653159, -2.220446049250302e-15, 0.15126076759684964, 0), (0.1512607675968494, 6.661338147750895e-16, -0.988493894865314, 0), (2.109423746787802e-15, 1.0000000000000022, 9.99200722162643e-16, 0), (-669.1757755958806, 2559.263006794719, -4289.405674372615, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+
+        def SphereLight "L_Extension_Ceiling_Downlight0_60" (
+            prepend apiSchemas = ["ShapingAPI"]
+        )
+        {
+            color3f inputs:color = (1, 1, 1)
+            float inputs:colorTemperature = 4500
+            bool inputs:enableColorTemperature = 1
+            float inputs:exposure = 15
+            float inputs:intensity = 200
+            float inputs:radius = 6
+            float inputs:shaping:cone:angle = 65
+            float inputs:shaping:cone:softness = 1
+            bool treatAsPoint = 0
+            token visibility = "inherited"
+            matrix4d xformOp:transform = ( (0.9884938948653159, -2.220446049250302e-15, 0.15126076759684964, 0), (0.1512607675968494, 6.661338147750895e-16, -0.988493894865314, 0), (2.109423746787802e-15, 1.0000000000000022, 9.99200722162643e-16, 0), (-377.58241963499836, 2485.82685517806, -4244.785636679008, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+
+        def SphereLight "L_Extension_Ceiling_Downlight0_61" (
+            prepend apiSchemas = ["ShapingAPI"]
+        )
+        {
+            color3f inputs:color = (1, 1, 1)
+            float inputs:colorTemperature = 4500
+            bool inputs:enableColorTemperature = 1
+            float inputs:exposure = 15
+            float inputs:intensity = 200
+            float inputs:radius = 6
+            float inputs:shaping:cone:angle = 65
+            float inputs:shaping:cone:softness = 1
+            bool treatAsPoint = 0
+            token visibility = "inherited"
+            matrix4d xformOp:transform = ( (0.9884938948653159, -2.220446049250302e-15, 0.15126076759684964, 0), (0.1512607675968494, 6.661338147750895e-16, -0.988493894865314, 0), (2.109423746787802e-15, 1.0000000000000022, 9.99200722162643e-16, 0), (311.92125174815544, 2485.82685517806, -4313.60978409291, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+
+        def SphereLight "L_Extension_Ceiling_Downlight0_62" (
+            prepend apiSchemas = ["ShapingAPI"]
+        )
+        {
+            color3f inputs:color = (1, 1, 1)
+            float inputs:colorTemperature = 4500
+            bool inputs:enableColorTemperature = 1
+            float inputs:exposure = 15
+            float inputs:intensity = 200
+            float inputs:radius = 6
+            float inputs:shaping:cone:angle = 65
+            float inputs:shaping:cone:softness = 1
+            bool treatAsPoint = 0
+            token visibility = "inherited"
+            matrix4d xformOp:transform = ( (0.9884938948653159, -2.220446049250302e-15, 0.15126076759684964, 0), (0.1512607675968494, 6.661338147750895e-16, -0.988493894865314, 0), (2.109423746787802e-15, 1.0000000000000022, 9.99200722162643e-16, 0), (-1276.9469529539988, 2534.136335274799, -4326.133109206558, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+
+        def SphereLight "L_Extension_Ceiling_Downlight0_63" (
+            prepend apiSchemas = ["ShapingAPI"]
+        )
+        {
+            color3f inputs:color = (1, 1, 1)
+            float inputs:colorTemperature = 4500
+            bool inputs:enableColorTemperature = 1
+            float inputs:exposure = 15
+            float inputs:intensity = 200
+            float inputs:radius = 6
+            float inputs:shaping:cone:angle = 65
+            float inputs:shaping:cone:softness = 1
+            bool treatAsPoint = 0
+            token visibility = "inherited"
+            matrix4d xformOp:transform = ( (0.9884938948653159, -2.220446049250302e-15, 0.15126076759684964, 0), (0.1512607675968494, 6.661338147750895e-16, -0.988493894865314, 0), (2.109423746787802e-15, 1.0000000000000022, 9.99200722162643e-16, 0), (-1966.7656600273908, 2501.0993734907165, -4219.510479008093, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+
+        def SphereLight "L_Extension_Ceiling_Downlight0_64" (
+            prepend apiSchemas = ["ShapingAPI"]
+        )
+        {
+            color3f inputs:color = (1, 1, 1)
+            float inputs:colorTemperature = 4500
+            bool inputs:enableColorTemperature = 1
+            float inputs:exposure = 15
+            float inputs:intensity = 200
+            float inputs:radius = 6
+            float inputs:shaping:cone:angle = 65
+            float inputs:shaping:cone:softness = 1
+            bool treatAsPoint = 0
+            token visibility = "inherited"
+            matrix4d xformOp:transform = ( (0.9884938948653159, -2.220446049250302e-15, 0.15126076759684964, 0), (0.1512607675968494, 6.661338147750895e-16, -0.988493894865314, 0), (2.109423746787802e-15, 1.0000000000000022, 9.99200722162643e-16, 0), (-2326.598927396995, 2501.099373490717, -4274.572686788977, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+
+        def SphereLight "L_Extension_Ceiling_Downlight0_65" (
+            prepend apiSchemas = ["ShapingAPI"]
+        )
+        {
+            color3f inputs:color = (1, 1, 1)
+            float inputs:colorTemperature = 4500
+            bool inputs:enableColorTemperature = 1
+            float inputs:exposure = 15
+            float inputs:intensity = 200
+            float inputs:radius = 6
+            float inputs:shaping:cone:angle = 65
+            float inputs:shaping:cone:softness = 1
+            bool treatAsPoint = 0
+            token visibility = "inherited"
+            matrix4d xformOp:transform = ( (0.9884938948653159, -2.220446049250302e-15, 0.15126076759684964, 0), (0.1512607675968494, 6.661338147750895e-16, -0.988493894865314, 0), (2.109423746787802e-15, 1.0000000000000022, 9.99200722162643e-16, 0), (-2265.5327891069232, 2501.099373490717, -4673.641829711585, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+
+        def SphereLight "L_Extension_Ceiling_Downlight0_66" (
+            prepend apiSchemas = ["ShapingAPI"]
+        )
+        {
+            color3f inputs:color = (1, 1, 1)
+            float inputs:colorTemperature = 4500
+            bool inputs:enableColorTemperature = 1
+            float inputs:exposure = 15
+            float inputs:intensity = 200
+            float inputs:radius = 6
+            float inputs:shaping:cone:angle = 65
+            float inputs:shaping:cone:softness = 1
+            bool treatAsPoint = 0
+            token visibility = "inherited"
+            matrix4d xformOp:transform = ( (0.9884938948653159, -2.220446049250302e-15, 0.15126076759684964, 0), (0.1512607675968494, 6.661338147750895e-16, -0.988493894865314, 0), (2.109423746787802e-15, 1.0000000000000022, 9.99200722162643e-16, 0), (-2095.0657131374705, 2478.7484643326497, -4959.858249281764, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+
+        def SphereLight "L_Extension_Ceiling_Downlight0_67" (
+            prepend apiSchemas = ["ShapingAPI"]
+        )
+        {
+            color3f inputs:color = (1, 1, 1)
+            float inputs:colorTemperature = 4500
+            bool inputs:enableColorTemperature = 1
+            float inputs:exposure = 15
+            float inputs:intensity = 200
+            float inputs:radius = 6
+            float inputs:shaping:cone:angle = 65
+            float inputs:shaping:cone:softness = 1
+            bool treatAsPoint = 0
+            token visibility = "inherited"
+            matrix4d xformOp:transform = ( (0.9884938948653159, -2.220446049250302e-15, 0.15126076759684964, 0), (0.1512607675968494, 6.661338147750895e-16, -0.988493894865314, 0), (2.109423746787802e-15, 1.0000000000000022, 9.99200722162643e-16, 0), (-1168.3594550313583, 2871.492970116403, -4937.189586879111, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+
+        def SphereLight "L_Extension_Ceiling_Downlight0_68" (
+            prepend apiSchemas = ["ShapingAPI"]
+        )
+        {
+            color3f inputs:color = (1, 1, 1)
+            float inputs:colorTemperature = 4500
+            bool inputs:enableColorTemperature = 1
+            float inputs:exposure = 15
+            float inputs:intensity = 200
+            float inputs:radius = 6
+            float inputs:shaping:cone:angle = 65
+            float inputs:shaping:cone:softness = 1
+            bool treatAsPoint = 0
+            token visibility = "inherited"
+            matrix4d xformOp:transform = ( (0.9884938948653159, -2.220446049250302e-15, 0.15126076759684964, 0), (0.1512607675968494, 6.661338147750895e-16, -0.988493894865314, 0), (2.109423746787802e-15, 1.0000000000000022, 9.99200722162643e-16, 0), (1720.4490117502328, 2859.538579731594, -4664.697769839472, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+
+        def SphereLight "L_Extension_Ceiling_Downlight0_69" (
+            prepend apiSchemas = ["ShapingAPI"]
+        )
+        {
+            color3f inputs:color = (1, 1, 1)
+            float inputs:colorTemperature = 4500
+            bool inputs:enableColorTemperature = 1
+            float inputs:exposure = 15
+            float inputs:intensity = 200
+            float inputs:radius = 6
+            float inputs:shaping:cone:angle = 65
+            float inputs:shaping:cone:softness = 1
+            bool treatAsPoint = 0
+            token visibility = "inherited"
+            matrix4d xformOp:transform = ( (0, -3.3306690738754696e-16, 1, 0), (1, 0, 0, 0), (0, 0.9999999999999999, 2.2204460492503128e-16, 0), (-5336.558412781108, 2116.591622357915, 2030.077229947454, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+
+        def SphereLight "L_Extension_Ceiling_Downlight0_70" (
+            prepend apiSchemas = ["ShapingAPI"]
+        )
+        {
+            color3f inputs:color = (1, 1, 1)
+            float inputs:colorTemperature = 4500
+            bool inputs:enableColorTemperature = 1
+            float inputs:exposure = 15
+            float inputs:intensity = 200
+            float inputs:radius = 6
+            float inputs:shaping:cone:angle = 65
+            float inputs:shaping:cone:softness = 1
+            bool treatAsPoint = 0
+            token visibility = "inherited"
+            matrix4d xformOp:transform = ( (0, -3.3306690738754696e-16, 1, 0), (1, 0, 0, 0), (0, 0.9999999999999999, 2.2204460492503128e-16, 0), (-5338.908198110886, 2068.7366375954216, 1705.3619044046557, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+
+        over "L_Glod_Around_Lights44"
+        {
+            float inputs:exposure = 15
+        }
+
+        over "L_Glod_Ceiling_Uplights6"
+        {
+            float inputs:exposure = 14
+            matrix4d xformOp:transform = ( (0.9738934161967503, 8.326672684688674e-17, -0.227005757390916, 0), (0.22700575739091608, 1.110223024625157e-16, 0.973893416196751, 0), (1.526556658859591e-16, -1.0000000000000007, 1.110223024625157e-16, 0), (-6579.075833, 2110.526453, 1960.167469, 1) )
+        }
+
+        over "L_Glod_Around_Lights34"
+        {
+            float inputs:exposure = 15
+        }
+
+        over "L_Glod_Ceiling_Uplights7"
+        {
+            float inputs:exposure = 15
+        }
+
+        over "L_Glod_Around_Lights3"
+        {
+            float inputs:exposure = 14
+        }
+
+        over "L_Glod_Around_Lights2"
+        {
+            float inputs:exposure = 14
+        }
+
+        over "L_Glod_Around_Lights"
+        {
+            float inputs:exposure = 14
+        }
+
+        over "L_Glod_Around_Lights4"
+        {
+            float inputs:exposure = 14
+        }
+
+        over "L_Glod_Around_Lights5"
+        {
+            float inputs:exposure = 14
+        }
+
+        over "L_Glod_Around_Lights13"
+        {
+            float inputs:exposure = 14
+        }
+
+        over "L_Glod_Around_Lights12"
+        {
+            float inputs:exposure = 14
+        }
+
+        over "L_Glod_Ceiling_Uplights8"
+        {
+            float inputs:exposure = 14
+        }
+
+        over "L_Glod_Ceiling_Uplights9"
+        {
+            float inputs:exposure = 14
+        }
+
+        over "L_Glod_Around_Lights14"
+        {
+            float inputs:exposure = 14
+        }
+
+        over "L_Glod_Around_Lights15"
+        {
+            float inputs:exposure = 14
+        }
+
+        over "L_Glod_Around_Lights17"
+        {
+            float inputs:exposure = 14
+        }
+
+        over "L_Glod_Around_Lights39"
+        {
+            float inputs:exposure = 14
+            float inputs:radius = 5
+        }
+
+        over "L_Glod_Around_Lights16"
+        {
+            float inputs:exposure = 12
+        }
+
+        def SphereLight "L_Glod_Around_Lights14_01" (
+            prepend apiSchemas = ["ShapingAPI"]
+        )
+        {
+            color3f inputs:color = (1, 1, 1)
+            float inputs:colorTemperature = 2800
+            bool inputs:enableColorTemperature = 1
+            float inputs:exposure = 14
+            float inputs:intensity = 933.8234
+            float inputs:radius = 5
+            float inputs:shaping:cone:angle = 62.96
+            float inputs:shaping:cone:softness = 0.9841169
+            bool treatAsPoint = 0
+            token visibility = "inherited"
+            matrix4d xformOp:transform = ( (0, -4.440892098500629e-16, 1.0000000000000007, 0), (1, 8.881784197001252e-16, 0, 0), (-8.881784197001256e-16, 1.0000000000000004, 4.440892098500628e-16, 0), (-6508.305123795334, 2091.114337, -124.36227923035452, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+
+        over "L_Glod_Around_Lights49"
+        {
+            float inputs:exposure = 15
+            float inputs:intensity = 900
+            float inputs:radius = 5
+        }
+
+        over "L_Glod_Around_Lights53"
+        {
+            bool inputs:enableColorTemperature = 1
+            float inputs:exposure = 14
+            float inputs:intensity = 900
+            bool inputs:normalize = 0
+            float inputs:radius = 5
+        }
+
+        over "L_Glod_Tubes27"
+        {
+            float inputs:exposure = 12
+        }
+
+        over "L_Glod_Around_Lights28"
+        {
+            float inputs:exposure = 14
+        }
+
+        over "L_Glod_Around_Lights29"
+        {
+            float inputs:exposure = 14
+        }
+
+        over "L_Glod_Around_Lights27"
+        {
+            float inputs:intensity = 5000
+            float inputs:radius = 5
+        }
+
+        over "L_Glod_Around_Lights56"
+        {
+            float inputs:intensity = 900
+            float inputs:radius = 5
+        }
+
+        over "L_Glod_Around_Lights54"
+        {
+            float inputs:intensity = 900
+            float inputs:radius = 5
+        }
+
+        over "L_Glod_Around_Lights52"
+        {
+            float inputs:intensity = 900
+            float inputs:radius = 5
+        }
+
+        over "L_Glod_Around_Lights58"
+        {
+            float inputs:intensity = 900
+            float inputs:radius = 5
+        }
+
+        over "L_Glod_Around_Lights51"
+        {
+            float inputs:intensity = 900
+            float inputs:radius = 5
+        }
+
+        over "L_Glod_Around_Lights18"
+        {
+            float inputs:exposure = 14
+        }
+
+        over "L_Glod_Around_Lights19"
+        {
+            float inputs:exposure = 14
+        }
+
+        over "L_Glod_Around_Lights46"
+        {
+            float inputs:exposure = 12
+        }
+
+        def SphereLight "L_Glod_Around_Lights19_01" (
+            prepend apiSchemas = ["ShapingAPI"]
+        )
+        {
+            color3f inputs:color = (1, 1, 1)
+            float inputs:colorTemperature = 2800
+            bool inputs:enableColorTemperature = 1
+            float inputs:exposure = 14
+            float inputs:intensity = 933.8234
+            float inputs:radius = 5
+            float inputs:shaping:cone:angle = 62.96
+            float inputs:shaping:cone:softness = 0.9841169
+            bool treatAsPoint = 0
+            token visibility = "inherited"
+            matrix4d xformOp:transform = ( (0, -4.440892098500629e-16, 1.0000000000000007, 0), (1, 8.881784197001252e-16, 0, 0), (-8.881784197001256e-16, 1.0000000000000004, 4.440892098500628e-16, 0), (-6364.722347929414, 2087.8160920000246, 535.3969664163576, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+
+        over "L_Glod_Around_Lights47"
+        {
+            float inputs:intensity = 900
+        }
+
+        over "L_Glod_Around_Lights11"
+        {
+            float inputs:exposure = 14
+        }
+
+        over "L_Glod_Around_Lights6"
+        {
+            float inputs:exposure = 14
+        }
+
+        over "L_Glod_Around_Lights10"
+        {
+            float inputs:exposure = 14
+        }
+
+        over "L_Glod_Around_Lights7"
+        {
+            float inputs:exposure = 14
+        }
+
+        over "L_Glod_Around_Lights8"
+        {
+            float inputs:exposure = 14
+        }
+
+        over "L_Glod_Around_Lights48"
+        {
+            float inputs:exposure = 14
+        }
+
+        over "L_Glod_Around_Lights40"
+        {
+            float inputs:exposure = 14
+        }
+
+        over "L_Glod_Around_Lights36"
+        {
+            float inputs:exposure = 14
+        }
+
+        def SphereLight "L_Glod_Around_Lights3_01" (
+            prepend apiSchemas = ["ShapingAPI"]
+        )
+        {
+            color3f inputs:color = (1, 1, 1)
+            float inputs:colorTemperature = 2800
+            bool inputs:enableColorTemperature = 1
+            float inputs:exposure = 14
+            float inputs:intensity = 933.8234
+            float inputs:radius = 5
+            float inputs:shaping:cone:angle = 62.96
+            float inputs:shaping:cone:softness = 0.9841169
+            bool treatAsPoint = 0
+            token visibility = "inherited"
+            matrix4d xformOp:transform = ( (0, -4.440892098500629e-16, 1.0000000000000007, 0), (1, 8.881784197001252e-16, 0, 0), (-8.881784197001256e-16, 1.0000000000000004, 4.440892098500628e-16, 0), (-5704.605957451291, 2133.968446573073, 2164.5160874617563, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+
+        def SphereLight "L_Glod_Around_Lights3_02" (
+            prepend apiSchemas = ["ShapingAPI"]
+        )
+        {
+            color3f inputs:color = (1, 1, 1)
+            float inputs:colorTemperature = 2800
+            bool inputs:enableColorTemperature = 1
+            float inputs:exposure = 14
+            float inputs:intensity = 933.8234
+            float inputs:radius = 5
+            float inputs:shaping:cone:angle = 62.96
+            float inputs:shaping:cone:softness = 0.9841169
+            bool treatAsPoint = 0
+            token visibility = "inherited"
+            matrix4d xformOp:transform = ( (0, -4.440892098500629e-16, 1.0000000000000007, 0), (1, 8.881784197001252e-16, 0, 0), (-8.881784197001256e-16, 1.0000000000000004, 4.440892098500628e-16, 0), (-5771.981433469236, 2133.9684465730734, 2604.8169517604947, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+
+        def SphereLight "L_Glod_Around_Lights3_03" (
+            prepend apiSchemas = ["ShapingAPI"]
+        )
+        {
+            color3f inputs:color = (1, 1, 1)
+            float inputs:colorTemperature = 2800
+            bool inputs:enableColorTemperature = 1
+            float inputs:exposure = 14
+            float inputs:intensity = 933.8234
+            float inputs:radius = 5
+            float inputs:shaping:cone:angle = 62.96
+            float inputs:shaping:cone:softness = 0.9841169
+            bool treatAsPoint = 0
+            token visibility = "inherited"
+            matrix4d xformOp:transform = ( (0, -4.440892098500629e-16, 1.0000000000000007, 0), (1, 8.881784197001252e-16, 0, 0), (-8.881784197001256e-16, 1.0000000000000004, 4.440892098500628e-16, 0), (-5484.494058864552, 2124.3160777928215, 2875.983521344515, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+
+        def SphereLight "L_Glod_Around_Lights3_04" (
+            prepend apiSchemas = ["ShapingAPI"]
+        )
+        {
+            color3f inputs:color = (1, 1, 1)
+            float inputs:colorTemperature = 2800
+            bool inputs:enableColorTemperature = 1
+            float inputs:exposure = 14
+            float inputs:intensity = 933.8234
+            float inputs:radius = 5
+            float inputs:shaping:cone:angle = 62.96
+            float inputs:shaping:cone:softness = 0.9841169
+            bool treatAsPoint = 0
+            token visibility = "inherited"
+            matrix4d xformOp:transform = ( (0, -4.440892098500629e-16, 1.0000000000000007, 0), (1, 8.881784197001252e-16, 0, 0), (-8.881784197001256e-16, 1.0000000000000004, 4.440892098500628e-16, 0), (-5290.344621156673, 2124.3160777928265, 3193.216548284814, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+
+        def SphereLight "L_Glod_Around_Lights3_05" (
+            prepend apiSchemas = ["ShapingAPI"]
+        )
+        {
+            color3f inputs:color = (1, 1, 1)
+            float inputs:colorTemperature = 2800
+            bool inputs:enableColorTemperature = 1
+            float inputs:exposure = 14
+            float inputs:intensity = 933.8234
+            float inputs:radius = 5
+            float inputs:shaping:cone:angle = 62.96
+            float inputs:shaping:cone:softness = 0.9841169
+            bool treatAsPoint = 0
+            token visibility = "inherited"
+            matrix4d xformOp:transform = ( (0, -4.440892098500629e-16, 1.0000000000000007, 0), (1, 8.881784197001252e-16, 0, 0), (-8.881784197001256e-16, 1.0000000000000004, 4.440892098500628e-16, 0), (-5399.643468989058, 2124.3160777928215, 3343.3295291645027, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+
+        def SphereLight "L_Glod_Around_Lights44_01" (
+            prepend apiSchemas = ["ShapingAPI"]
+        )
+        {
+            color3f inputs:color = (1, 1, 1)
+            float inputs:colorTemperature = 2800
+            bool inputs:enableColorTemperature = 1
+            float inputs:exposure = 15
+            float inputs:intensity = 900
+            float inputs:radius = 15
+            float inputs:shaping:cone:angle = 40.207996
+            float inputs:shaping:cone:softness = 0.9751293
+            bool treatAsPoint = 0
+            token visibility = "inherited"
+            matrix4d xformOp:transform = ( (0, -4.440892098500629e-16, 1.0000000000000007, 0), (1, 8.881784197001252e-16, 0, 0), (-8.881784197001256e-16, 1.0000000000000004, 4.440892098500628e-16, 0), (-5416.363798981985, 2438.790563431895, 1647.8454798048056, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+
+        def SphereLight "L_Glod_Around_Lights44_02" (
+            prepend apiSchemas = ["ShapingAPI"]
+        )
+        {
+            color3f inputs:color = (1, 1, 1)
+            float inputs:colorTemperature = 2800
+            bool inputs:enableColorTemperature = 1
+            float inputs:exposure = 15
+            float inputs:intensity = 900
+            float inputs:radius = 15
+            float inputs:shaping:cone:angle = 40.207996
+            float inputs:shaping:cone:softness = 0.9751293
+            bool treatAsPoint = 0
+            token visibility = "inherited"
+            matrix4d xformOp:transform = ( (0, -4.440892098500629e-16, 1.0000000000000007, 0), (1, 8.881784197001252e-16, 0, 0), (-8.881784197001256e-16, 1.0000000000000004, 4.440892098500628e-16, 0), (-5620.930614722518, 2438.790563431897, 999.2260708800811, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+
+        def SphereLight "L_Glod_Around_Lights44_03" (
+            prepend apiSchemas = ["ShapingAPI"]
+        )
+        {
+            color3f inputs:color = (1, 1, 1)
+            float inputs:colorTemperature = 2800
+            bool inputs:enableColorTemperature = 1
+            float inputs:exposure = 15
+            float inputs:intensity = 900
+            float inputs:radius = 15
+            float inputs:shaping:cone:angle = 40.207996
+            float inputs:shaping:cone:softness = 0.9751293
+            bool treatAsPoint = 0
+            token visibility = "inherited"
+            matrix4d xformOp:transform = ( (0, -4.440892098500629e-16, 1.0000000000000007, 0), (1, 8.881784197001252e-16, 0, 0), (-8.881784197001256e-16, 1.0000000000000004, 4.440892098500628e-16, 0), (-5550.87547721571, 2438.7905634318995, 541.4135340959768, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+
+        def SphereLight "L_Glod_Around_Lights44_04" (
+            prepend apiSchemas = ["ShapingAPI"]
+        )
+        {
+            color3f inputs:color = (1, 1, 1)
+            float inputs:colorTemperature = 2800
+            bool inputs:enableColorTemperature = 1
+            float inputs:exposure = 15
+            float inputs:intensity = 900
+            float inputs:radius = 15
+            float inputs:shaping:cone:angle = 40.207996
+            float inputs:shaping:cone:softness = 0.9751293
+            bool treatAsPoint = 0
+            token visibility = "inherited"
+            matrix4d xformOp:transform = ( (0, -4.440892098500629e-16, 1.0000000000000007, 0), (1, 8.881784197001252e-16, 0, 0), (-8.881784197001256e-16, 1.0000000000000004, 4.440892098500628e-16, 0), (-5869.230391522472, 2438.790563431904, 492.69840398095414, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+
+        def SphereLight "L_Glod_Around_Lights44_05" (
+            prepend apiSchemas = ["ShapingAPI"]
+        )
+        {
+            color3f inputs:color = (1, 1, 1)
+            float inputs:colorTemperature = 2800
+            bool inputs:enableColorTemperature = 1
+            float inputs:exposure = 15
+            float inputs:intensity = 900
+            float inputs:radius = 15
+            float inputs:shaping:cone:angle = 40.207996
+            float inputs:shaping:cone:softness = 0.9751293
+            bool treatAsPoint = 0
+            token visibility = "inherited"
+            matrix4d xformOp:transform = ( (0, -4.440892098500629e-16, 1.0000000000000007, 0), (1, 8.881784197001252e-16, 0, 0), (-8.881784197001256e-16, 1.0000000000000004, 4.440892098500628e-16, 0), (-5917.67141712558, 2438.790563431906, 809.262036642643, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+
+        def SphereLight "L_Glod_Around_Lights44_06" (
+            prepend apiSchemas = ["ShapingAPI"]
+        )
+        {
+            color3f inputs:color = (1, 1, 1)
+            float inputs:colorTemperature = 2800
+            bool inputs:enableColorTemperature = 1
+            float inputs:exposure = 15
+            float inputs:intensity = 900
+            float inputs:radius = 15
+            float inputs:shaping:cone:angle = 40.207996
+            float inputs:shaping:cone:softness = 0.9751293
+            bool treatAsPoint = 0
+            token visibility = "inherited"
+            matrix4d xformOp:transform = ( (0, -4.440892098500629e-16, 1.0000000000000007, 0), (1, 8.881784197001252e-16, 0, 0), (-8.881784197001256e-16, 1.0000000000000004, 4.440892098500628e-16, 0), (-5613.785448289753, 2438.790563431934, 1278.707552253733, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+
+        def SphereLight "L_Glod_Around_Lights44_07" (
+            prepend apiSchemas = ["ShapingAPI"]
+        )
+        {
+            color3f inputs:color = (1, 1, 1)
+            float inputs:colorTemperature = 2800
+            bool inputs:enableColorTemperature = 1
+            float inputs:exposure = 15
+            float inputs:intensity = 900
+            float inputs:radius = 15
+            float inputs:shaping:cone:angle = 40.207996
+            float inputs:shaping:cone:softness = 0.9751293
+            bool treatAsPoint = 0
+            token visibility = "inherited"
+            matrix4d xformOp:transform = ( (0, -4.440892098500629e-16, 1.0000000000000007, 0), (1, 8.881784197001252e-16, 0, 0), (-8.881784197001256e-16, 1.0000000000000004, 4.440892098500628e-16, 0), (-5513.442140888182, 2438.790563431935, 1467.3347746662864, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+
+        def SphereLight "L_Glod_Around_Lights3_06" (
+            prepend apiSchemas = ["ShapingAPI"]
+        )
+        {
+            color3f inputs:color = (1, 1, 1)
+            float inputs:colorTemperature = 2800
+            bool inputs:enableColorTemperature = 1
+            float inputs:exposure = 14
+            float inputs:intensity = 933.8234
+            float inputs:radius = 5
+            float inputs:shaping:cone:angle = 62.96
+            float inputs:shaping:cone:softness = 0.9841169
+            bool treatAsPoint = 0
+            token visibility = "inherited"
+            matrix4d xformOp:transform = ( (0, -4.440892098500629e-16, 1.0000000000000007, 0), (1, 8.881784197001252e-16, 0, 0), (-8.881784197001256e-16, 1.0000000000000004, 4.440892098500628e-16, 0), (-5312.048065696014, 1720.3160777928292, 2129.614140235973, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+
+        def SphereLight "L_Glod_Around_Lights3_07" (
+            prepend apiSchemas = ["ShapingAPI"]
+        )
+        {
+            color3f inputs:color = (1, 1, 1)
+            float inputs:colorTemperature = 2800
+            bool inputs:enableColorTemperature = 1
+            float inputs:exposure = 14
+            float inputs:intensity = 933.8234
+            float inputs:radius = 5
+            float inputs:shaping:cone:angle = 62.96
+            float inputs:shaping:cone:softness = 0.9841169
+            bool treatAsPoint = 0
+            token visibility = "inherited"
+            matrix4d xformOp:transform = ( (0, -4.440892098500629e-16, 1.0000000000000007, 0), (1, 8.881784197001252e-16, 0, 0), (-8.881784197001256e-16, 1.0000000000000004, 4.440892098500628e-16, 0), (-5532.856019048975, 1475.3160777928356, 1820.6596974194433, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+    }
+}
+
+over "L_Extension_Ceiling_Downlight3"
+{
+    matrix4d xformOp:transform = ( (0, -3.3306690738754696e-16, 1, 0), (1, 0, 0, 0), (0, 0.9999999999999999, 2.2204460492503128e-16, 0), (-6462.865699043218, 1810.0000000000086, 925.547897083247, 1) )
+}
+
+over "L_Extension_Ceiling_Downlight3_01"
+{
+    matrix4d xformOp:transform = ( (0, -3.3306690738754696e-16, 1, 0), (1, 0, 0, 0), (0, 0.9999999999999999, 2.2204460492503128e-16, 0), (-6462.865699043218, 1810.0000000000086, 925.547897083247, 1) )
+}
+
+over "OmniverseKit_Persp"
+{
+    custom uniform vector3d omni:kit:centerOfInterest = (0, 0, -66.43834842388343)
+}
+

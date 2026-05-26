@@ -1,0 +1,239 @@
+---
+description: Corridor waypoint routing — nav_waypoint_* graph (entrance + ring + branches), plan_route(), multi-segment NavMesh legs, via-point pruning, useWaypoints toggle; distinct from path XZ straightening/smoothing
+---
+
+# Corridor Waypoint Routing
+
+**Corridor waypoints** (`nav_waypoint_*` Xform prims) are **authoring-time graph nodes** used to steer **seat and restroom navigation** through a predictable corridor ring (and upper-level branches). They are **not** the same thing as the **NavMesh polyline waypoints** sent to the web / auto-mover; those are produced by `calculate_path_points` per leg and post-processed (see `.cursor/rules/topics/navmesh-path-refinement.mdc`).
+
+The graph reduces “wall hugging” and wrong-side-of-building starts by **forcing intermediate via-points** (ring + staircase chain). It does **not** replace NavMesh pathfinding — each leg is still a **shortest path on the baked mesh**.
+
+## Relationship to NavMesh path refinement
+
+| Concern | Where it lives |
+|--------|----------------|
+| **Which corridors to visit** (ring order, entrance vs inside) | `waypoint_router.plan_route()` → `via_points` |
+| **Walkable polyline along the mesh** | `RouteInstance._compute_path()` → `RouteComposer.compose(via_points=…)` → `_navmesh_leg` per leg (see `route-composer.mdc`) |
+| **Straighter polylines in open areas + light smoothing** | `scripts/navmesh_shortest_path/path_metrics.py` (`smooth_path_xz`), applied from `route_engine/compute.py` and `route_engine/player_route.py` (see path-refinement topic) |
+
+Multi-segment routes concatenate leg polylines, then apply **one** global `smooth_path_xz` on the combined list.
+
+`nav_waypoint_*` Xform prims form a three-tier graph: **entrance** waypoints outside the building, a **ring** of main-corridor waypoints, and **branches** to upper-level sections via staircase access points.
+
+## USD layer
+
+Waypoint prims live in `source/data/scenes/sublayers/nav_waypoints_layer.usda` (sublayer of `main_scene.usda`). Four types:
+
+- **Building entrance waypoints** (`nav_waypoint_entrance_01`, `_02`, …) — outside the building near main doors. Auto-detected by prefix `nav_waypoint_entrance_`; excluded from the ring. The router compares NavMesh walking distance to the nearest entrance vs the nearest ring waypoint. Whichever is closer wins. When the entrance wins, `_nearest_ring_by_navmesh` finds the ring waypoint to join from the entrance.
+- **Section entrance waypoints** (`nav_waypoint_A` … `nav_waypoint_U`) — main corridor sections are on the ring; upper-level sections (E, F, H, P, S) are **excluded** from the ring and treated as branch endpoints.
+- **Midpoint waypoints** (`nav_waypoint_AB`, `nav_waypoint_BC`, …) — placed between adjacent entrance waypoints to keep the ring path smooth.
+- **Staircase access waypoints** (`nav_waypoint_DEF`, `nav_waypoint_GH`, `nav_waypoint_OP`, `nav_waypoint_RS`) — near staircase bases on the main corridor level. These are **off the ring** (excluded together with upper-level waypoints) and form the first step of the branch chain.
+
+All are `/World/nav_waypoint_*` Xform prims resolved on the composed stage.
+
+## Three-tier routing (entrance → ring → branches)
+
+### Bidirectional endpoint selection (`_pick_endpoint`)
+
+Both endpoints — start (player) and end (target) — are picked by the **same** direction-agnostic helper `_pick_endpoint(ring, entrances, pos, other_idx, label=...)`. Decision model — all by **NavMesh walking distance** (no XZ heuristics for inside/outside detection):
+
+1. **Nearest ring** — `_nearest_ring_by_navmesh(ring, pos)` evaluates the top `_START_CANDIDATES` (5) XZ-nearest ring waypoints, queries NavMesh distance for the top `_MAX_VALIDATION_QUERIES` (3), and picks the one with the shortest actual walk.
+2. **Nearest entrance** — NavMesh distance from `pos` to each entrance waypoint; pick the closest.
+3. **Compare** — if the entrance is NavMesh-closer *and* the anchor is **not** already past it (`_is_past_entrance`) → route via that entrance. Otherwise → use `_best_ring_index` for cost-optimised ring node. The past-entrance check is the critical guard that prevents mid-route recalcs from pulling a just-entered player back out the door.
+
+### Forward-bias rule (mid-route recalc correctness)
+
+Both `_pick_endpoint` (entrance selection) and `_best_ring_index` (ring candidate selection) apply a geometric **"has the anchor already passed this candidate?"** test, implemented by `_is_past_entrance` and `_is_behind_ring_candidate` respectively. The cost function alone (`XZ + ring_travel`) can legitimately pick a behind candidate when the player has walked just past a waypoint — its XZ term is still tiny, and `ring_travel` from there to the goal is only slightly larger than from the forward candidate. During initial routing this is harmless; during pause/recalc it materialises as a "walk forward, turn 180, walk back" glitch.
+
+The forward-bias filter keeps the legacy cost scoring intact as the fallback (when no forward candidate exists — typically only when the anchor sits on the goal), so initial routes from outside are unchanged. Only recalcs where the anchor has already progressed along the ring see the behaviour change.
+
+When the entrance wins:
+- For the **start** call: the entrance position is **prepended** to the via-points.
+- For the **end** call: the entrance position is **appended** to the via-points.
+- `_nearest_ring_by_navmesh(ring, ent_pos)` finds the ring waypoint with shortest **corridor walk** from the entrance (no destination bias, no XZ shortcuts through the arena). This becomes the ring join/exit point.
+
+This naturally handles "am I past the entrance?" on either side — if `pos` is inside, the ring is closer by NavMesh walk, so the entrance is never considered for that side. Forward (outdoor → POI) and reverse (POI → outdoor) routes are now built by the same code path: forward picks `entrance_in` on the start, `None` on the end; reverse picks `None` on the start, `entrance_out` on the end. Same primitives, same cost function, just two calls.
+
+#### Chicken-and-egg note
+
+`_best_ring_index`'s cost is `XZ(pos → cand) + ring_travel(cand → other_idx)`, so each pick needs the other endpoint's ring index. `plan_route_to_position` resolves this in one pass (no convergence loop):
+
+1. Compute a cheap **end anchor** = `_nearest_index(ring, target_pos)` (XZ-nearest, no NavMesh queries).
+2. Pick the start using that anchor as `other_idx`.
+3. Pick the end properly using the now-locked `start_idx` as `other_idx`.
+
+### Ring + branches
+
+```
+  [Entrance waypoints]  (outside building, auto-detected)
+         │
+         ▼
+Main corridor ring (angular-sorted):
+  ...→ N → NO → O → OR → R → RT → T → ...
+                 ↑              ↑
+            nearest ring    nearest ring
+                 │              │
+             Staircase      Staircase
+            (off ring)      (off ring)
+           OP→OP_2→OP_3     RS→…→S
+                │              │
+                P              S
+           (off ring)      (off ring)
+```
+
+- **Ring sections** (A, B, C, D, G, J, K, L, M, N, O, R, T, U + midpoints): route follows the ring to `nav_waypoint_{section}`.
+- **Upper-level sections** (E, F, H, P, S): route follows the ring to the **nearest ring waypoint** to the staircase access point, then appends the branch chain (staircase → section). Both staircase and section waypoints are off the ring.
+
+### Upper-section exit optimisation
+
+For upper-level sections, the initial ring exit is the ring waypoint nearest the staircase. However, `plan_route` checks **±1 ring neighbours** and picks whichever minimises `ring_travel(start → candidate) + XZ(candidate → staircase)`. This prevents overshooting past the staircase when approaching from the opposite direction.
+
+### Symmetric leading / trailing skips and skip-entirely shortcut
+
+`plan_route_to_position` applies three direction-symmetric prunings around the ring portion:
+
+1. **Leading skip** (start side): if `player_pos` is within `SKIP_THRESHOLD_CM` (200 cm) of `ring[start_idx]` AND no entrance was prepended, drop the leading ring waypoint. (When `entrance_in` is set, the ring node is the entrance's join point and is always emitted.)
+2. **Trailing skip** (end side, mirror): if `target_pos` is within `SKIP_THRESHOLD_CM` of `ring[end_idx]` AND no entrance will be appended, drop the trailing ring waypoint. (When `entrance_out` is set, the end ring node is the entrance's join point and is always emitted.)
+3. **Skip-entirely shortcut**: after the via-list is built, if **neither** entrance is involved and `XZ(player → target) < XZ(player → via[0])` (target is closer than the first ring waypoint), waypoints are dropped — return `[]` for direct NavMesh routing.
+4. **Shared ring node with single entrance** (`start_idx == end_idx`, exactly one of `entrance_in` / `entrance_out` set): drop the shared ring node. It IS the entrance's ring join, so emitting it forces `entrance → ring_join → target`, a detour whenever NavMesh `entrance → target` is already a clean corridor walk (same island guaranteed by `_same_navmesh`). The NavMesh leg naturally passes near the join without forcing an exact hit. Kept when both entrances are set (legitimate bridge between two different doors) or when neither is set (case 1/2 above apply).
+
+`plan_route` (seat path) keeps the older single-sided ring-entry shortcut: `XZ(player → seat)` vs `XZ(player → via[0])`. Seat path is intentionally start-side-asymmetric (the seat itself is the canonical exit, no end-side entrance has meaning).
+
+| Upper section | Branch chain (off ring; order matters) |
+|---|---|
+| E | `nav_waypoint_DEF` → `nav_waypoint_DEF_2` → `nav_waypoint_DE_1` → `nav_waypoint_E` |
+| F | `nav_waypoint_DEF` → `nav_waypoint_DEF_2` → `nav_waypoint_DF_1` → `nav_waypoint_F` |
+| H | `nav_waypoint_GH` → `nav_waypoint_GH_2` → `nav_waypoint_GH_3` → `nav_waypoint_H` |
+| P | `nav_waypoint_OP` → `nav_waypoint_OP_2` → `nav_waypoint_OP_3` → `nav_waypoint_P` |
+| S | `nav_waypoint_RS` → `nav_waypoint_RS_2` → `nav_waypoint_RS_3` → `nav_waypoint_S` |
+
+Defined in `UPPER_SECTION_BRANCH` and `_BRANCH_OFF_RING` in `waypoint_router.py`. The ring exit is the nearest ring waypoint to the **staircase** prim (first chain entry), with ±1 neighbour optimisation for upper sections.
+
+## Architecture
+
+```
+[SeatNavigateWidget]                         [Any POI widget]
+  useWaypoints checkbox                        (waypoints via POI_CONFIGS)
+        │                                            │
+  handleSeatNavigate                          handlePoiClick
+  → sendMessage('seatNavigate', ...)          → sendMessage('navmeshRouteCalculate',
+        │                                       { routeId: '<poiType>_nav', ... })
+        │                                            │
+[Kit: _on_seat_navigate]                     [Kit: _on_calc]
+  ├─ plan_route(section) → via_points[]        ├─ if routeId in _waypoint_route_ids:
+  └─ set_route_for_id(via_points=...)          │    _compute_poi_waypoints() → via_points[]
+                                               └─ set_route_for_id(via_points=...)
+        │                                            │
+        └─────────── both flow into ────────────────┘
+                          │
+                [navmesh_route_service/ + route_engine/]
+                  RouteConfig.via_points stores the waypoint list
+                  ├─ _prune_passed_via_points(end_pos): drops passed waypoints
+                  ├─ RouteInstance._compute_path() → RouteComposer.compose(
+                  │      via_points=…, enable_corridor_routing=use_composer)
+                  │      → composer builds + concatenates NavMesh legs
+                  └─ set_route_for_id(): via_points=None inherits
+
+[POI distance estimation]
+  _on_routes_to_pois_request → compute_routes_to_exits(use_waypoints=cfg flag)
+    → plan_route_to_position per target → _measure_multi_segment per route
+
+  _waypoint_route_ids is derived from POI_CONFIGS at startup:
+    any config with "use_waypoints": True and a "route_id" gets its
+    route_id added to the set.
+```
+
+## Key files
+
+| File | Role |
+|---|---|
+| `waypoint_router.py` | Three-tier graph (entrance + ring + branches), `plan_route()`, `plan_route_to_position()` |
+| `route_measure/compute_multi.py` | `measure_multi_segment()` for waypoint-based distance estimation |
+| `navmesh_route_service/service.py` (`NavMeshRouteService`) | Multi-route manager; `set_route_for_id` + via-point inheritance; execution lives in `route_engine/` |
+| `extension.py` (`_on_seat_navigate`) | Reads `useWaypoints` + `section`, calls `plan_route`, passes `via_points` and **`corridor_section`** (same section letter when waypoints on) to `set_route_for_id` for composer / shortcut resume parity |
+| `extension.py` (`_on_calc`) | For any route_id in `_waypoint_route_ids`, calls `_compute_poi_waypoints` to compute waypoints |
+| `extension.py` (`POI_CONFIGS`) | Data-driven config per POI type: `"use_waypoints"`, `"route_id"`, `"prefix"`, `"max_results"` |
+| `extension.py` (`_compute_poi_waypoints`) | Shared helper: resolves positions and calls `plan_route_to_position` |
+| `SeatNavigateWidget.tsx` | "Use corridor waypoints" checkbox, `SeatQuery.useWaypoints` |
+| `useNavigationHandlers.ts` | Passes `useWaypoints: false` in `seatNavigate` payload when unchecked |
+| `nav_waypoints_layer.usda` | USD sublayer with all `nav_waypoint_*` prims |
+
+## waypoint_router.py internals
+
+- **`_scan_waypoints(stage)`** — finds all `/World/nav_waypoint_*` prims, extracts world positions.
+- **`_build_caches(stage)`** — scans all waypoints; separates entrance waypoints (auto-detected by `_ENTRANCE_PREFIX`), filters out branch + entrance names, sorts the remaining into the corridor ring by angular position; also builds `_all_waypoints` lookup dict and `_entrances` list. Cached until `invalidate()`.
+- **`_navmesh_distance(a, b)`** — actual walkable distance via `navmesh_path_length_cm()` (lightweight query, skips full `calculate_path_points` pipeline). Returns `float('inf')` on failure.
+- **`_nearest_ring_by_navmesh(ring, pos)`** — finds the ring waypoint with shortest NavMesh walk from `pos`. Evaluates top `_START_CANDIDATES` XZ-nearest, queries NavMesh for top `_MAX_VALIDATION_QUERIES`. No destination bias. Returns `(ring_index, navmesh_distance_cm)`. Used for ring joining from entrance and for entrance-vs-ring detection (both sides).
+- **`_is_behind_ring_candidate(anchor_pos, cand_idx, other_idx, ring)`** — forward-bias test. Returns True when the anchor has already passed `ring[cand_idx]` along the shorter-arc toward `ring[other_idx]` (dot of `(anchor − cand)` against the first forward ring step `(next − cand)` > 0). Prevents the "cost function picks a just-behind waypoint because its XZ is tiny" failure that showed up on pause/recalc of already-in-progress routes (bird-eye `poi_nav` especially).
+- **`_is_past_entrance(anchor_pos, ent_pos, ring_join_pos)`** — entrance forward-bias test. Returns True when the anchor has crossed the entrance into the ring area (anchor's offset from entrance projects positively onto the inward `entrance → ring_join` vector). Without it, a mid-route recalc where the player has just stepped past the door can still see the entrance as the NavMesh-nearest approach point and route them 180° back out.
+- **`_pick_endpoint(ring, entrances, pos, other_idx, *, label="Start")`** — direction-agnostic entrance-vs-ring decision. Nearest entrance closer → check `_is_past_entrance` first; if anchor is already past it, skip and fall through to ring. Ring closer → use `_best_ring_index`. Called twice by `plan_route_to_position` (`label="Start"` then `label="End"`); called once by `plan_route` (seat path, `label="Start"`). `label` is purely for log clarity. Returns `(ring_idx, entrance_pos_or_None)`.
+- **`_best_ring_index(ring, anchor_pos, other_idx)`** — cost-optimised ring node near `anchor_pos`. Scores top `_START_CANDIDATES` (5) nearest ring waypoints as `XZ(anchor → candidate) + ring_travel_distance(candidate → other_idx)`, then filters out behind-anchor candidates via `_is_behind_ring_candidate` (keeping all as fallback when none are forward). Validates remaining with a NavMesh-walk ÷ XZ-span **wall-check ratio** (`_WALL_CHECK_RATIO`). Real indoor detours (stairs, floor change) can exceed a tight threshold without crossing geometry — if the ratio is set too low, candidates such as `nav_waypoint_UA` are skipped spuriously and `plan_route_to_position` can return **degenerate via lists**, which breaks or weakens `RouteComposer` for some POI targets (more visible when **shortcuts are off**). Direction-agnostic — `_ring_travel_distance` returns the shorter arc, so the same cost function works for both start (`anchor=player`, `other_idx=end_idx`) and end (`anchor=target`, `other_idx=start_idx`).
+- **`_ring_travel_distance(ring, from_idx, to_idx)`** — sum of XZ distances between consecutive waypoints along the shorter ring traversal.
+- **`_exit_index_for_section(ring, section, all_wps)`** — for upper sections, finds the nearest ring waypoint to the staircase access point (dynamically by position); for ring sections, returns the index of `nav_waypoint_{section}`.
+- **`_ring_path(ring_len, from_idx, to_idx)`** — returns the shorter traversal (CW or CCW) around the ring.
+- **`plan_route_to_position(player_pos, target_pos)`** — generic entry point for non-seat POIs (restrooms, quiet zones, exits). **Bidirectional**: picks both endpoints with `_pick_endpoint`, so the route can enter AND exit the corridor through the best entrance. Forward routes (outdoor → POI) and reverse routes (POI → outdoor) are produced by the same code path. Edge cases handled inline: `entrance_in == entrance_out` collapses to a single via-point; `start_idx == end_idx` with no entrances skips the redundant ring node when both endpoints are within `SKIP_THRESHOLD_CM`. Used by `_on_calc` for `poi_nav` / `quiet_zone_nav` and by `compute_routes_to_exits` for waypoint-based distance estimation.
+- **`prune_passed_via_points(player_pos, via_points, end_pos=None, *, reached_threshold_cm=VIA_POINT_REACHED_CM)`** — pure geometric helper shared by every surface that consumes corridor via-points. Sequential dot-product forward-bias test from the front of the via-list (drops `wp[i]` when the player is "ahead" of it along `wp[i] → wp[i+1]`, or `wp[-1] → end_pos` for the last waypoint), plus a head-of-list reached-radius drop after pruning. Called by `RouteInstance._compute_path` (engine) **and** by `RouteComposer._plan_intra_island_via` (composer's auto-corridor branch). Without the shared call, the bird-eye preview re-introduced ring waypoints the engine had pruned and rendered them as a spurious "extra arm" on the dashed overlay (most visible when the player was already inside the corridor and asked for directions to an outdoor map-marker spawn). The two surfaces must always go through this helper — divergence here is invisible until a user reports geometry drift between preview and committed route.
+- **`plan_route(player_pos, seat_pos, section, *, floor_hint_y=None, branch_join_pos=None)`** — seat-specific entry point; calls `_pick_endpoint(label="Start")`, builds ring path (unless mid-branch rejoin skips it — see below), optimises exit ±1 for upper sections, appends branch chain. Intentionally **start-side-only** (no end-side `_pick_endpoint`): the seat is the canonical exit and an end-side entrance has no meaning. Before returning, applies the legacy single-sided ring-entry shortcut: if the seat is XZ-closer than the first via-point, returns `[]` (direct NavMesh routing). Returns ordered via-point positions.
+
+**Post–vertical-move kwargs (elevators / seat resume):** used only for sections in `UPPER_SECTION_BRANCH`. **`floor_hint_y`** trims branch names whose prim **Y** is below `floor_hint_y - _DEFAULT_BRANCH_FLOOR_TOL_CM` (450 cm). **`branch_join_pos`** (player world position at lift exit or resume) selects a **suffix** of the trimmed chain via `_suffix_upper_branch_from_join_pos`: nearest chain waypoint in **3D** among staircase + intermediates only; if within **`_JOIN_AT_SECTION_ANCHOR_MAX_CM`** (700 cm) of the **section anchor** (last chain prim), suffix is **anchor-only**. When the first kept branch prim ≠ staircase head, the **main ring** segment is omitted (entrance prepend unchanged). Wired from `route_composer` post-hop leg and `route_engine/compute.py` seat resume when `corridor_section` is set — same `plan_route` + section as non-shortcut `seat_nav` (see `shortcuts.mdc`).
+
+## `navmesh_route_service` via-point handling
+
+- **`RouteConfig.via_points`** — list of `(x, y, z)` tuples representing intermediate waypoints.
+- **`set_route_for_id(..., via_points=None)`** — `None` = inherit from existing route (preserves waypoints during auto-move recalc); `[]` = explicitly clear.
+- **Multi-segment leg construction** — handled inside `RouteComposer.compose(via_points=…)` (see `route-composer.mdc`). The composer builds one `_navmesh_leg` per via-point pair, concatenates the polylines, and deduplicates junction points. The route engine (`route_engine/compute.py`: `RouteInstance._compute_path`) just passes the pruned via-list through to the composer alongside cost dicts and `enable_corridor_routing` (driven by `RouteConfig.use_composer`).
+- **`_prune_passed_via_points(player_pos, via_points, end_pos=None)`** — thin per-route logging wrapper around `waypoint_router.prune_passed_via_points` (above). Owns only the `[NAVMESH_ROUTE:<id>] Pruned …` line — all algorithmic logic lives in the shared helper so the engine and the composer's auto-corridor branch cannot drift.
+- **Measurement** — drawn routes go through `compose_with_measure()` (in `route_composer/measure.py`); the legacy single-segment `compute_route_measure` is no longer used by the engine and survives only for the bulk exits widget.
+
+## Constants
+
+| Constant | File | Value | Purpose |
+|---|---|---|---|
+| `SKIP_THRESHOLD_CM` | `waypoint_router.py` | 200 | Skip waypoint if player is already this close |
+| `VIA_POINT_REACHED_CM` | `waypoint_router.py` | 300 | Default head-of-list reached-radius for `prune_passed_via_points` — also the engine's runtime "you've reached this waypoint" radius |
+| `_ENTRANCE_PREFIX` | `waypoint_router.py` | `"nav_waypoint_entrance_"` | Prefix for auto-detecting entrance waypoints |
+| `_START_CANDIDATES` | `waypoint_router.py` | 5 | Number of nearby ring waypoints evaluated for cost-based start selection |
+| `_WALL_CHECK_RATIO` | `waypoint_router.py` | **6.0** (was 3.0) | NavMesh walk length ÷ XZ straight-line span between anchor and candidate. Above this, `_best_ring_index` skips the candidate as “likely wall”. **3.0 mis-fired** on legitimate long detours (~5.9× observed for `nav_waypoint_UA`), collapsing POI corridor vias; **6.0** matches production arena geometry better. Still a heuristic — tune here, not in the composer. |
+| `_MAX_VALIDATION_QUERIES` | `waypoint_router.py` | 3 | Cap on NavMesh queries during ring-start candidate validation |
+| `UPPER_SECTION_BRANCH` | `waypoint_router.py` | dict | Upper section → ordered branch prim names (staircase → … → section anchor) |
+| `_DEFAULT_BRANCH_FLOOR_TOL_CM` | `waypoint_router.py` | 450 | `floor_hint_y` branch trim tolerance (cm) |
+| `_JOIN_AT_SECTION_ANCHOR_MAX_CM` | `waypoint_router.py` | 700 | If `branch_join_pos` this close (3D) to section anchor, join at anchor only |
+
+## "Use waypoints" toggle
+
+- **Default**: enabled (checked)
+- **Scope**: seat navigation has an explicit toggle. Restroom and quiet zone navigation always use waypoints (configured via `POI_CONFIGS["restroom"]["use_waypoints"]` and `POI_CONFIGS["quiet_zone"]["use_waypoints"]`). Exit routes, point-and-click, and spot navigation do not use waypoints.
+- **When disabled**: `useWaypoints: false` is sent in the `seatNavigate` payload; backend skips `plan_route()` entirely and uses direct NavMesh shortest path
+- **When enabled**: backend calls `plan_route()` with the seat's section letter
+
+## Adding new waypoints
+
+1. Add `def Xform "nav_waypoint_XX"` in `nav_waypoints_layer.usda` (inside the `over "World"` block)
+2. Call `waypoint_router.invalidate()` if the ring was already cached (or restart the app)
+3. For a new **entrance waypoint**: name it `nav_waypoint_entrance_NN` — auto-detected by prefix, no code changes needed
+4. For a new **ring waypoint** (main corridor): just add the prim — it joins the ring automatically
+5. For a new **upper-level section**: add the section waypoint prim, add a staircase access waypoint prim (if needed), and register the branch chain in `UPPER_SECTION_BRANCH` in `waypoint_router.py` (`_BRANCH_OFF_RING` is derived automatically)
+
+## Adding waypoint routing to other navigation types
+
+Seat and restroom navigation use corridor waypoints. To extend to other POI types, only `POI_CONFIGS` needs a change — no code modifications required:
+
+1. Add `"use_waypoints": True` and `"route_id": "<poiType>_nav"` to the POI's entry in `POI_CONFIGS` (in `extension.py`).
+2. That is all. `_waypoint_route_ids` is derived from `POI_CONFIGS` at startup, so `_on_calc` will automatically compute corridor waypoints for routes with that `route_id`. Distance estimation via `compute_routes_to_exits` also reads the `"use_waypoints"` flag from the config.
+3. Optionally add a `useWaypoints` toggle in the corresponding frontend widget if user control is desired.
+
+## Native NavMesh API usage
+
+Distance-only queries (waypoint scoring, entrance detection, multi-segment measurement) use `navmesh_path_length_cm()` in `navmesh_shortest_path.py`. This performs `query_shortest_path` + `path_length_cm(path.get_points())` but skips the heavy `calculate_path_points` pipeline (position resolution, stage access, `Gf` conversion, endpoint snap validation is included). Much lighter than the full pipeline which is reserved for route drawing and path refinement.
+
+`_is_segment_clear()` uses `path.length()` directly for its ratio check (straightening validation).
+
+**API reference**: [Omniverse NavMesh API Commands](https://docs.omniverse.nvidia.com/extensions/latest/ext_navigation-mesh/api.html) — covers `INavigation`, `INavMesh`, `INavMeshPath` (`get_points`, `length`, `closest_distance`, `evaluate_position`, `evaluate_tangent`), area management, and `NavAgentDesc`.
+
+## Related
+
+- **NavMesh straightening / smoothing pipeline** (applies to each leg and to point-and-click): `.cursor/rules/topics/navmesh-path-refinement.mdc`
+- **Navigation shortcuts (elevators)** — `plan_route` post-hop / resume kwargs, `corridor_section` parity: `.cursor/rules/topics/shortcuts.mdc`
+- **Route measurement & exits**: `.cursor/rules/topics/route-measurement.mdc`
+- **Seat navigation UI & flow**: `.cursor/rules/topics/seat-navigation.mdc`
+- **Bird's-eye route overlay** (uses `plan_route` / `plan_route_to_position` as via-point source): `.cursor/rules/topics/bird-eye-route.mdc`

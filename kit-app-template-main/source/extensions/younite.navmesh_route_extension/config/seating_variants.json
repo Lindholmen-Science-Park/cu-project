@@ -1,0 +1,6 @@
+{
+  "all_seats": "availability_all_seats.json",
+  "half_capacity": "availability_half_capacity.json",
+  "one_third_capacity": "availability_one_third_capacity.json",
+  "event_playstation_c": "availability_event_playstation_c.json"
+}

@@ -1,0 +1,27 @@
+[package]
+title = "Younite USD Viewer Stage Core Extension"
+description = "Stage lifecycle, readiness gating, and initialization timing (timeline/instancer settle)"
+version = "0.1.0"
+authors = ["Younite"]
+keywords = ["stage", "readiness", "timeline", "core"]
+category = "Core"
+
+[dependencies]
+"younite.messaging_core_extension" = {}  # outbound registration + incoming bridge must be up early
+"younite.weather_and_seasons_extension" = {}  # weather + seasons services (sky, rain, snow, fog, seasons)
+"omni.usd" = {}
+"omni.timeline" = {}
+"omni.anim.navigation.core" = {}  # REQUIRED: register NavSchema types before opening navmesh USDs
+"omni.kit.viewport.utility" = {}  # camera switch + viewport camera binding
+"omni.physx.cct" = {}  # teleport + gravity toggling uses PhysX CCT utils
+
+[[python.module]]
+name = "younite.usd_viewer_stage_core_extension"
+
+[build]
+include = [
+    "younite/**/*.py",
+    "*.md",
+    "*.toml",
+]
+

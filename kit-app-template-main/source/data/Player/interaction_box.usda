@@ -1,0 +1,33 @@
+#usda 1.0
+(
+    defaultPrim = "InteractionBox"
+    metersPerUnit = 0.01
+    upAxis = "Y"
+)
+
+def Xform "InteractionBox"
+{
+    # Teleport interaction metadata
+    custom string interaction:type = "teleport"
+    custom string interaction:display_name = "Arena Teleporter"
+    custom string interaction:message = "Enter the Skandinavium Arena"
+    custom string interaction:ui_type = "teleport"
+    custom string interaction:target_location = "arena_center"
+    custom double3 interaction:target_position = (0, 100, 0)  # Center of arena, elevated
+    custom double3 interaction:target_rotation = (0, 0, 0)    # Face forward
+    custom bool interaction:requires_confirmation = true
+    
+    # Semi-big square box - approximately 4x4x4 meters (400x400x400 cm) for better visibility
+    def Cube "Box"
+    {
+        double size = 400.0  # 4 meters in centimeters for better visibility
+        double3 xformOp:translate = (0, -300, 0)  # Place the box 50cm lower (center at -300cm)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+        
+        # Make it very visible with a bright color for debugging
+        color3f[] primvars:displayColor = [(1.0, 0.0, 0.0)]  # Bright red color
+        
+        # Add some transparency to make it more visible
+        float primvars:displayOpacity = 0.8
+    }
+}

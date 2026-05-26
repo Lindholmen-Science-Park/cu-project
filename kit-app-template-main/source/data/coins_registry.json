@@ -1,0 +1,70 @@
+{
+    "_comment": "Coin-type registry. Anchor xforms in coins_layer.usda: translate + rotate only (no parent scale). `modelScale`: uniform number or [sx,sy,sz] applied on session `CoinModel` (see attach_coin_payload). `modelRotation`: XYZ degrees on CoinModel. Y-up `coin_toilet_unisex.usd` vs Z-up `other_coins/*.usdc` use different modelRotation (see unisex vs rest). `spinAxis`: CoinModel-local after modelRotation. See .cursor/rules/topics/poi-coins.mdc.",
+    "version": 1,
+    "spinEnabled": false,
+    "coinTypes": {
+        "unisex": {
+            "asset": "Assets/Coins/coin_toilet_unisex.usd",
+            "labelIcon": "icon_unisex.svg",
+            "modelRotation": [0, 270, 0],
+            "modelScale": 0.25,
+            "spinAxis": "z"
+        },
+        "men": {
+            "asset": "Assets/Coins/other_coins/coin_men_toilet.usdc",
+            "labelIcon": "icon_men.svg",
+            "modelRotation": [-90, 270, 0],
+            "modelScale": 0.25,
+            "spinAxis": "z"
+        },
+        "women": {
+            "asset": "Assets/Coins/other_coins/coin_women_toilet.usdc",
+            "labelIcon": "icon_women.svg",
+            "modelRotation": [-90, 270, 0],
+            "modelScale": 0.25,
+            "spinAxis": "z"
+        },
+        "accessible": {
+            "asset": "Assets/Coins/other_coins/coin_accessible_toilet.usdc",
+            "labelIcon": "icon_accessible.svg",
+            "modelRotation": [-90, 270, 0],
+            "modelScale": 0.25,
+            "spinAxis": "z"
+        },
+        "changing_table": {
+            "asset": "Assets/Coins/other_coins/coin_changing_table.usdc",
+            "labelIcon": "icon_changing_table.svg",
+            "modelRotation": [-90, 270, 0],
+            "modelScale": 0.25,
+            "spinAxis": "z"
+        },
+        "kiosk": {
+            "asset": "Assets/Coins/other_coins/coin_kiosk.usdc",
+            "labelIcon": "icon_kioski.svg",
+            "modelRotation": [-90, 270, 0],
+            "modelScale": 0.25,
+            "spinAxis": "z"
+        },
+        "elevator": {
+            "asset": "Assets/Coins/other_coins/coin_elevator.usdc",
+            "labelIcon": "icon_elevator.svg",
+            "modelRotation": [-90, 270, 0],
+            "modelScale": 0.25,
+            "spinAxis": "z"
+        },
+        "emergency_exit": {
+            "asset": "Assets/Coins/other_coins/coin_emergency_exit.usdc",
+            "labelIcon": "icon_emergency_exit.svg",
+            "modelRotation": [-90, 270, 0],
+            "modelScale": 0.25,
+            "spinAxis": "z"
+        },
+        "ticket_office": {
+            "asset": "Assets/Coins/other_coins/coin_ticket_office.usdc",
+            "labelIcon": "icon_ticket_office.svg",
+            "modelRotation": [-90, 270, 0],
+            "modelScale": 0.25,
+            "spinAxis": "z"
+        }
+    }
+}

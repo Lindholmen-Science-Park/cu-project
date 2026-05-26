@@ -1,0 +1,55 @@
+#usda 1.0
+(
+    defaultPrim = "World"
+)
+
+over "World"
+{
+    def Xform "PlayerSpawnPoint_01"
+    {
+        token visibility = "inherited"
+        double3 xformOp:rotateXYZ = (0, -144.76279851329397, 0)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (-5778.041302571314, 2245.785888627629, -5907.339475028431)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "PlayerSpawnPoint_02"
+    {
+        token visibility = "inherited"
+        double3 xformOp:rotateXYZ = (159.0863, -44.913113, 180)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (-20575.503849787317, 17733.411693822807, -21878.62751009331)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "PlayerSpawnPoint_Arena"
+    {
+        double3 xformOp:rotateXYZ = (0, 0, 0)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (2754.4137042841894, 2386.9043981078676, -837.2655671687743)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "PlayerSpawnPoint_Foyer"
+    {
+        double3 xformOp:rotateXYZ = (0, 0, 0)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (-1972.5856781970579, 2285.4629807289966, -4444.121881314821)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "PlayerSpawnPoint_Entrance"
+    {
+        float3 xformOp:rotateXYZ = (0, 225, 0)
+        float3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (-3191.699462890625, 2289.593505859375, -6583.5830078125)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+}
+
+over "OmniverseKit_Persp"
+{
+    custom uniform vector3d omni:kit:centerOfInterest = (0, 0, -190.8848375987393)
+}
+

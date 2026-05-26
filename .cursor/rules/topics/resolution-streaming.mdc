@@ -1,0 +1,186 @@
+---
+description: Streaming resolution sync — resizeAppWindow-driven, small Kit default, reconnect on resize, safeTerminateStream, object-fit cover NDC mapping. Read when working on streaming, resolution, resize, reconnection, or loading overlays.
+---
+
+# Streaming resolution sync
+
+How the web app matches the Kit renderer resolution to the browser viewport, and the constraints involved.
+
+## Architecture overview
+
+```
+Browser viewport (e.g. 375×812)
+  → getAlignedResolution() → encoder-safe dims (e.g. 384×816)
+  → AppStream connect at 384×816
+  → NVST encoder max set to 384×816
+  → omni.kit.livestream.app resizeAppWindow → Kit renderer resizes to 384×816
+  → dynamicResize adapts from Kit default (640×360) during transition
+```
+
+## Key files
+
+| File | Role |
+|------|------|
+| `web-viewer-sample-main/src/features/streaming/AppStream.tsx` | Connect, resize listener, NDC click mapping |
+| `web-viewer-sample-main/src/features/streaming/streamUtils.ts` | `safeTerminateStream()` — force-clears library state |
+| `web-viewer-sample-main/src/features/streaming/hooks/useStreamConnection.ts` | Loading text, stream lifecycle, scene events |
+| `web-viewer-sample-main/src/features/streaming/StreamOnlyWindow.tsx` | Wires `onLoadingStatus` to `setLoadingText` |
+| `web-viewer-sample-main/src/features/streaming/overlays/interactionBoxes/InteractionBoxesOverlay.tsx` | `computeVideoContentRect()` — overlay positioning (cover semantics) |
+| `kit-app-template-main/.../resolution_service.py` | Kit-side: updates `/app/renderer/resolution/*` (belt-and-suspenders) |
+| `kit-app-template-main/source/apps/younite.usd_viewer_streaming_base.kit` | Livestream settings, small default resolution |
+
+## How resolution matching works
+
+The NVIDIA `omni.kit.livestream.app` extension has a `resizeAppWindow` method that runs during `PreUpdate`. It queries the primary stream for the client's connect resolution and resizes the Kit app window + renderer to match. This is the **primary** mechanism for resolution control — do not fight it.
+
+### Why Kit starts at 640×360
+
+The NVST encoder sets its **maximum** frame size at connection time (the DirectConfig `width`/`height`). Frames that exceed this max are rejected with a warning. During the brief transition after connect (before `resizeAppWindow` finishes), the Kit renderer is still at its startup default. If the default (previously 1280×720) is larger than the client's aligned resolution, frames would be rejected.
+
+Setting the Kit default to 640×360 (our minimum aligned resolution) ensures the first frames are always ≤ the encoder max. `dynamicResize = true` handles these smaller frames during the transition. Once `resizeAppWindow` takes effect (within a few frames), the renderer matches the client exactly.
+
+### Critical .kit settings
+
+| Setting | Value | Why |
+|---------|-------|-----|
+| `renderer.resolution.width/height` | 640×360 | Small default ≤ any aligned resolution |
+| `window.width/height` | 640×360 | Matches renderer default |
+| `livestream.allowResize` | 1 | Let resizeAppWindow control the renderer |
+| `fillViewport` | true | Viewport follows window size (which resizeAppWindow controls) |
+| `primaryStream.allowDynamicResize` | true | Accept frames during startup transition |
+| `dynamicResize` (webrtc plugin) | true | Encoder adapts to frame size changes |
+
+## getAlignedResolution
+
+Converts viewport dimensions to encoder-safe values:
+- Width: 32-aligned (NVENC macroblock constraint)
+- Height: 16-aligned (avoids FrameGrabFailed on certain heights like 1384, 1386)
+- Clamped to 640×360 – 1920×1440
+- Preserves the viewport's **true** aspect ratio (no cropping, no bars)
+
+## Portrait FOV cap (dynamic aperture)
+
+In portrait orientation the true aspect ratio is preserved in the render buffer but the vertical FOV would become extreme (~103° for a typical phone) — producing a fish-eye look. The `ResolutionService` on Kit narrows the camera's `horizontalAperture` and `verticalAperture` on the **session layer** to cap vertical FOV at `MAX_VFOV_DEG` (default 55°). `focalLength` is never modified — this preserves perspective characteristics and avoids conflicts with `camera_placement_extension` lens controls.
+
+**How it works:**
+1. `ResolutionService._adjust_portrait_fov()` is called on `changeResolutionRequest`, `scene.loaded`, `younite.camera.viewTypeChanged`, and `fixedCameraStatus`.
+2. It reads the active viewport camera's original `focalLength` and `horizontalAperture` (cached per camera path on first access).
+3. If the render target is portrait and vFOV > `MAX_VFOV_DEG`, it sets narrowed `horizontalAperture` and `verticalAperture` on the session layer (camera native aspect matches render target — no conform policy issues). In landscape, the overrides are cleared.
+
+**Key math** (in `resolution_service.py`):
+```
+new_v_ap = 2 × focalLength × tan(MAX_VFOV / 2)
+new_h_ap = new_v_ap × (W / H)
+```
+
+**Result for a typical phone (375×812, first-person camera 18mm focal):**
+- Landscape 16:9: hFOV ≈ 60°, vFOV ≈ 36° — no adjustment
+- Portrait 9:21.6: vFOV capped from 103° → 55°, hFOV narrows from 60° → 27°
+
+**Timing**: The `changeResolutionRequest` fires before the camera exists during startup, so `_adjust_portrait_fov` silently returns. The `scene.loaded` listener ensures the cap is applied once the camera is ready.
+
+**Interaction with other services**: `viewport_api.world_to_ndc` (used by `ProjectionService`) automatically reflects the session-layer aperture, so overlay positioning stays correct.
+
+## Connection flow
+
+1. Browser computes aligned resolution from viewport size
+2. Connect at aligned resolution → NVST encoder max = aligned resolution
+3. Kit's `resizeAppWindow` resizes renderer to match (within a few frames)
+4. `dynamicResize` handles the brief 640×360 → aligned transition
+5. After 400ms: `onStarted()` → loading overlay hides
+6. `changeResolutionRequest` sent as belt-and-suspenders confirmation
+
+## safeTerminateStream — critical fix
+
+The NVIDIA library (`@nvidia/omniverse-webrtc-streaming-library` v5.18.0) has a race condition:
+- `stop()` sets `_disconnectStatus = 1` and returns immediately
+- `terminate()` checks `_disconnectStatus !== 0` → throws "Stream is already stopping"
+- `_terminateStream()` never runs → `_ragnarokApp` stays alive
+- Next `connect()` finds `_ragnarokApp` → returns "Stream already connected" with no real WebRTC connection
+
+**Fix:** After fire-and-forget `stop()`/`terminate()`, force-clear internal state:
+- `_stream._ragnarokApp.destroy()` then null it
+- `_stream = null`
+- `_disconnectStatus = 0`
+- `_streamStatus = 0`
+
+**Never remove this force-clear** — it is essential for reliable reconnection.
+
+## Resize handling
+
+- `resize` and `orientationchange` events are debounced (`ORIENTATION_DEBOUNCE_MS`, 500ms)
+- `getAlignedResolution()` computes new dims; if unchanged, no-op
+- If changed: `desiredResolution` state updates → connect effect re-runs → full reconnect
+- Reconnect needed because the NVST encoder max is fixed at connect time — resize requires a new connection so `resizeAppWindow` sets the Kit renderer to the new size
+
+### Instant visual hide
+
+When the resize handler fires, the stream is hidden **immediately** (before the debounce settles) by setting `resolutionSynced = false`. This prevents the user from seeing the old aspect ratio during the debounce period. A `resizeReconnectingRef` tracks that a resize-triggered reconnection is in progress — the "Readjusting screen resolution…" overlay stays visible through the entire reconnect cycle (debounce → terminate → reconnect → resolution sync) because it uses `!showStream && resizeReconnectingRef.current` rather than depending on the internal `streamReady` state (which resets to false during reconnection).
+
+If the user flips back before the debounce fires and the aligned resolution ends up unchanged, `applyResize` detects `prev === next`, clears the ref, and restores `resolutionSynced = true` — the stream reappears without an unnecessary reconnection.
+
+### Reconnection cooldown
+
+`RESIZE_RECONNECT_COOLDOWN_MS = 8000` throttles resize-triggered reconnections. Each reconnection sends one `ui.ready` message to Kit. The Kit-side streaming watchdog (`ui_stage_service.py`) resets all livestream extensions if 5+ `ui.ready` arrive within 30 seconds. Without the cooldown, rapid orientation flips on mobile could trigger the watchdog, causing `NVST_R_INVALID_STATE` errors, `scene.loaded` delivery failures, and eventually a black screen.
+
+If a resize occurs during the cooldown period, it is **deferred** (via `deferredResizeRef`) and applied once the cooldown expires. This ensures the final desired resolution is always applied.
+
+### Resolution-adjusting overlay
+
+`AppStream.tsx` renders a "Readjusting screen resolution…" overlay (spinner + message, matching `LoadingOverlay` styling) when `!showStream && resizeReconnectingRef.current`. This covers the gap where:
+- AppStream's internal `streamReady` is false (connect effect re-running)
+- The parent's `stream.streamReady` (from `useStreamConnection`) is still true (no failure callback fires during a normal reconnect)
+- Neither the parent's `LoadingOverlay` nor the stream div is visible
+
+The ref is cleared in three places: `applyResize` (no-change fallback), the resolution sync effect (successful sync), ensuring the overlay always disappears when the stream becomes visible.
+
+### Duplicate ui.ready prevention
+
+`handleStreamStarted` in `useStreamConnection.ts` sends `ui.ready` when `onStarted()` fires. A previous `useEffect` in `AppStream.tsx` sent a second `ui.ready` 150ms after `streamReady` — this was removed because each reconnection (resize) would double-count toward the Kit-side watchdog threshold.
+
+## NVST encoder constraints
+
+- The encoder max is set at connect time via DirectConfig `width`/`height`
+- Frames **larger** than the max are always rejected (hard limit, not fixable with dynamicResize)
+- `dynamicResize = true` allows frames **smaller** than the max (used during Kit startup transition)
+- `primaryStream.allowDynamicResize = true` enables dynamic resize for the primary stream
+- Spectator stream lines must remain **commented out** — the plugin blocks ALL resize operations when any `spectatorStream` entry exists
+
+## object-fit: cover and NDC mapping
+
+The `<video>` element uses `object-fit: cover` so the stream fills the viewport completely (no black bars). Since aligned resolution may differ slightly from viewport, `cover` crops the tiny overflow (~30px max).
+
+Both the NDC click handler (`AppStream.tsx`) and the overlay positioning (`InteractionBoxesOverlay.tsx`) use **cover semantics**: they compute the full scaled video rect (which extends slightly beyond the element) and map coordinates through it. These two must always agree — if you change one, change the other.
+
+## Loading status flow
+
+| Phase | Loading text | Source |
+|-------|-------------|--------|
+| Connecting | "Connecting to local stream…" | `useStreamConnection` initial state |
+| Resolution sync | "Syncing resolution to WxH…" | `AppStream` via `onLoadingStatus` |
+| Synced | "Stream connected, waiting for scene…" | `useStreamConnection.handleStreamStarted` |
+| Scene loading | Kit loading.phase messages | `useStreamConnection.processSceneEvent` |
+| Ready | Hidden | `scene.loaded` or `loading.phase` phase=ready |
+| Resize reconnect | "Readjusting screen resolution…" | `AppStream` inline overlay (spinner + text) |
+
+## Initialization scenarios
+
+1. **Browser before Kit:** Connect fails → timeout → retry (up to `MAX_CONNECT_RETRIES` = 3) → Kit starts → connects
+2. **Kit first, then user (immediate):** Connect succeeds → resizeAppWindow → `ui.ready` → Kit responds with `scene.loaded` → ready
+3. **Kit first, then user (late):** Same as 2, but the initial `ui.ready` may be silently dropped because the WebRTC data channel isn't fully bidirectional yet. The periodic retry in `useStreamConnection` (every 3 s) resends `ui.ready` until the response arrives. See `stage-init.mdc` → "Late-connecting or re-requesting client".
+4. **User resizes:** Instant hide → debounced resize → new `desiredResolution` → terminate → reconnect at new resolution → overlay visible throughout → stream reappears at new resolution
+5. **User refreshes:** Kit detects CLIENT_DISCONNECTED → new page load → same as scenario 2/3
+
+## Gotchas
+
+- **Two `streamReady` states**: `AppStream` has its own internal `streamReady` (reset immediately when the connect effect re-runs) and `useStreamConnection` exposes `stream.streamReady` (only set to false on explicit failure). During a resize reconnect, the internal one goes false while the hook's stays true — neither the parent `LoadingOverlay` (needs `!stream.streamReady`) nor the stream div (needs internal `streamReady && resolutionSynced`) is visible. The `resizeReconnectingRef` overlay bridges this gap.
+- **Kit-side streaming watchdog**: `ui_stage_service.py` tracks `ui.ready` arrivals — if 5+ arrive within 30 seconds, it resets all livestream extensions. Each WebRTC reconnection sends one `ui.ready`. Duplicate `ui.ready` effects or aggressive reconnection loops can trip this threshold. The `RESIZE_RECONNECT_COOLDOWN_MS` and duplicate-prevention measures keep us safely under the limit.
+- React StrictMode double-invokes effects in dev — `connectionIdRef` guards against stale callbacks
+- The `connectWithDelay` uses exponential backoff (1s, 2s, 4s, max 5s) to give Kit time to accept the new connection
+- `maxReconnects: 0` in DirectConfig — we manage retries ourselves to avoid zombie connections from the library's internal retry queue
+- `MAX_CONNECT_RETRIES = 3` — three WebRTC connection attempts before giving up (previously 1; increased for reconnection resilience after browser refresh)
+- The static `AppStream.stop()` method uses `safeTerminateStream()` for backward compatibility
+- Viewers skip resolution sync entirely — they observe the host's framebuffer as-is
+- Never set `livestream.allowResize = 0` — it prevents `resizeAppWindow` from matching the renderer to the client, leaving the renderer stuck at the Kit default
+- Never set the Kit default resolution higher than the minimum aligned resolution (640×360) — larger defaults would exceed the encoder max during startup transition
+- High-frequency outbound events (e.g. `uiInteractionBoxesUpdate`) must check `/younite/client/connected` before dispatching — see `stage-init.mdc` → "Client connectivity gate"

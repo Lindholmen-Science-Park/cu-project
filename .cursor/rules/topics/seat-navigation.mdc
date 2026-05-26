@@ -1,0 +1,743 @@
+---
+description: Seat data generation pipeline, seat navigation, seat auto-move, seat highlighting, route measurement, seating layout variants -- read when working on seat-related features
+---
+
+# Seat Navigation & Auto-Move
+
+Navigate to any seat by section, row, and seat number. The route is calculated via NavMesh; the player can auto-move along it -- same pattern as predefined spot navigation. The target seat is highlighted with a glowing green material during navigation.
+
+## Architecture overview
+
+```
+[Web: SeatNavigateWidget]  --seatNavigate-->  [Kit: _on_seat_navigate]
+                      |                              |
+                      |                    seat_nav_target_bridge: seat id + snap_world cache
+                      |                    (cleared on stop / teleport / non-seat route)
+                      |                              |
+                      |                    set_route_for_id("seat_nav", pos, face_direction=True)
+                      |                              |
+                      v                              v
+              seat_highlight              navmeshRouteWaypoints + measures (lightweight polyline projection)
+                      |                              |
+[Web: navigationStateSet autoMove] -->  PointClickAutoMover -- polyline end -- stop(arrived)
+                      |                              |
+                      |                    [player_core _on_auto_move_complete]
+                      |                    seat_nav: TeleportService -> seats_lookup XYZ (before autoMoveStatus)
+                      |                    non-seat: gentle ground snap only
+                      |                              |
+                      +---------- autoMoveStatus(seat_nav) --> Web: celebration, seatNavigate stop, unhighlight
+
+Manual seat (autoMove off): `_emit_lightweight_measure` — player inside **endpoint AABB** + path guard
+  -> `navmeshRouteArrival` { manualNearDestination: true } -> stop(lightweight_arrival) -> same celebration path
+  (skipFaceTowardCenter: no arena yaw -- user approached from free walk)
+
+Route failure:
+  navmeshRouteWaypoints { success: false } -> navmeshRouteError -> Web "unreachable"
+```
+
+## Structured seat input (SeatQuery)
+
+The widget sends seat data as a structured object, not a string:
+
+```typescript
+interface SeatQuery {
+    section: string;   // e.g. "L" (uppercased on send)
+    row: string;       // e.g. "8" walking; wheelchair uses real row from data (typically "6")
+    seat: string;      // e.g. "14" — plain digits for both modes after WC→row-6 post-process
+}
+```
+
+**CU dropdowns (cascading)**: In CU mode all three fields are dropdowns powered by the offline-generated **`seat_hierarchy.json`** (see "Seat hierarchy data" below). Section options are the keys of `walking` / `wheelchair`; choosing a section populates **Row** → choosing a row populates **Seat** (same three-level cascade in **walking and wheelchair**). Picking an upstream value resets every downstream value (`onSectionChange` clears row + seat; `onRowChange` clears seat). Stale draft values that no longer exist in the active list are auto-cleared by guard `useEffect`s (mode switch, hierarchy regeneration, etc.). The shared dropdown chrome lives in `SeatChoiceDropdown.tsx` and reuses the same `cu-seat-panel__section-lang-dropdown` styles for all three fields.
+
+**Dev / default panel**: Free-text `<input>` fields (digits-only filter for row + seat). Wheelchair mode shows **section, row, and seat** like walking.
+
+**Wheelchair mode**: When `accessibilityMode === 'wheelchair'`, the widget still uses **section → row → seat**. Rows and seats come from the **`wheelchair`** branch of `seat_hierarchy.json` (nested like `walking`). After **`postprocess_wheelchair_wc_to_row6.py`**, data uses ticket-style row **`6`** and numeric seat ids such as **`C-6-14`**; `buildQuery()` sends **uppercase** `section`/`row` and **numeric** `seat` with **no** forced `"WC"` row and **no** `R` prefix on the wire. `activeSeatRouteId`, dismiss logic, and Kit payloads use the same `SECTION-ROW-SEAT` key shape as walking (e.g. `C-6-1`). `build_seat_hierarchy.py` still strips a legacy **`R`** prefix on `seat_number` when present so old JSON rows survive in the dropdown until post-process is applied.
+
+**Section filtering in wheelchair mode**: The Section dropdown switches to `CU_WHEELCHAIR_SECTION_LETTERS` (sections with `tier: "wheelchair"` seats — currently `['C', 'D', 'G', 'J', 'K', 'R', 'T']`). In walking mode it switches to `CU_STADIUM_SECTION_LETTERS` (the 19 sections that actually contain navigable non-wheelchair seats — derived from the hierarchy, **not** the full 26-letter alphabet). If the user has a section selected that is not in the active list, it's auto-cleared (along with row + seat).
+
+The backend's `_resolve_seat_number(payload)` helper builds the seat ID string (`"Section-Row-Seat"`) from the structured fields. It also supports legacy `seatNumber` string payloads for backward compatibility.
+
+## Seat hierarchy data (web dropdowns)
+
+The CU dropdowns are powered by a small JSON file generated offline from the master seat list:
+
+| File | Role |
+|---|---|
+| `data/Assets/Seats/Tools/build_seat_hierarchy.py` | Reads `extracted_seats_with_rows.json`, writes the compact tree to the frontend |
+| `web-viewer-sample-main/src/features/streaming/widgets/seat-navigate/data/seat_hierarchy.json` | Generated tree (~56 KB). **Vite imports it directly** — no runtime fetch. |
+| `widgets/seat-navigate/constants.ts` | Loads the JSON, exposes `CU_STADIUM_SECTION_LETTERS`, `CU_WHEELCHAIR_SECTION_LETTERS`, `getWalkingRowsForSection` / `getWalkingSeatsForRow`, `getWheelchairRowsForSection` / `getWheelchairSeatsForRow` |
+
+Structure:
+
+```json
+{
+  "walking":    { "A": { "1": ["1","2",…], "2": [...], … }, … },
+  "wheelchair": { "C": { "6": ["1","2",…] }, "D": { "6": ["1","2",…] }, … }
+}
+```
+
+Companion (MEDFOLJARE) seats are excluded — they are visual-only and not navigable. **`wheelchair`** mirrors **`walking`**: section → row string → sorted seat number strings. Legacy CAD extraction may still emit `row: "WC"` and `R`-prefixed `seat_number` until **`postprocess_wheelchair_wc_to_row6.py`** is run (see below).
+
+**Regenerate** when the source DXF / `extracted_seats_with_rows.json` changes: run **`build_seat_hierarchy.py`** after the JSON is final (Step 4 of `rebuild_seats.py`, or manually from `data/Assets/Seats/Tools/`). The generated JSON is committed. If you use **`rebuild_seats.py`** end-to-end, remember it **does not** invoke the WC→row-6 post-process — run **`postprocess_wheelchair_wc_to_row6.py`** after extraction when needed, then re-run **instancer → lookup → hierarchy** (see "Step 1a" below).
+
+## Offline data generation pipeline
+
+Scripts live in `data/Assets/Seats/Tools/`, data files in `data/Assets/Seats/Data/`, and USD outputs in `data/Assets/Seats/`. Requires `ezdxf`, `numpy`, and `pxr` (OpenUSD).
+
+**One-command rebuild**: `rebuild_seats.py` runs extraction plus steps 2–4 in sequence. It **does not** run `postprocess_wheelchair_wc_to_row6.py`; after a full rebuild that re-runs `extract_cad_seats`, wheelchair rows in JSON are again CAD-style (`WC` / `R*`) until you apply the post-process and regenerate instancer, lookup, and hierarchy (see Step 1a).
+
+```bash
+cd data/Assets/Seats/Tools
+python rebuild_seats.py              # outputs .usda
+python rebuild_seats.py --usdc       # outputs .usdc (binary, smaller/faster)
+```
+
+### Step 1: Extract seat data from DXF
+
+**Script**: `Tools/extract_cad_seats.py`
+**Input**: `Data/260113 Scandinavium Arenaplan.dxf` (CAD floor plan), `Data/tele_boundaries.json`, `Data/section_overrides.json`, `Data/row_heights.json`
+**Output**: `Data/extracted_seats_with_rows.json` (~11,691 seats)
+
+The script:
+1. Parses the DXF for INSERT entities (seat blocks), row label TEXT, wheelchair markers, and companion (MEDFOLJARE) polylines
+2. **Phase 1 (TELE/lower seats)**: Assigns sections via angular wedges from SEKTIONER divider lines, rows via fan-sweep with k-gap clustering
+3. **Phase 2 (Upper seats)**: Section from DXF layer name, rows via nearest row-label matching
+4. **Companion seats**: Parses LWPOLYLINE rectangles on `*-STOLAR MEDFOLJARE` layers (helper seats behind wheelchair positions, 65 across sections C, D, G, J, K, R, T). Computes center position from polyline vertices and resolves rotation from the nearest regular seat text entity. Tier is `"companion"`, row is `"COMP"`, IDs use format `"Section-COMP-N"` (e.g. `"C-COMP-1"`). These seats are visual-only -- not navigable.
+5. Applies per-seat overrides from `section_overrides.json` (row corrections, seat number fixes)
+6. Applies Z-heights from `row_heights.json` (40 row levels + wheelchair + companion height, in mm)
+7. Writes per-seat record: `{ id, section, row, seat_number, tier, x, y, rotation, handle, z }`
+
+Seat IDs use the format `"Section-Row-SeatNumber"` (e.g. `"A-4-15"`). Fresh **`extract_cad_seats.py`** output still uses **`C-WC-R1`**-style ids for wheelchair tier; after **`postprocess_wheelchair_wc_to_row6.py`** they become ticket-style **`C-6-1`**. Coordinates are in mm (`metersPerUnit=0.001`).
+
+```bash
+python extract_cad_seats.py
+```
+
+### Step 1a: Wheelchair WC → ticket row 6 (JSON post-process)
+
+**Script**: `Tools/postprocess_wheelchair_wc_to_row6.py`  
+**Input / output**: Rewrites **`Data/extracted_seats_with_rows.json`** in place. Also updates **`Data/extracted_event_seats.json`** if that file exists beside the baseline.
+
+**When to run** (every time baseline JSON is recreated with CAD legacy wheelchair rows):
+
+- Immediately after **`python extract_cad_seats.py`** (or after **`rebuild_seats.py`**, which starts with the same extractor). The extractor intentionally keeps **`row: "WC"`** and **`seat_number`** like **`R14`** so CAD tooling stays unchanged.
+- Any time you pull or merge a fresh `extracted_seats_with_rows.json` that still contains `"row": "WC"` for wheelchair-tier seats.
+
+The script maps each such seat to **`row: "6"`**, strips the leading **`R`** from **`seat_number`** (plain digits), sets **`id`** to **`{SECTION}-6-{n}`**, and uppercases **`section`**. **Idempotent**: rows already at `"6"` are skipped. See the script docstring for the **collision** note if numeric row `6` already exists for walking seats in the same section.
+
+```bash
+python postprocess_wheelchair_wc_to_row6.py
+```
+
+**Recommended order with event seating**: **`extract_cad_seats.py` → `postprocess_wheelchair_wc_to_row6.py` → `extract_event_seats.py`** so the event baseline inherits normalized wheelchair ids before **`generate_instancer.py`**. If you only regenerate the baseline, run post-process **after** Step 1 and **before** Step 2.
+
+**After post-process** (same as rest of pipeline): **`generate_instancer.py`** → **`create_lookup.py`** → **`build_seat_hierarchy.py`**. If you already ran a full `rebuild_seats.py` without post-process, run post-process once, then run those three steps again (no need to re-extract unless DXF changed).
+
+### Step 1b: Extract event seats (optional)
+
+**Script**: `Tools/extract_event_seats.py`
+**Input**: `Data/240904 Playstation C  Seating  (V1).dxf` (event CAD), `Data/extracted_seats_with_rows.json` (baseline), `Data/row_heights.json`
+**Output**: `Data/extracted_event_seats.json` (~10,087 seats)
+
+Creates event-specific seating by starting from the original baseline data (including companion seats) and applying removals + additions. Companion seats in removed sections are automatically filtered out by the section rules:
+
+1. **Color=9 STOLAR rectangles** -- scans for `LWPOLYLINE` entities with ACI color 9 on `STOLAR*` layers, matches each to the nearest `STOLNUMMER` TEXT label by position, removes those individual seats
+2. **Explicit section/tier rules** (constants in the script):
+   - `REMOVE_ALL_SECTIONS = {"K", "L", "M"}` -- entire sections removed
+   - `REMOVE_EXCEPT_WHITELIST_SECTIONS = {"J", "N"}` -- all seats removed except specific `KEEP_SEAT_IDS` (wheelchair accessibility positions)
+3. **Parkettstolar floor seats** -- parses `INSERT` entities from the `Parkettstolar` layer (arena floor), groups by X-position into rows (descending numbering), assigns sequential seat numbers by Y-position, sets Z-height to row 0. IDs use format `"PARKETT-Row-Seat"` with tier `"parkett"`.
+
+To add a new event variant: copy this script, adjust `REMOVE_ALL_SECTIONS`, `REMOVE_EXCEPT_WHITELIST_SECTIONS`, `KEEP_SEAT_IDS`, and floor-seat parsing as needed for the new CAD file.
+
+```bash
+python extract_event_seats.py
+```
+
+### Step 2: Generate the PointInstancer USD with variants
+
+**Script**: `Tools/generate_instancer.py`
+**Input**: `Scan-Arenaseats.usdc` (4 prototype meshes — Up/Down × Orange/White), `Data/extracted_seats_with_rows.json`, optionally `Data/extracted_event_seats.json`
+**Output**: `seats_instanced.usda` (or `.usdc`), `Data/availability_*.json`, plus config files in `navmesh_route_extension/config/`
+
+The script:
+1. Extracts Chair 0's mesh from the source USD as the prototype (geometry, UVs, materials with OmniPBR MDL, subsets)
+2. Creates 5 prototypes from `Scan-Arenaseats.usdc` (separate folded-Up and unfolded-Down meshes per colour, plus a green nav-target highlight):
+
+| Index | Prototype | Source mesh | Usage |
+|---|---|---|---|
+| 0 | ChairOrangeUp | `SeatScandOrange_Up_001` | **Default** for upper tier + companion seats (folded, empty) |
+| 1 | ChairWhiteUp | `SeatScandWhite_Up_001` | **Default** for lower tier (including `"parkett"`), folded |
+| 2 | ChairOrangeDown | `SeatScandOrange_Down_001` | Runtime: occupied / nav-visited upper-tier seat |
+| 3 | ChairWhiteDown | `SeatScandWhite_Down_001` | Runtime: occupied / nav-visited lower-tier seat |
+| 4 | ChairHighlight | `SeatScandOrange_Down_001` (Down geometry, every subset rebound to a green-glow OmniPBR material) | Runtime: active seat-nav target |
+
+The variant `protoIndices` array only ever contains Up indices (0/1) — every Down/Highlight transition is a runtime session-layer override applied through `seat_proto_override` (see "Seat prototype override service" below).
+
+The four chair meshes share identical pivots in the source asset, which is what makes them safely swappable as PointInstancer prototypes — flipping `protoIndices[i]` between Up/Down/Highlight at runtime is purely a draw-call swap, no per-seat re-positioning.
+
+3. Applies `ROTATION_OFFSET = 180 deg` to correct prototype orientation relative to DXF rotations
+4. Applies `PROTO_SCALE = 10.0` to scale the cm-based prototype mesh to mm coordinates
+
+**Source asset orientation pitfall**: `Scan-Arenaseats.usdc` is authored Y-up but every chair mesh is internally Z-up — a `(-90°, 0, 0)` parent xformOp + `(0, -2.748, 3.135)` cm translate makes them display correctly inside the source's Y-up stage. Our generator's instancer is **Z-up**, so the parent transform must NOT be applied during prototype extraction (`extract_arena_prototype` reads raw mesh points, dropping the parent's translate too so the pivot matches the previous pipeline — no retuning of `BACKREST_OFFSET_MM`, `Z_OFFSET`, or row Z-heights). Applying the rotation lays every chair flat on its back; the bbox check at the top of `extract_arena_prototype`'s docstring is the regression test.
+
+**Companion-seat XY pivot** (`seat_pivot_offset.py`): companion seats use their own `SEAT_PIVOT_COMPANION_MM = -250.0` (50 mm forward of `SEAT_PIVOT_UPPER_MM = -300.0`). The ArenaSeatV2 backrest curves rearward, and companion seats sit against a wall — the 5 cm forward bias keeps the curved back from clipping. Upper-tier seats keep the original -300 mm pivot. Companion seats are excluded from `seats_lookup.json` (visual-only, not navigable), so this change is purely visual.
+5. Builds a `PointInstancer` with positions, orientations, scales, proto-indices, and `primvars:seatId` (per-instance, `varying` interpolation, full IDs like `"A-4-15"`)
+6. **Companion seats** (tier `"companion"`) are appended to every variant's instance arrays -- they are always visible but never included in availability files (visual-only, not navigable). For baseline variants all 65 companion seats are included; for the event variant only companion seats from surviving sections are included (sections removed by the event rules lose their companion seats too).
+7. Wheelchair seats are placed as separate Xform prims under `/World/WheelchairSpots` (position markers, no mesh). Their IDs are included in every availability file (always available regardless of capacity variant, since they are accessibility positions).
+8. Every variant gets an explicit availability file -- no `null` entries in `seating_variants.json`. This ensures navigation/teleport is strictly limited to seats visible in the active variant.
+9. Creates a `VariantSet` named `"seating"` with variants: `all_seats`, `half_capacity`, `one_third_capacity`, and `event_playstation_c` (if event data exists)
+10. Writes `seating_variants.json` and copies availability JSONs to the extension config folder
+
+```bash
+python generate_instancer.py            # outputs .usda
+python generate_instancer.py --usdc     # outputs .usdc
+```
+
+The generated `seats_instanced.usda` is referenced by the scene at `/World/Skandinavium/seats_instanced/SeatInstancer`.
+
+### Step 3: Create the runtime lookup
+
+**Script**: `Tools/create_lookup.py`
+**Input**: `Data/extracted_seats_with_rows.json` + optionally `Data/extracted_event_seats.json` + `main_scene.usda` (for the instancer's world transform)
+**Output**: `navmesh_route_extension/config/seats_lookup.json` (compact `{ "A-4-15": [x,y,z], ... }`)
+
+Transforms each seat's local position (mm) to world space using the SeatInstancer's `ComputeLocalToWorldTransform`, so the Kit extension can navigate directly to world coordinates. Companion seats (tier `"companion"`) are excluded from the lookup since they are visual-only and not navigable. If `extracted_event_seats.json` exists, any new seat IDs (e.g. `PARKETT-*`) are merged into the lookup so they are navigable when the event variant is active.
+
+**After manually adjusting the Skandinavium model** (e.g. moving/rotating the Root or the seats in Skandinavium.usda): re-run only `create_lookup.py`. It opens the composed `main_scene.usda`, so the instancer's world transform will reflect your changes. No need to re-run extraction or instancer generation unless the source DXF or seat positions changed.
+
+```bash
+python create_lookup.py
+```
+
+### Data files (data/Assets/Seats/Data/)
+
+| File | Purpose |
+|---|---|
+| `extracted_seats_with_rows.json` | Master seat data: id, section, row, position, rotation, tier, z-height |
+| `extracted_event_seats.json` | Event seat data (filtered baseline + Parkettstolar floor seats) |
+| `row_heights.json` | Row Z-heights in mm (40 levels + WC + COMP), applied during extraction |
+| `section_overrides.json` | Per-section row ranges, anchor seats, and per-seat corrections |
+| `tele_boundaries.json` | Boundary lines for TELE section wedge assignment |
+| `availability_all_seats.json` | Full-capacity availability (all chairs + all wheelchair spots) |
+| `availability_half.json` | Half-capacity availability (every 2nd chair per row + all wheelchair spots) |
+| `availability_third.json` | One-third-capacity availability (every 3rd chair per row + all wheelchair spots) |
+| `availability_event_playstation_c.json` | Event availability (filtered chairs + event wheelchair spots + floor seats) |
+
+### Generated config files (navmesh_route_extension/config/)
+
+| File | Purpose |
+|---|---|
+| `seats_lookup.json` | Seat ID -> world-space `[x,y,z]` (union of all variants' seats) |
+| `seating_variants.json` | Maps variant name -> availability filename (every variant has an explicit file) |
+| `availability_*.json` | Per-variant availability sets (copied from Data/) |
+
+## Runtime data flow
+
+1. **`seat_lookup.py`** loads `seats_lookup.json` (union of all seats across all variants) + `seating_variants.json` on first use.
+2. The active variant determines which `availability_*.json` is loaded. Every variant has an explicit availability file -- navigation and teleportation are strictly limited to seats present in the active variant's availability set.
+3. `get_seat_position()` always returns a position (seat exists in any variant). `is_seat_available()` checks the active availability set.
+4. Switching variant via `seatLayoutChange` event: unhighlights any active seat, updates USD VariantSet on the SeatInstancer prim, calls `seat_lookup.set_active_variant()` to swap the availability filter, then invalidates the seat highlight cache.
+
+## Seat prototype override service (seat_proto_override.py)
+
+Single owner of the seat instancer's session-layer `protoIndices` opinion. Three callers (`seat_highlight`, `seat_fold_state`, and the unhighlight nav-visited write) need to flip prototype indices on the same PointInstancer attribute — doing it from each module independently means whichever writes last wins, which would lose fold-state every time a highlight is applied (and vice versa). This module is the only place that writes the override; everyone else routes through `set_one` / `clear_one` / `set_overrides` / `set_down_for_seat`.
+
+Internal state is `{instance_idx: (proto_idx, priority)}`; `_flush()` rebuilds the merged array from the variant baseline + every override and writes it once. The variant baseline is read by walking the property stack and skipping the session layer, so our own override never loops back into the merge.
+
+**Priority ladder** (higher wins):
+
+| Constant | Value | Producer | Lifecycle |
+|---|---|---|---|
+| `FOLD_PRIORITY` | 1 | `seat_fold_state.refresh()` (crowd density change) | Bulk-cleared on every density flip via `set_overrides({}, clear_priority=FOLD_PRIORITY)` |
+| `NAV_VISITED_PRIORITY` | 5 | `seat_highlight.unhighlight_seat()` writes one when a route ends | Persists for the rest of the session — survives crowd flips and seating-variant swaps; only cleared by `reset()` (stage close) |
+| `HIGHLIGHT_PRIORITY` | 10 | `seat_highlight.highlight_seat()` writes one for the active nav target | Cleared by `unhighlight_seat()` (then immediately replaced with a NAV_VISITED Down at the same index) |
+
+**Helpers**:
+
+| Function | Use |
+|---|---|
+| `set_one(idx, proto, prio)` | Single-index override |
+| `clear_one(idx, prio)` | Drop one override **only if its priority matches** — guards against highlight clearing fold-state, etc. |
+| `set_overrides(updates, clear_priority=None)` | Bulk write at one priority; `clear_priority` drops every existing override at that level first |
+| `set_down_for_seat(idx, prio)` | Reads variant baseline at idx (0/1), maps via `_UP_TO_DOWN` to the matching Down (2/3), writes the override. Used by both `seat_fold_state` and `unhighlight_seat`. No-op for indices that don't sit on a known Up prototype. |
+| `get_baseline_proto(idx)` | Diagnostic — variant-baseline proto at idx |
+| `reapply()` | Re-flush against the current baseline. Called after `seating` variant change so existing overrides survive the baseline swap. |
+| `reset()` | Drop everything (e.g. stage close) |
+
+**Seating variant interaction**: `_on_seat_layout_change` in `extension.py` calls `seat_proto_override.reapply()` immediately after the USD VariantSet flips, then `seat_fold_state.refresh()`. Variant order is generator-stable, so visited / fold overrides at instance idx N still target the same seat after the flip.
+
+## Seat highlighting (seat_highlight.py)
+
+Runtime per-seat highlight using PointInstancer prototype swapping. Routes through `seat_proto_override` so highlight composes with crowd-driven Down-state and nav-visited Down-state without clobbering them.
+
+**Key design**: All highlight edits are written to the **session layer** so they never pollute the VariantSet data on the root layer. This prevents corruption when switching variants while a seat is highlighted.
+
+| Function | Behavior |
+|---|---|
+| `highlight_seat(seat_number)` | Reads `primvars:seatId` to find the instance index, calls `seat_proto_override.set_one(idx, HIGHLIGHT_INDEX=4, HIGHLIGHT_PRIORITY)`. Auto-unhighlights any previously highlighted seat first. |
+| `unhighlight_seat()` | Clears the highlight override, then **writes a NAV_VISITED Down override** at the same index via `set_down_for_seat` so the seat stays unfolded — the user has effectively sat down (see "Nav-visited Down state" below). Restores the seated-crowd character. |
+| `invalidate_cache()` | Clears the `seatId -> index` mapping (must be called after variant switch since instance arrays change) |
+| `get_highlighted_seat()` | Returns the currently highlighted seat number or `None` |
+
+**Seat ID format**: Full IDs like `"A-4-15"` are used directly for lookup (case-insensitive fallback). No zero-padding.
+
+**Instancer path**: `/World/Skandinavium/seats_instanced/SeatInstancer`
+
+### Nav-visited Down state
+
+When a seat route ends — auto-walk arrival, manual stop, proximity arrival, dismiss, switching to a different seat — `unhighlight_seat()` does **not** clear the seat back to baseline. It writes a `NAV_VISITED_PRIORITY` Down override so the chair stays unfolded for the rest of the session. Rationale: the user has "sat down" there, the chair shouldn't fold up behind them.
+
+| Behaviour | Why |
+|---|---|
+| Survives crowd density flips | Visited (priority 5) > FOLD (priority 1); the bulk-clear in `set_overrides(..., clear_priority=FOLD_PRIORITY)` only touches priority-1 entries. |
+| Survives seating-variant flips | `seat_proto_override.reapply()` re-flushes overrides against the new baseline; instance order is variant-stable in the generator so the visited idx still maps to the right seat. |
+| Loses to a new highlight | `HIGHLIGHT_PRIORITY` (10) > `NAV_VISITED_PRIORITY` (5); when the highlight is cleared, the visited Down on that seat is rewritten (it's the same priority-5 opinion that was already present, plus a fresh one from the new arrival). |
+| Cleared on stage close | `seat_proto_override.reset()` wipes everything; the override map is process-local. |
+
+**Wheelchair / companion seats**: visited Down is a no-op for these. Wheelchair seats live under `/World/WheelchairSpots` (separate Xforms, not in the PointInstancer); companion seats are in the instancer but are not navigable (`is_seat_available` returns False / never gets a `seatNavigate`). For both, no highlight ever writes a HIGHLIGHT override → no `unhighlight_seat()` call → no visited Down. Works as intended.
+
+### Seated-crowd character hide (companion to highlight)
+
+`highlight_seat()` and `unhighlight_seat()` also drive `seated_crowd_highlight.py` so the **sitting character** on the target seat is removed from view while the seat route is active — otherwise the green chair would be mostly occluded by a seated body. The hide rides on the existing seat-highlight lifecycle, so every existing call site (route stop, seat layout switch, seat teleport completion, bird-eye seat-directions teardown, …) restores the character automatically — no per-call-site wiring.
+
+It also re-applies on `seatedCrowdLayoutChanged` (observed by `navmesh_route_extension/extension.py`), so toggling "Display crowd" off/on or switching density via the dev picker mid-route keeps the target uncovered.
+
+The hide is a silent no-op when the seated-crowd payload has not loaded yet, when the seat is wheelchair/companion (no character placed), or when the current `crowd_density` variant already hides that character.
+
+**Mechanism, regen requirement, the `primvars:seatId` lookup, and the session-layer `invisibleIds` union → see `.cursor/rules/topics/seated-crowd.mdc` § "Per-seat character hide".**
+
+## Kit backend (younite.navmesh_route_extension)
+
+### `seat_nav_target_bridge.py`
+
+Small process-wide bridge so **player core** can read the same **seat id** and optional **cached snap `[x,y,z]`** that navigation set when the user requested directions. Populated in `extension.py` when a seat route is calculated (`set_seat_nav_target_seat_id(seat_number, pos)`); cleared on seat stop, seat teleport, and other route teardown paths. Player core uses it in `_on_auto_move_complete` to snap via `TeleportService` (fallback: `get_seat_position` if cache empty) **before** dispatching `autoMoveStatus`, so the celebration runs at the exact seat pose.
+
+### Payload parsing: `_resolve_seat_number(payload)`
+
+Shared helper used by both `_on_seat_navigate` and `_on_seat_teleport`. Builds the seat ID from structured or legacy payloads:
+
+1. If `{ section, row, seat }` fields are all present -> returns `"section-row-seat"` (e.g. `"A-4-15"`)
+2. Otherwise falls back to `seatNumber` string (legacy)
+
+### Event: `seatNavigate`
+- **Handler**: `_on_seat_navigate` in `extension.py`
+- **Payload**: `{ section: string, row: string, seat: string, action?: "navigate"|"stop" }` (or legacy `{ seatNumber: string }`)
+- **Navigate flow**: Resolves seat ID via `_resolve_seat_number()`, looks up position via `seat_lookup.get_seat_position()`, checks availability via `is_seat_available()`, highlights the seat via `seat_highlight.highlight_seat()`, then calls `self._svc.set_route_for_id("seat_nav", ..., face_direction=True)`. On the first successful waypoint dispatch, the player's camera instantly turns to face the route direction. Route measure is computed automatically since `routeId != "player"`.
+- **Stop flow**: Stops the route, calls `seat_highlight.unhighlight_seat()`.
+- **Response event**: `seatNavigateResult` with `{ seatNumber, success, position?, error? }` -- `position` is `[x, y, z]` on success.
+
+### Event: `seatLayoutChange`
+- **Handler**: `_on_seat_layout_change` in `extension.py`
+- **Payload**: `{ variant: string }` (empty = query current)
+- **Flow**: Unhighlights active seat first, sets USD VariantSet `"seating"` on the SeatInstancer prim, calls `seat_lookup.set_active_variant()`, invalidates highlight cache.
+- **Response event**: `seatLayoutChanged` with `{ variant, success, variants[] }`.
+
+### Route failure relay: `navmeshRouteError`
+
+When any route calculation fails (the async NavMesh path query returns no result), the internal `navmeshRouteWaypoints` event fires with `success: false`. A listener in `extension.py` relays this as a `navmeshRouteError` outbound event with `{ routeId, error }`. This is generic -- works for `seat_nav`, `exit_nav`, `poi_nav`, `quiet_zone_nav`, and any future route type.
+
+### Key module: `seat_lookup.py`
+- `get_seat_position(seat_number) -> tuple | None`
+- `is_seat_available(seat_number) -> bool | None`
+- `get_seat_positions_bbox_center_xz() -> tuple | None` -- axis-aligned bbox center of all seat positions in **XZ** (cached; cleared on `reload()`). Used as "bowl / stadium plan center" for facing.
+- `camera_local_yaw_to_face_world_xz(player_prim, observer_x, observer_z, target_x, target_z) -> float | None` -- camera-local yaw (deg) to look from a world XZ point toward a target XZ point; same convention as `NavigationOrchestratorService.face_toward_world_xz` (`atan2` + player root yaw).
+- `get_available_variants() -> dict`
+- `set_active_variant(name)` / `get_active_variant()`
+- `reload()` -- called on shutdown to reset state (also clears bbox cache).
+
+### Route measurement integration
+The `seat_nav` route goes through `set_route_for_id()` which creates a `_RouteInstance`. Since `routeId != "player"`, the route engine (using types and helpers from the `route_measure` package) computes distance and estimated time (base + crowd-adjusted) automatically. The measure is dispatched as `navmeshRouteMeasure` with `routeId: "seat_nav"`.
+
+**Update cadence**: Between full recalcs, lightweight remaining-distance updates use **`LIGHTWEIGHT_MEASURE_INTERVAL_SEC`** from `route_engine/constants.py` (`_periodic_loop` in `route_engine/instance_base.py`; `_emit_lightweight_measure` in `route_engine/arrival.py` — project player onto stored polyline; no NavMesh re-query). During auto-move, full recalcs are suppressed -- only lightweight measures fire. When auto-move stops, a full recalc runs immediately. See `.cursor/rules/topics/route-measurement.mdc`.
+
+**Arrival logic (`_emit_lightweight_measure`)** -- seat-specific:
+
+| Mode | When Kit stops / notifies |
+|------|---------------------------|
+| **Auto-move on** | Under **1 m** along polyline (`ROUTE_ARRIVAL_THRESHOLD_CM`): route **stays active** (log once); completion is polyline end (or **AABB** on final approach via `PointClickAutoMover`) -> `stop(arrived)` -> player core seat snap -> `autoMoveStatus` -> web celebration. |
+| **Auto-move off** | Player inside **seat-manual endpoint AABB** (wider XZ than generic POI) **and** remaining along path ≤ `ARRIVAL_PATH_GUARD_MAX_REMAINING_CM`: `navmeshRouteArrival` with **`manualNearDestination: true`**, `stop(waypoint_error="lightweight_arrival")` -- web runs the **same** celebration as auto-walk but passes **`skipFaceTowardCenter`** so the user is not rotated toward bowl center after free walk. |
+
+Other POIs use the **generic** endpoint AABB half-extents and the same path guard.
+
+**Arrival volume**: World-axis-aligned box centered on the **last polyline vertex**, rebuilt when the path updates (`route_engine/instance_base.py`, dimensions from `route_engine/constants.py`). See `.cursor/rules/topics/route-measurement.mdc` § lightweight updates.
+
+## Web frontend (SeatNavigateWidget + StreamOnlyWindow.tsx + UIControls.tsx)
+
+### SeatNavigateWidget
+
+**File**: `widgets/SeatNavigateWidget.tsx`
+
+The widget presents three cascading dropdowns (CU mode) — **Section**, **Row**, **Seat** — for **both** walking and wheelchair mesh modes. Wheelchair uses the same cascade and `SeatQuery` shape as walking (uppercase `section`/`row`, numeric `seat`; canonical ids like **`G-6-3`**). See "Structured seat input (SeatQuery)" above; the dev panel keeps free-text inputs for all three fields.
+
+Two action buttons (both disabled until all fields are filled):
+- **Get directions** -- calculates a NavMesh route (`seatNavigate` event)
+- **Teleport me there** -- instant teleport (`seatTeleport` event, see `poi-teleport.mdc`)
+
+The widget also shows:
+- Cost toggles: "Avoid crowds" / "Avoid noise"
+- Route measure (distance + time) when a route is active
+- "Move to seat" auto-walk button when a route is active
+- Error messages for not-found, not-available, and unreachable seats
+
+**Props**:
+```typescript
+onSeatNavigate: (query: SeatQuery) => void;
+onSeatTeleport?: (query: SeatQuery) => void;
+accessibilityMode: 'wheelchair' | 'walking';
+activeSeatRouteId: string | null;
+movingToSeatId: string | null;
+onSeatMoveStart: () => void;
+onSeatMoveStop: () => void;
+```
+
+### State variables
+| Variable | Type | Purpose |
+|---|---|---|
+| `activeSeatRouteId` | `string \| null` | Seat ID with active route, or `"not_found:X"` / `"not_available:X"` / `"unreachable:X"` for errors |
+| `movingToSeatId` | `string \| null` | Seat ID the player is auto-moving toward (null = not moving) |
+| `lastSeatPositionRef` | `ref<number[]>` | Cached `[x,y,z]` from last successful `seatNavigateResult` -- needed for auto-move |
+| `seatingLayout` | `string \| null` | Currently active seating layout variant name |
+| `availableSeatingLayouts` | `string[]` | All variant names available for switching (populated from `seatLayoutChanged` response) |
+| `seatArrivalLabel` | `string \| null` | Seat key captured on arrival (before `activeSeatRouteId` is cleared). Drives the arrival overlay card during the 5 s celebration. Auto-cleared when celebration ends. |
+
+### Error states
+
+| `activeSeatRouteId` prefix | Meaning | Display |
+|---|---|---|
+| `not_found:` | Seat ID not in lookup | "Seat X does not exist" |
+| `not_available:` | Seat exists but not in current variant | "Seat X is not available" |
+| `unreachable:` | Seat found but NavMesh path failed | "Seat X is unreachable -- no walkable path found" |
+
+Errors auto-clear after 3-5 seconds. While an error prefix is present, `hasValidRoute` is false and the Move/Stop buttons are hidden.
+
+### Variant query timing
+The available seating layouts are queried from Kit at two points:
+1. **Stream start** (`handleStreamStarted`): sends `seatLayoutChange` with empty variant
+2. **Scene loaded** (`scene.loaded` event): re-queries to handle cases where Kit wasn't ready at stream start
+
+### Seat route flow
+1. User fills in Section, Row, and Seat -> clicks "Get directions".
+2. `handleSeatNavigate(query)` sets `activeSeatRouteId = seatKey`, calls `markRouteCalculating('seat_nav')` to **close the ready gate**, then sends `seatNavigate` with `{ section, row, seat }` to Kit. The seat panel stays visible (button label flips to "Stop") because `seatStreamOverlayActive` is gated on `routeReadyByRouteId['seat_nav']`.
+3. Kit resolves the seat ID, highlights the seat, dispatches `seatNavigateResult { success: true, position }` (position saved to `lastSeatPositionRef`), then computes the route (`face_direction=True`).
+4. When pathfinding completes, Kit's `navmesh_route_extension` relays a **`navmeshRouteReady { routeId: 'seat_nav' }`** ping to web. The handler calls `markRouteReady('seat_nav', true)` → `seatStreamOverlayActive` flips true → the seat panel auto-collapses → the **stream overlay + play FAB appear**. Without this gate the FAB would appear immediately on click and silently no-op (because `lastSeatPositionRef` was still empty) — see "Route ready gating" in `bird-eye-route.mdc` for the full rationale.
+5. On the first successful waypoint dispatch (`faceDirection: true`), the player's camera **smoothly rotates** to face the route direction (`_face_route_direction` → `_start_face_turn(profile="route")`, **`FACE_ROUTE_*`**: 132°/s peak with `ease_scale_remaining`, look-ahead **800** stage units). Auto-mover yaw is deferred until the turn finishes (`is_face_turn_active`). Periodic recalculations do not trigger this — only the initial calculation after clicking the button.
+6. Route is drawn on screen. Route measure (distance + time) is displayed in the widget and below the floating move button.
+7. If the NavMesh path query fails, `navmeshRouteError` is received -> `activeSeatRouteId` set to `unreachable:X` and `markRouteReady('seat_nav', false)` keeps the overlay/FAB hidden. The user stays in first-person — we do **not** roll back to bird-eye on failure (there's nowhere good to roll back to and the inline error in the seat panel is enough surface area).
+
+### Auto-move flow (mirrors spot auto-move)
+1. **Start**: User clicks "Move to seat X" -> `handleSeatMoveStart()` sends `navigationStateSet` with `{ autoMove: true, routeId: 'seat_nav', endPos: [x,y,z] }`. The orchestrator triggers `navmeshRouteCalculate` (with `autoMove: true`) -> waypoints -> `PointClickAutoMover` moves the player. During auto-move, `_auto_move_active` is `true` on the route instance, suppressing full NavMesh re-queries. Lightweight remaining-distance updates use `LIGHTWEIGHT_MEASURE_INTERVAL_SEC`.
+2. **Arrival (auto-move)**: Polyline end -> auto-mover `stop(arrived)` (final translate applied before stop so seat snap is not overwritten) -> player core snaps to `seats_lookup` -> `autoMoveStatus` / `navmeshRouteStop` -> web sends `seatNavigate` stop, celebration overlay, `activeSeatRouteId` / `movingToSeatId` cleared.
+3. **Arrival (manual, auto-move off)**: User walks along the drawn route; when remaining polyline distance drops below **2.5 m**, Kit fires `navmeshRouteArrival` with **`manualNearDestination: true`** -> web same celebration as (2) with **`skipFaceTowardCenter: true`** (no arena yaw). Not the old 1 m seat threshold.
+4. **Cancelled**: Kit sends `autoMoveStatus { routeId: 'seat_nav', reason: 'cancelled' }` -> route extension clears `_auto_move_active` and triggers immediate recalc -> web re-requests the seat route (highlight stays active). The route now recalculates every 5 s as the user moves freely.
+5. **Interrupted (ground click)**: If the user clicks on the ground during auto-move, the orchestrator's `_ensure_auto_move()` detects the route change from `seat_nav` to `player` and dispatches `autoMoveStatus { routeId: 'seat_nav', reason: 'interrupted' }`. The route extension clears `_auto_move_active` and recalculates; the web re-requests the seat route (highlight stays, route redraws every 5 s, play button shown) but does **not** send `navigationStateSet` back -- the orchestrator already set up the player route for the ground click. The user can press play again to resume auto-move to the seat. This applies to all POI auto-move types (seat, exit, restroom, quiet zone, spots).
+6. **Manual stop**: User clicks "Stop moving" -> `handleSeatMoveStop()` disables auto-move, re-requests seat route, restores orchestrator to default `routeId: 'player'`.
+
+### Seat label formatting (`formatSeatLabel`)
+
+The stream navigation overlay and arrival card display human-readable labels via `formatSeatLabel()` in `AppStream.tsx`. It converts the raw seat key into a structured label:
+
+| Key | Output |
+|---|---|
+| `"O-8-11"` | `"Section O, Row 8, Seat 11"` |
+| `"C-6-1"` | `"Section C, Row 6, Seat 1"` (canonical wheelchair / ticket-style after post-process) |
+| `"C-WC-R1"` | Legacy keys still render as `"Section C, Seat 1"` (row `WC` omitted; `R`+digits collapsed to the number) for overlays and old bookmarks |
+
+For current data, wheelchair keys match the same **section / row / seat** pattern as walking. The **`WC`** + **`R\d+`** branch in `formatSeatLabel` remains for **legacy** seat strings only.
+
+### Arrival feedback (mode-dependent)
+
+Seat and POI arrival feedback is split by app mode (`appModeRef` on `EventStateSetters`). Kit sends the same events regardless of mode; the frontend event handlers branch:
+
+| Mode | Seat arrival | POI arrival (restroom, quiet zone, POI/geo teleport) |
+|---|---|---|
+| **CU** | `scheduleSeatArrivalCelebration` — full-screen confetti overlay + arrival card (5 s) | `schedulePoiArrival` — top-bar arrival overlay (5 s) |
+| **Dev** | `showTriggerNotification` — compact bottom toast (5 s) | `showTriggerNotification` — compact bottom toast (5 s) |
+
+This prevents CU celebration overlays from appearing in dev mode and dev toasts from appearing in CU mode.
+
+**`appModeRef` wiring**: `StreamOnlyWindow.tsx` creates a `useRef<AppMode>` that mirrors the current `useAppMode().mode` value. The ref is passed into the `useCustomEventHandler` setters object as `appModeRef`. Event handlers read `s.appModeRef.current` synchronously at dispatch time (no stale closures).
+
+#### CU celebration overlay
+
+When in CU mode, a 5-second celebration is shown on seat arrival:
+
+1. **Confetti/throne graphic** -- full-screen `stream-seat-arrival-celebration` PNG (pop animation).
+2. **Arrival navigation card** -- the top stream overlay stays visible during celebration with the formatted seat label, speaker/close buttons, and a "You have arrived !" pill (styled like the turn-hint bubble). No metrics or play/pause FAB.
+3. **Find my seat panel** (`SeatNavigateWidget`) is auto-closed.
+
+**Data flow**: Arrival handlers (`navigationHandlers.ts`, `seatHandlers.ts`) store the seat key in `seatArrivalLabel` via `setSeatArrivalLabel(prev)` _before_ clearing `activeSeatRouteId`. `StreamOnlyWindow` passes `seatArrivalLabel` and `onArrivalDismiss` to `AppStream`. The label is auto-cleared when `seatArrivalCelebrationVisible` goes false.
+
+**Dismiss**: The X button on the arrival card calls `dismissArrivalCelebration()` which clears both celebration and label immediately, cancelling the 5 s timer.
+
+#### Dev toast
+
+When in dev mode, seat and POI arrivals show a `TriggerZoneToast` (dark pill at bottom center, 5 s auto-dismiss). Rendered via `SharedOverlayLayer` using `ctrl.triggerZoneNotification` state from `ControlContext`.
+
+### Face toward bowl center (walk / auto-move / manual arrival only)
+
+**Not** used for restroom, exit, or quiet-zone arrival -- only **seat** arrival UX.
+
+When the celebration starts, `scheduleSeatArrivalCelebration()` in `hooks/eventHandlers/helpers.ts` sends **`playerFaceStadiumCenter`** unless **`skipFaceTowardCenter: true`**: set for **seat teleport** (Kit already set yaw) and for **manual walk to seat** (`manualNearDestination` from Kit -- user approached from an arbitrary direction).
+
+**Kit bridge** (`navmesh_route_extension/extension.py`): observes `playerFaceStadiumCenter`, reads `get_seat_positions_bbox_center_xz()`, dispatches **`playerFaceWorldXZ`** `{ x, z }`.
+
+**Player core** (`navigation_orchestrator_service.py`): observes `playerFaceWorldXZ`, calls **`face_toward_world_xz`** → `_start_face_turn(profile="stadium")`.
+
+**Stadium profile motion** (tuned for continuous sweep, no rate×ease cruise plateau):
+
+1. `_capture_face_turn_span` stores `start_yaw`, signed `total_delta`, and `duration_s = clamp(|Δ| / FACE_STADIUM_AVG_DEG_PER_S, FACE_STADIUM_DURATION_MIN_S, FACE_STADIUM_DURATION_MAX_S)`.
+2. Each `GLOBAL_EVENT_UPDATE` frame: `yaw = start_yaw + total_delta × smootherstep01(elapsed_s / duration_s)` (`ease_helpers.smootherstep01`).
+3. Current constants: **`FACE_STADIUM_AVG_DEG_PER_S`** **74**, min duration **0.45 s**, max **1.65 s**, snap within **0.35°**.
+
+Tune stadium speed by lowering/raising **`FACE_STADIUM_AVG_DEG_PER_S`** only (hot-reload). Route-start facing uses a different profile — **`FACE_ROUTE_*`** rate×ease — see `cct-movement.mdc` and `route-measurement.mdc`.
+
+**`stop_face_turn_if_active()`** cancels an in-progress turn when teleport or **`immediateViewAngles`** applies yaw synchronously.
+
+### Seat teleport: view fade + spawn facing (no post-teleport smooth turn)
+
+**Web** (`useSeatNavigation.ts`): `handleSeatTeleport` wraps **`beginViewTransition`** (same pattern as `handlePoiTeleport` in `useNavmeshCore.ts`): fade out -> `onFadeOutComplete` sends `seatTeleport` -> Kit -> `viewTransitionReady` -> fade in.
+
+**Kit** (`_on_seat_teleport`): Computes camera-local yaw toward the seating bbox center via `camera_local_yaw_to_face_world_xz` + `get_seat_positions_bbox_center_xz`. Calls **`TeleportService.teleport_to_coordinates(x, y, z, camera_local_yaw_deg=...)`** when yaw is valid; otherwise position-only. See `.cursor/rules/topics/poi-teleport.mdc` and `.cursor/rules/topics/camera-teleport.mdc`.
+
+**Web** (`seatHandlers.ts`): On successful `seatTeleportResult`, CU mode calls **`scheduleSeatArrivalCelebration(s, { skipFaceTowardCenter: true })`** (no `playerFaceStadiumCenter` -- avoids double-rotation after Kit already set yaw); dev mode calls **`showTriggerNotification`** instead.
+
+### Wheelchair mode auto-revert
+
+When the user navigates in wheelchair mode and reaches the destination (via auto-move, point-and-click, or teleport), the `navmeshMode` is automatically reverted to `'walking'` and a `navmeshModeSet { mode: 'walking' }` message is sent to Kit, triggering a rebake with walking agent settings.
+
+**Revert triggers** (all in `useCustomEventHandler.ts`):
+- `autoMoveStatus { reason: 'arrived' }` for `seat_nav`
+- `navmeshRouteArrival` for `seat_nav`
+- `seatTeleportResult { success: true }`
+
+**Manual revert triggers** (in `useNavigationHandlers.ts`):
+- User clicks "Stop" on an active seat route (`handleSeatNavigate` toggle-off)
+- User dismisses the route overlay (`handleSeatRouteDismiss`)
+
+The `revertWheelchairMode()` helper uses a functional updater on `setNavmeshMode` to guard against double-sends: only sends the Kit message if the current mode is `'wheelchair'`.
+
+### Route cleanup on arrival/stop
+
+When a seat route is stopped (arrival, manual stop, or dismiss), full cleanup ensures no stale routes survive a subsequent rebake:
+
+1. **Kit side** (`extension.py`): `seatNavigate { action: 'stop' }` and successful seat teleport both call `self._svc.stop_route("player")` in addition to `stop_route("seat_nav")`. This removes any stale `player` route that the navigation orchestrator may have created.
+2. **Web side**: All `navigationStateSet` messages that reset to `routeId: 'player'` include `endPos: null, endpointPath: null` to clear the orchestrator's stale endpoint. Without this, `_apply_state()` would recreate a `player` route with the old seat position, which `recalc_all_routes()` after a rebake would then redraw as a ghost path.
+3. **Web side**: `navmeshRouteStop { routeId: 'player' }` is sent alongside `seatNavigate stop` in arrival handlers as a safety net.
+
+### Cost category toggles (Avoid crowds / Avoid noise / Areas affect player movement)
+
+The seat widget includes **"Avoid crowds"** and **"Avoid noise"** toggle buttons that control whether camera (crowd) or sound area costs are included in seat/NPC/exit pathfinding. The navigation hamburger menu has an **"Areas affect player movement"** toggle that controls whether all area costs affect point-and-click (player/default) routes. When OFF, those cost categories are ignored (treated as default 1.0); slider values remain stored and are used when re-activated. State: `avoidCrowds` / `avoidNoise` / `pointClickCostsActive` booleans. Frontend sends `navmeshCostCategoryToggle` event with `category: "crowd"|"sound"|"player"`; backend has `_crowd_costs_active` / `_sound_costs_active` / `_player_costs_active` flags on `NavMeshRouteService`. Cost gating is baked into lambdas at `_RouteInstance` creation: player routes gate on `_player_costs_active`, others on the per-category flags. See `.cursor/rules/topics/route-measurement.mdc` for full details.
+
+## Route ID convention
+
+- Seat routes always use `routeId = "seat_nav"` (fixed, not per-seat) -- only one seat route active at a time.
+- Spot routes use the spot's `id` (e.g. `"wheelchair_ramp_01"`).
+- The default player route uses `routeId = "player"`.
+
+## Events summary
+
+| Event | Direction | Payload | Purpose |
+|---|---|---|---|
+| `seatNavigate` | Web -> Kit | `{ section, row, seat, action? }` | Navigate to seat / stop |
+| `seatNavigateResult` | Kit -> Web | `{ seatNumber, success, position?, error? }` | Seat found/not-found result |
+| `seatTeleport` | Web -> Kit | `{ section, row, seat }` | Instant teleport to seat (sent via `onFadeOutComplete`) |
+| `seatTeleportResult` | Kit -> Web | `{ seatNumber, success, position?, error? }` | Teleport result payload |
+| `viewTransitionReady` | Kit -> Web | `{ result }` | Unified fade-in trigger (dispatched after `seatTeleportResult`) |
+| `seatLayoutChange` | Web -> Kit | `{ variant }` | Switch seating variant |
+| `seatLayoutChanged` | Kit -> Web | `{ variant, success, variants[] }` | Variant switch result |
+| `navmeshRouteArrival` | Kit -> Web | `{ routeId, manualNearDestination? }` | Seat manual walk: endpoint **AABB** + `manualNearDestination`; other POIs: same AABB + path guard |
+| `navmeshRouteError` | Kit -> Web | `{ routeId, error }` | Route calculation failure (generic, any route) |
+| `playerFaceStadiumCenter` | Web -> Kit | `{}` | Seat celebration only -- bridge to `playerFaceWorldXZ` (not sent on teleport success) |
+| `playerFaceWorldXZ` | Kit internal | `{ x, z }` | Smooth yaw toward world XZ point (orchestrator) |
+| `younite.player.immediateViewAngles` | Kit internal | `{ yaw, pitch }` | Sync `PlayerInputController` after teleport sets camera yaw (see `poi-teleport.mdc`) |
+
+## Key files
+
+| File | Role |
+|---|---|
+| **Offline generation** (run when source DXF/model changes) | |
+| `data/Assets/Seats/Tools/rebuild_seats.py` | One-command pipeline: extract → instancer → lookup → hierarchy (four steps). Does **not** run `postprocess_wheelchair_wc_to_row6.py` — add Step 1a manually when needed |
+| `data/Assets/Seats/Tools/extract_cad_seats.py` | Step 1: DXF -> `extracted_seats_with_rows.json` (CAD-style wheelchair `WC` / `R*` preserved) |
+| `data/Assets/Seats/Tools/postprocess_wheelchair_wc_to_row6.py` | Step 1a: in-place JSON normalize `WC` -> row `6`, strip `R` prefix, rewrite `id` (see § Step 1a) |
+| `data/Assets/Seats/Tools/extract_event_seats.py` | Step 1b: Event DXF + baseline -> `extracted_event_seats.json` (section removal, color=9 filtering, Parkettstolar floor seats) |
+| `data/Assets/Seats/Tools/generate_instancer.py` | Step 2: seat data + prototype mesh -> `seats_instanced.usda`/`.usdc` with 3 prototypes + VariantSets + per-variant availability |
+| `data/Assets/Seats/Tools/create_lookup.py` | Step 3: seat data (+ event data) + world transform -> `seats_lookup.json` |
+| `data/Assets/Seats/Scan-Arenaseats.usdc` | Source 3D model — 4 chair prototypes (Up/Down × Orange/White) extracted by `generate_instancer.py`. Y-up source with internally Z-up meshes (parent transform deliberately not baked, see § "Source asset orientation pitfall"). |
+| `data/Assets/Seats/Data/extracted_seats_with_rows.json` | Master baseline data: per-seat id, section, row, position, rotation, tier, z-height |
+| `data/Assets/Seats/Data/extracted_event_seats.json` | Event variant data: filtered baseline + Parkettstolar floor seats |
+| `data/Assets/Seats/Data/row_heights.json` | Row Z-heights in mm (persistent, applied during extraction) |
+| `data/Assets/Seats/Data/section_overrides.json` | Per-section row ranges and per-seat corrections |
+| **Runtime config** (generated, committed) | |
+| `navmesh_route_extension/config/seats_lookup.json` | Seat ID -> world `[x,y,z]` |
+| `navmesh_route_extension/config/seating_variants.json` | Variant name -> availability filename |
+| `navmesh_route_extension/config/availability_*.json` | Per-variant availability sets |
+| **Kit extension** | |
+| `navmesh_route_extension/extension.py` | `_on_seat_navigate`, `_on_seat_teleport`, `_on_seat_layout_change`, `_on_route_waypoints` handlers |
+| `navmesh_route_extension/seat_nav_target_bridge.py` | Seat id + snap world cache for player-core arrival snap |
+| `navmesh_route_extension/services/kit_services/route_engine/arrival.py` | `_emit_lightweight_measure` — seat manual/auto thresholds, `lightweight_arrival` stop |
+| `navmesh_route_extension/services/kit_services/seat_lookup.py` | Position lookup, availability, variant management |
+| `navmesh_route_extension/services/kit_services/seat_highlight.py` | Per-seat highlight; routes through `seat_proto_override` (HIGHLIGHT_PRIORITY); writes a NAV_VISITED Down on unhighlight; drives `seated_crowd_highlight` |
+| `navmesh_route_extension/services/kit_services/seat_proto_override.py` | Single owner of the seat instancer's session-layer `protoIndices` opinion; merges fold / nav-visited / highlight overrides at three priority levels |
+| `navmesh_route_extension/services/kit_services/seat_fold_state.py` | Crowd-driven seat fold-state — occupied seats Down, empty seats Up; refreshes on `seatedCrowdLayoutChanged` and after seating-variant flip |
+| `navmesh_route_extension/services/kit_services/seated_crowd_highlight.py` | Hides the seated-crowd character on the highlighted seat by unioning its id into `invisibleIds` on the session layer; re-applies on `seatedCrowdLayoutChanged` |
+| `navmesh_route_extension/services/kit_services/route_measure/` | Distance + estimated time calculation (shared with spot routes); public API via package `__init__` and `route_measure/route_measure_service.py` |
+| **Player extension** | |
+| `usd_viewer_player_core_extension/extension.py` | `_on_auto_move_complete` -- `seat_nav` TeleportService snap before `autoMoveStatus`; gentle ground snap for other routes |
+| `inputs/point_click/auto_mover.py` | `PointClickAutoMover` -- `lightweight_arrival` -> `arrived`; no final translate after `stop(arrived)` |
+| `navigation_orchestrator_service.py` | `_face_route_direction`, `face_toward_world_xz`, observes `playerFaceWorldXZ`; `stop_face_turn_if_active` |
+| **Web frontend** | |
+| `SeatNavigateWidget.tsx` | Section/row/seat state; `availableRows` / `availableSeats` from `seat_hierarchy.json` (walking + wheelchair); `buildQuery()` uppercases section/row; `routeFormKey` matches `activeSeatRouteId`; Get directions + Teleport + bird-eye preflight |
+| `SeatFormBody.tsx` | CU: three `SeatChoiceDropdown`s (section / row / seat) for walking **and** wheelchair; dev: three text inputs (digits-only row/seat) |
+| `SeatChoiceDropdown.tsx` | Generic dropdown used for section/row/seat in CU mode; reuses `cu-seat-panel__section-lang-dropdown` styles; auto-disables when options are empty; supports placeholder, error state. Full native-`<select>`-style keyboard: type-ahead (printable chars, 700 ms idle reset, repeat-key cycles matches), `ArrowUp`/`Down` (wraps), `Home`/`End`, `Enter`/`Space` to commit, `Escape` to close. Active option is communicated via `aria-activedescendant` and `.cu-lang-dropdown-option--active`. |
+| `seat-navigate/data/seat_hierarchy.json` | `{ walking: {section: {row: [seats]}}, wheelchair: {section: {row: [seats]}} }` from `build_seat_hierarchy.py` |
+| `seat-navigate/constants.ts` | `getWalkingRowsForSection`, `getWalkingSeatsForRow`, `getWheelchairRowsForSection`, `getWheelchairSeatsForRow`, plus section letter lists |
+| `data/Assets/Seats/Tools/build_seat_hierarchy.py` | Step 4 — `extracted_seats_with_rows.json` → `seat_hierarchy.json` (drops MEDFOLJARE; strips legacy `R` prefix on wheelchair `seat_number` when present) |
+| `AppStream.tsx` | `formatSeatLabel` — full section/row/seat for canonical keys; legacy `WC` + `R\d+` branch for old keys |
+| `StreamOnlyWindow.tsx` | State, handlers, event routing for seat nav + auto-move + variant query |
+| `UIControls.tsx` | Floating move button, layout variant selector, route measure display |
+| `useNavigationHandlers.ts` / `useSeatNavigation.ts` | `handleSeatNavigate`, `handleSeatMoveStart/Stop` in composed nav hook; **`handleSeatTeleport`** lives in `useSeatNavigation.ts` (view transition + `seatTeleport`) |
+| `hooks/eventHandlers/helpers.ts` | `scheduleSeatArrivalCelebration`, `schedulePoiArrival`, `showTriggerNotification` -- arrival feedback helpers; mode branching is in the callers |
+| `hooks/eventHandlers/seatHandlers.ts` | `seatTeleportResult` -> CU: celebration (`skipFaceTowardCenter`), dev: toast. Also handles `poiTeleportResult` / `geoTeleportResult` with same mode split |
+| `viewTransition/*` | `beginViewTransition`, `useViewTransitionController` -- seat teleport fade (see `camera-teleport.mdc`) |
+| `useCustomEventHandler.ts` | `seatNavigateResult`, `seatTeleportResult`, `viewTransitionReady`, `navmeshRouteError`, `navmeshRouteMeasure`, `navmeshRouteArrival` handlers |
+
+## Bird-eye seat directions (swap-aware preview + first-person commit)
+
+When the user is in **bird-eye view**, the seat widget no longer commits a route directly — it routes through the shared **`MapMarkerDirectionsPanel`** (same panel as POI/Foyer directions) so the user can choose the start/end inputs and swap them before confirming. The full panel mechanics + paired state setters are documented in **`bird-eye-route.mdc` § "Directions panel"** — read that first. This section covers the seat-specific bits.
+
+### Flow
+
+```
+SeatNavigateWidget (bird-eye) — handleGo
+  ├─ requestSeatTeleportFromBirdEyeCheck(query)  ← preflight RPC
+  │       (synchronous validation: avoids stuck-on-black-overlay)
+  ├─ if invalid: surface inline error, abort
+  ├─ sendMessage('birdEyeRouteRequest', { endSeatNumber, useWaypoints, section })
+  │       → draws dashed bird-eye polyline
+  └─ openSeatDirectionsPreview(query, displayLabel)
+          ├─ displayLabel: t('seat.label', { id: seatLabel }) — seatLabel = SECTION-ROW-SEAT (e.g. C-6-1)
+          └─ panel mounts, user can swap inputs
+
+Panel "Start navigation"
+  ├─ setActiveSeatRouteId(seatKey)  (same SECTION-ROW-SEAT string as walking)
+  ├─ setSeatRouteSwapState({ fromSeat: swapped, displayLabel: swapped ? "Current position" : null })
+  ├─ markRouteCalculating('seat_nav')   ← closes ready gate; play FAB stays hidden
+  ├─ beginViewTransition (fade)
+  └─ sendMessage('seatDirectionsStart', { seatKey, startUseStoredFp, endUseStoredFp })
+          ↓ Kit: feature_commands_service/seat_directions.py::SeatDirectionsHandler._run_directions
+            1. read stored FP pos (BEFORE async_first_person_enter clears it)
+            2. await svc.async_first_person_enter("", dispatch_ready=False)
+                  ← LOD + navmesh prep; viewTransitionReady DEFERRED
+            3. if start_is_seat (swap): _dispatch_seat_teleport(seat_id) + 3-frame wait
+                  (lets seatTeleport's auto-unhighlight finish before re-highlight)
+            4. seat_highlight.highlight_seat(seat_id)  (now visible — full LOD active)
+            5. waypoint_router.plan_route(fp_ref, seat_ref, section)  (reversed if swap)
+            6. dispatch_to_events2('navmeshRouteCalculate', { routeId: 'seat_nav', viaPoints })
+            7. dispatch_to_events2('seatDirectionsResolved', { kind: 'seat', seatKey, endPos })
+            8. await svc.await_navmesh_route_settled('seat_nav')
+                  ← holds the black overlay until waypoints exist (or fail)
+            9. svc.dispatch_view_transition_ready('firstPerson', True)  ← fade-in
+          ↓ web: seatDirectionsResolved fills lastSeatPositionRef
+          ↓ web: navmeshRouteReady opens the gate → seat panel hides → overlay + play FAB show
+```
+
+The `viewTransitionReady` deferral and the per-route ready gate are documented in **`bird-eye-route.mdc` § "Route ready gating"** — the same pattern is reused for POI / quiet-zone navigation. The seat panel stays visible during the calculation phase because `appUI.seatStreamOverlayActive` (which hides the panel in `SeatNavigateWidget`) is gated on `nav.routeReadyByRouteId['seat_nav']`.
+
+### Preflight check (`seatTeleportFromBirdEyeCheck`)
+
+Both bird-eye seat actions ("Get directions" and "Teleport me there") run the same synchronous Kit RPC before any view transition. `requestSeatTeleportFromBirdEyeCheck()` in `seatBirdEyeTeleportRpc.ts` uses a `requestId` round-trip. On failure the handler surfaces the inline error in the seat panel; on success the action proceeds. Without this preflight an invalid seat would leave the user stuck on the black "Switching to first person…" overlay (the executor returns silently → `viewTransitionReady` never fires).
+
+### Wheelchair / ticket-style labels
+
+`handleGo` builds **`seatLabel`** from `query` as **`${section}-${row}-${seat}`** (uppercase section/row from `buildQuery()`). That string is sent as **`endSeatNumber`** to Kit and used for **`displayLabel`** via `t('seat.label', { id: seatLabel })` — no separate WC/`R` stripping in the widget once data uses **`C-6-*`** ids. Legacy **`C-WC-R*`** keys are still accepted by Kit lookup if present in old `seats_lookup` snapshots; **`formatSeatLabel`** in `AppStream.tsx` keeps a branch for those for overlays and bookmarks (see § Seat label formatting).
+
+### Swap-mode arrival
+
+When `fromSeat` is true (swap mode) the player teleports *to* the seat as the route's **origin** and walks AWAY from it toward the player's previous FP position. This needs special handling in two places:
+
+1. **Arrival celebration** (`navigationHandlers.ts`, both `handleAutoMoveStatus` and `handleRouteArrival`):
+   - Captured `fromSeat = s.seatRouteFromSeatRef.current` outside the React updater (Strict-Mode safety)
+   - `s.clearSeatRouteSwapState()` clears both the ref and `seatRouteDisplayLabel`
+   - Inside the updater: branch on `fromSeat` — if true call `schedulePoiArrival(s, t('search.directionsCurrentPosition'))` (POI-style overlay reading "Arrived at Current position"); if false call `scheduleSeatArrivalCelebration(s)` (full-screen seat celebration)
+   - The dynamic in-flight pill label is supplied by `seatRouteDisplayLabel` (set to `"Current position"` for swap, `null` otherwise so it falls back to the formatted seat label)
+
+2. **`seatTeleport` auto-unhighlight workaround** (`SeatDirectionsHandler._run_directions`):
+   - The `seatTeleport` handler in `navmesh_route_extension/extension.py` unhighlights the seat after every teleport (correct UX for "I arrived at my seat" — wrong for swap where the seat is the *origin*)
+   - The directions handler waits **3 frames** after `_dispatch_seat_teleport` so the async unhighlight completes, then re-applies `seat_highlight.highlight_seat(seat_id)` so the seat stays green throughout the seat_nav route
+
+### Seat highlight LOD timing
+
+The bird-eye light LOD (`scandinavium_lod_light_overrides.usda`) deactivates `/World/Skandinavium/seats_instanced/SeatInstancer`. Writing `protoIndices` overrides on an inactive prim has no visible effect, so:
+
+- **`extension.py` `_on_bird_eye_route_request`** must NOT call `highlight_seat` for the bird-eye preview path (the seat won't render anyway in light LOD). It used to; now it doesn't.
+- **`SeatDirectionsHandler._run_directions`** calls `highlight_seat(seat_id)` only AFTER `await svc.async_first_person_enter("")`, so the highlight lands on the active full-LOD `SeatInstancer`.
+
+**Wheelchair seats are a known limitation**: they live under `/World/WheelchairSpots` (separate Xform prims, not the PointInstancer), so `seat_highlight.py` doesn't currently highlight them. Acceptable for now since wheelchair seats are visually marked anyway.
+
+### Paired swap state (must move together)
+
+Two state items track swap mode. They MUST be set/cleared together to prevent label drift between the in-flight pill and the suppression logic. Use the paired API on `useSeatNavigation`, never touch the underlying ref/state directly:
+
+| API | When |
+|---|---|
+| `setSeatRouteSwapState({ fromSeat, displayLabel })` | Panel "Start navigation" — sets both to swap-mode values |
+| `clearSeatRouteSwapState()` | Arrival, dismiss, new seat selected, panel close — clears both |
+
+Cleared in 5 places: `handleSeatNavigate` (new seat), `handleSeatRouteDismiss` (route teardown), `MapMarkerDirectionsPanel.dismiss` (panel close), `navigationHandlers.handleAutoMoveStatus` (auto-move arrival), `navigationHandlers.handleRouteArrival` (proximity arrival).
+
+### POI counterpart
+
+`adoptPoiRouteTarget(routeKey, { ..., displayLabel })` plays the same role for POI routes — it sets BOTH `poiRouteDisplayLabel` (state, drives in-flight pill) and `lastPoiDisplayNameRef` (ref, drives arrival overlay) so callers don't need to mutate the ref separately. The directions panel uses this for the POI swap case (passes `t('search.directionsCurrentPosition')` as the label).
+
+### Wheelchair mode in bird-eye
+
+Switching the navmesh mode from the seat widget (or the `MapMarkerDirectionsPanel` foot/wheelchair tabs) is an **instant pointer swap** on the dual-mode NavMesh cache — no rebake, no Skandinavium LOD swap, no busy state. Both meshes are pre-baked at startup and live in memory side by side; `navmeshModeSet` only updates the active-mode string and recalculates routes against the cached handle. See `navmesh-dual-mode.mdc`.
+
+The Skandinavium LOD-swap dance in `NavMeshBakeOrchestrator._ensure_full_lod_for_bake` still runs for *real* rebakes triggered from bird-eye (incidents, camera areas, sound areas, depth obstacles) — those still need the full-LOD interior geometry to bake walkable surfaces — but the user-driven mode toggle no longer goes through that path.
+
+### Files specific to bird-eye seat directions
+
+| File | Role |
+|---|---|
+| `widgets/MapMarkerDirectionsPanel.tsx` | Shared directions sheet — branches on `preview.kind` (`'poi'` vs `'seat'`), handles swap, dispatches `mapMarkerDirectionsStart` or `seatDirectionsStart` |
+| `widgets/seat-navigate/seatBirdEyeTeleportRpc.ts` | Synchronous preflight RPC helper (`requestSeatTeleportFromBirdEyeCheck`) |
+| `hooks/navigationHandlers/useSeatNavigation.ts` | `setSeatRouteSwapState` / `clearSeatRouteSwapState` paired API; `seatRouteFromSeatRef` + `seatRouteDisplayLabel` state |
+| `hooks/navigationHandlers/usePoiNavigation.ts` | `adoptPoiRouteTarget` paired setter (state + ref) |
+| `hooks/eventHandlers/seatHandlers.ts` | `seatTeleportFromBirdEyeCheckResult` handler (RPC response); `seatTeleportResult` reads `seatRouteFromSeatRef` to skip the "arrived at seat" celebration during the swap "hop" |
+| `hooks/eventHandlers/navigationHandlers.ts` | Arrival branching on `fromSeat` (POI-style swap arrival vs full seat celebration) |
+| `feature_commands_service/seat_directions.py:SeatDirectionsHandler._run_directions` (Kit) | Orchestrates: read stored FP → enter FP+LOD → swap teleport + 3-frame wait → re-highlight → waypoint plan → `navmeshRouteCalculate` + `seatDirectionsResolved` |
+| `feature_commands_service/seat_directions.py:SeatDirectionsHandler.on_teleport_from_bird_eye_check` (Kit) | Synchronous preflight handler |
+
+## POI arrival race condition (restroom / quiet zone)
+
+For `poi_nav` and `quiet_zone_nav`, Kit sends **both** `autoMoveStatus(arrived)` and `navmeshRouteArrival` when the player reaches the destination during auto-move. The web must handle this without double-processing.
+
+**Critical rule**: All arrival side-effects -- ref reads, `schedulePoiArrival` -- must be **synchronous** (top-level in the handler), never inside deferred React functional updaters. If placed inside a `setState(prev => { ... })` updater, the call is batched and the second event handler can race ahead synchronously.
+
+**`schedulePoiArrival` timer guard**: The helper returns immediately if `poiArrivalTimerRef.current` is already set (first caller wins). This prevents the second event from overwriting the correct display name with a fallback.
+
+**Pattern** (same for both POI types in both `handleAutoMoveStatus` and `handleRouteArrival`):
+1. **Synchronously** capture `lastDisplayNameRef.current` and clear it
+2. **Synchronously** call `schedulePoiArrival(s, capturedName)` -- timer guard blocks duplicates
+3. Queue state cleanup (`setActiveRouteId(null)`, etc.) in functional updaters with `if (!prev) return prev` guards
+
+Violating this pattern (e.g. reading the ref or calling `schedulePoiArrival` inside a `setMovingToRestroomId` updater) causes two bugs: (a) arrival label falls back to generic "restroom", (b) deferred `setActiveRestroomRouteId(null)` clobbers a newly selected route after re-opening the widget.
+
+## POI arrival feedback
+
+`poi_nav`, `quiet_zone_nav`, `poiTeleportResult`, and `geoTeleportResult` arrivals are mode-gated:
+
+- **CU**: `schedulePoiArrival` — top-bar overlay with the POI display name (5 s, timer-guarded against race duplicates).
+- **Dev**: `showTriggerNotification` — bottom toast ("Arrived at ..." / "Teleported to ...", 5 s).
+
+All six arrival paths (restroom auto-move, restroom route-arrival, quiet zone auto-move, quiet zone route-arrival, POI teleport, geo teleport) branch on `s.appModeRef.current`. Branching lives in `navigationHandlers.ts` and `seatHandlers.ts`.
+
+**Future**: To add full-screen celebration for restroom/quiet-zone (matching seat UX): (1) add per-route manual threshold in `_emit_lightweight_measure` (`route_engine/arrival.py`), (2) create `schedulePoiArrivalCelebration` with destination-specific labels/assets, (3) decide per POI whether `skipFaceTowardCenter` applies. Related constants such as `ROUTE_ARRIVAL_THRESHOLD_CM` live in `route_engine/constants.py`.
+
+## Related
+
+- **Corridor waypoint graph** (`nav_waypoint_*`, `plan_route`, `useWaypoints`): `.cursor/rules/topics/waypoint-routing.mdc`
+- **NavMesh path straightening / smoothing** (shared with point-and-click): `.cursor/rules/topics/navmesh-path-refinement.mdc`
+- **Instant seat/POI teleport** ("Teleport me there" button, `seatTeleport` / `poiTeleport` events): `.cursor/rules/topics/poi-teleport.mdc`
+- **Route measurement** (distance/time for walk paths): `.cursor/rules/topics/route-measurement.mdc`
+- **Camera view switching and spawnpoint teleport**: `.cursor/rules/topics/camera-teleport.mdc`

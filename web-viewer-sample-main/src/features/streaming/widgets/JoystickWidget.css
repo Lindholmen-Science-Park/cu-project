@@ -1,0 +1,85 @@
+/* Joystick Widget - Bottom Corners (Mobile View) */
+.joystick-widget {
+    position: fixed;
+    bottom: 24px;
+    left: 24px;
+    z-index: 999;
+    pointer-events: auto;
+}
+
+.joystick-widget--right {
+    left: auto;
+    right: 24px;
+}
+
+.joystick-base {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    background: rgba(100, 150, 255, 0.25);
+    border: 3px solid rgba(100, 150, 255, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+    backdrop-filter: blur(8px);
+    cursor: grab;
+    user-select: none;
+}
+
+.joystick-base:active {
+    cursor: grabbing;
+}
+
+.joystick-stick {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: rgba(60, 120, 220, 0.55);
+    border: 2px solid rgba(255, 255, 255, 0.35);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    pointer-events: none;
+    transition: transform 0.12s ease-out;
+}
+
+.joystick-stick.dragging {
+    transition: none;
+}
+
+@media (max-width: 768px) {
+    .joystick-widget {
+        bottom: 20px;
+        left: 20px;
+    }
+    .joystick-widget--right {
+        left: auto;
+        right: 20px;
+    }
+    .joystick-base {
+        width: 100px;
+        height: 100px;
+    }
+    .joystick-stick {
+        width: 40px;
+        height: 40px;
+    }
+}
+
+@media (max-width: 480px) {
+    .joystick-widget {
+        bottom: 16px;
+        left: 16px;
+    }
+    .joystick-widget--right {
+        left: auto;
+        right: 16px;
+    }
+    .joystick-base {
+        width: 88px;
+        height: 88px;
+    }
+    .joystick-stick {
+        width: 36px;
+        height: 36px;
+    }
+}

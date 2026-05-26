@@ -1,0 +1,127 @@
+---
+description: Kit SDK update procedure — version pins, repo tool deps, generated block lifecycle, clean build, upstream diff checklist. Read when upgrading the Kit SDK version.
+alwaysApply: false
+---
+
+# Kit SDK Update Procedure
+
+How to update the Kit SDK to a new version (e.g. 110.0 → 110.1).
+
+---
+
+## Upstream Reference
+
+The canonical upstream is **[NVIDIA-Omniverse/kit-app-template](https://github.com/NVIDIA-Omniverse/kit-app-template)** on the `main` branch. Check its `CHANGELOG.md` and `tools/` files for each release.
+
+Official release notes: `https://docs.omniverse.nvidia.com/dev-guide/latest/release-notes/<version>.html`
+
+---
+
+## Files to Update
+
+### 1. Kit Kernel Version — `kit-app-template-main/tools/deps/kit-sdk.packman.xml`
+
+The `kit-kernel` package version string. Only the semver prefix changes; the `+feature.${platform_target_abi}.${config}` suffix is a packman variable.
+
+```xml
+<package name="kit-kernel" version="110.1.1+production.${platform_target_abi}.${config}"/>
+```
+
+Note: between 110.1.0 and 110.1.1 the suffix changed from `+feature` to `+production` — the upstream now ships production-tagged packages.
+
+### 2. VERSION.md — `kit-app-template-main/tools/VERSION.md`
+
+Single line with the semver (e.g. `110.1.1`). Used for packaging metadata.
+
+### 3. Repo Tool Dependencies — `kit-app-template-main/tools/deps/repo-deps.packman.xml`
+
+Bump each package version to match the upstream template. Compare with:
+```
+https://raw.githubusercontent.com/NVIDIA-Omniverse/kit-app-template/main/tools/deps/repo-deps.packman.xml
+```
+
+Current versions (110.1.1) — unchanged from 110.1.0:
+
+| Package | Version |
+|---------|---------|
+| repo_man | 2.2.1 |
+| repo_build | 1.27.2 |
+| repo_kit_tools | 1.18.1 |
+| repo_test | 2.46.1 |
+| repo_package | 6.2.0 |
+| repo_kit_template | 2.3.2 |
+| repo_usd | 5.0.29 |
+
+### 4. repo.toml — `kit-app-template-main/repo.toml`
+
+Diff the upstream `repo.toml` against ours. Merge new sections/settings while preserving our custom `[repo_precache_exts].apps` list. Common additions in updates: new deprecation warnings, new tool sections, new settings.
+
+**Do NOT adopt `generated_app_path`** from the upstream template — it auto-generates a kit file from all local extensions and fails when test dependencies reference `.kit` app names (e.g. `younite.usd_viewer_streaming` in the setup extension's `[[test]]` block). Our project uses explicit `apps = [...]` entries instead.
+
+### 5. kit-sdk-deps.packman.xml — `kit-app-template-main/tools/deps/kit-sdk-deps.packman.xml`
+
+Usually unchanged between minor versions. Compare with upstream to verify.
+
+---
+
+## Generated Blocks in .kit Files
+
+Each `.kit` file in `source/apps/` contains an auto-generated `BEGIN GENERATED PART` / `END GENERATED PART` block that locks extension versions. These blocks are pinned to the old SDK version after an update.
+
+**Action:** Delete the entire generated block (from `BEGIN` to `END` inclusive) from each `.kit` file. The build tooling (`repo precache_exts`) regenerates them with correct versions on the next build.
+
+**Important:** The base `.kit` file must have a `[settings.app.exts] folders.'++' = [...]` block **outside** the generated section. The old 110.0 generated block included these search paths, but the 110.1 regenerated block only contains `enabled = [...]`. Without explicit folders, production launches (`startstream_prod`) fail because Kit can't find local extensions. The dev `.kit` has its own folders block that masks this issue when using `startstream.bat`.
+
+Files with generated blocks:
+- `younite.usd_viewer_streaming_base.kit`
+- `younite.usd_viewer_streaming_dev.kit`
+- `younite.usd_composer.kit`
+
+---
+
+## Clean Build
+
+After all file changes, run `cleanbuild.bat` from the project root (or manually delete `_build/` and `_repo/` inside `kit-app-template-main/`). Then run `startstream.bat` to perform a fresh build.
+
+The first build after an SDK update is slower because packman downloads the new Kit kernel and all updated extensions.
+
+---
+
+## After-Pull Workflow (for other developers)
+
+When another developer pulls a Kit SDK update from git:
+
+1. Run `cleanbuild.bat` from the project root
+2. Run `startstream.bat` as normal
+
+The build will fetch the new SDK version, download updated extensions, and regenerate the `.kit` file version locks automatically.
+
+> **⚠️ Common gotcha after a SDK bump + clean build:** if a teammate runs `startstream_prod.bat` *first* (skipping dev), they may see red "fallback" materials with `[omni.rtx.materials] Unable to find SdrShaderNode` errors. This happens when the prod resolution closure doesn't reach an extension that prod actually needs at runtime — a clean `_build/` plus a SDK-bumped registry can change which extensions get pulled transitively. **Fix:** add the missing extension(s) to `younite.usd_viewer_streaming_base.kit` `[dependencies]` so prod doesn't depend on transitive resolution. We've already done this for the MDL chain (`omni.mdl`, `omni.mdl.neuraylib`, `omni.mdl.usd_converter`, `omni.kit.material.library`, `omni.kit.usd.mdl`). See `streaming-profiles.mdc` § *Critical pitfall: production kit must explicitly list every runtime-required extension* for the full triage procedure.
+
+---
+
+## Extension Checklist
+
+After updating, verify that all local extensions still have the 5 required files (see `streaming-profiles.mdc`). Missing `premake5.lua` is a common issue — without it, the build won't symlink the extension into `_build/` and Kit can't discover it at runtime.
+
+Also check for empty extension stub folders in `source/extensions/` that may have been left behind from removed features. These cause harmless but noisy warnings during build.
+
+---
+
+## Driver Requirements
+
+Kit SDK updates may bump the CUDA toolkit version, which raises the minimum GPU driver requirement. Check the release notes for minimum driver versions before deploying.
+
+Kit 110.1 requires:
+- **Windows:** driver >= 572.61
+- **Linux:** driver >= 570.124.06
+
+---
+
+## History
+
+| Version | Date | Notes |
+|---------|------|-------|
+| 110.1.1 | 2026-05-15 | Blackwell GPU stability fixes (RTX PRO 6000 NVENC/CUDA), multi-GPU rendering flicker fixes, Events 2.0 `:immediate` delivery fix in livestream, FSD camera transform / deformable mesh fixes, MDL "Collect As" path fix, kit-kernel package tag changed from `+feature` → `+production` |
+| 110.1.0 | 2026-04-16 | PointInstancer primvar fix, CUDA 12.8, Python runtime updates, carb.settings list override fix |
+| 110.0.0 | 2026-03-05 | Initial Kit 110 adoption, Events 2.0 requirement |

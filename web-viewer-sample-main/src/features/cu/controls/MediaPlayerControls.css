@@ -1,0 +1,196 @@
+/*
+ * Shared styling for the four media-player buttons exported from
+ * `MediaPlayerControls.tsx`. Used by `VideoBookPlayer`, `Video360Overlay`, and
+ * `SpatialSoundOverlay`.
+ *
+ * Visual contract per Figma:
+ *   Settings   — 48×48 white circle, Dark-Purple sliders glyph
+ *   Mute (off) — 40×40 transparent pill, off-white border + glyph
+ *   Mute (on)  — 40×40 white pill, Dark-Purple glyph
+ *   CC   (off) — 40×40 transparent pill, white-border + white masked glyph
+ *   CC   (on)  — 40×40 white pill, Dark-Purple masked glyph
+ *   Play/Pause — 64×64 white circle, Dark-Purple play/pause glyph
+ *
+ * `mpc-` namespace = "media player controls". Layout / positioning lives with
+ * the host overlay (transports pin mute left & CC right, etc.) so this file
+ * is purely visual.
+ */
+
+.mpc-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    -webkit-tap-highlight-color: transparent;
+    transition: background 0.15s ease, transform 0.1s ease, border-color 0.15s ease;
+}
+
+.mpc-btn:active {
+    transform: scale(0.9);
+}
+
+.mpc-btn:focus-visible {
+    outline: 2px solid #DCFF7D;
+    outline-offset: 2px;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Settings (48 × 48 white circle, Dark-Purple sliders glyph)         */
+/*  Hosts typically place this in the top-bar.                         */
+/* ------------------------------------------------------------------ */
+
+.mpc-btn--settings {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.92);
+    color: var(--Dark-Purple, #351A84);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
+}
+
+.mpc-btn--settings:hover {
+    background: #ffffff;
+}
+
+.mpc-btn--settings:active {
+    transform: scale(0.94);
+}
+
+.mpc-btn--settings:focus-visible {
+    outline-offset: 3px;
+}
+
+.mpc-settings-icon {
+    display: block;
+    flex-shrink: 0;
+    width: 23px;
+    height: 23px;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Mute toggle (40 × 40 pill)                                         */
+/* ------------------------------------------------------------------ */
+
+.mpc-btn--mute {
+    width: 40px;
+    height: 40px;
+    border-radius: 80px;
+    background: transparent;
+    border: 1px solid #f6f6f6;
+    color: #f6f6f6;
+}
+
+.mpc-btn--mute:hover {
+    border-color: #ffffff;
+    background: rgba(255, 255, 255, 0.1);
+}
+
+/* `mpc-btn--active` on the mute button means audio is muted. Flips to a solid
+   white pill with a Dark-Purple glyph — mirrors the captions "on" treatment so
+   the two togglable controls share one mental model. */
+.mpc-btn--mute.mpc-btn--active {
+    background: #ffffff;
+    border-color: #ffffff;
+    color: var(--Dark-Purple, #351a84);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+/* ------------------------------------------------------------------ */
+/*  Captions toggle (40 × 40 pill)                                     */
+/* ------------------------------------------------------------------ */
+
+.mpc-btn--cc {
+    width: 40px;
+    height: 40px;
+    border-radius: 80px;
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    color: #ffffff;
+}
+
+.mpc-btn--cc:hover {
+    border-color: rgba(255, 255, 255, 0.8);
+}
+
+/**
+ * CC chip drawn from a single SVG path (chip outline + `CC` cutouts). Rendering
+ * it as a CSS `mask-image` instead of an `<img>` lets the chip colour follow
+ * `currentColor`, which means the active state — Dark-Purple text on a white
+ * pill — works without touching the SVG file. The cutouts let the button's
+ * background show through where the letters live, so a Dark-Purple mask on a
+ * white button reads as "purple chip with white CC inside" exactly per Figma.
+ *
+ * `@icons/map-markers/ClosedCaptioning.svg` is the same asset both the
+ * videobook and 360° overlay used previously.
+ */
+.mpc-cc-icon {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    background-color: currentColor;
+    -webkit-mask: url('../../../icons/map-markers/ClosedCaptioning.svg') center / contain no-repeat;
+    mask: url('../../../icons/map-markers/ClosedCaptioning.svg') center / contain no-repeat;
+}
+
+.mpc-btn--cc.mpc-btn--active {
+    background: #ffffff;
+    border-color: #ffffff;
+    color: var(--Dark-Purple, #351A84);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+/* No-captions-available state — keep the affordance visible but lower opacity
+   and no hover so users see captions are simply not present for this source. */
+.mpc-btn--cc.mpc-btn--disabled {
+    opacity: 0.35;
+    cursor: default;
+    pointer-events: none;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Play / pause (64 × 64 white circle)                                */
+/* ------------------------------------------------------------------ */
+
+.mpc-btn--play {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: #fff;
+    color: var(--Dark-Purple, #351a84);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.mpc-btn--play:hover {
+    background: #f0f0f0;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Responsive — landscape / short viewports                           */
+/*  Host overlays already shrink other chrome at this breakpoint;      */
+/*  matching the buttons here keeps the proportions in sync.           */
+/* ------------------------------------------------------------------ */
+
+@media (max-height: 500px) {
+    .mpc-btn--settings {
+        width: 40px;
+        height: 40px;
+    }
+
+    .mpc-btn--play {
+        width: 52px;
+        height: 52px;
+    }
+
+    .mpc-btn--mute,
+    .mpc-btn--cc {
+        width: 36px;
+        height: 36px;
+    }
+
+    .mpc-cc-icon {
+        width: 18px;
+        height: 18px;
+    }
+}

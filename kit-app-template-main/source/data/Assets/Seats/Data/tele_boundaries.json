@@ -1,0 +1,94 @@
+{
+    "_comment": "Manually verified SEKTIONER divider lines for TELE section boundaries. Two 'main entrance' gaps (D/G, O/R) have two lines each.",
+    "section_order": ["L", "K", "J", "G", "D", "C", "B", "A", "U", "T", "R", "O", "N", "M"],
+    "boundaries": [
+        {
+            "between": ["K", "L"],
+            "lines": [
+                {"handle": "1d8e5", "from": [154608.58, 89386.35], "to": [159630.43, 90957.25]}
+            ]
+        },
+        {
+            "between": ["J", "K"],
+            "lines": [
+                {"handle": "6e577", "type": "polyline", "from": [148607.04, 98072.16], "to": [160592.90, 113473.10]}
+            ]
+        },
+        {
+            "between": ["G", "J"],
+            "lines": [
+                {"handle": "486b", "from": [143776.66, 129384.95], "to": [137859.92, 102672.35]}
+            ]
+        },
+        {
+            "between": ["D", "G"],
+            "main_entrance": true,
+            "lines": [
+                {"handle": "4882", "from": [115827.61, 109919.60], "to": [115988.23, 104544.59], "side": "D"},
+                {"handle": "4883", "from": [121517.00, 104544.59], "to": [121681.91, 109919.60], "side": "G"}
+            ]
+        },
+        {
+            "between": ["C", "D"],
+            "lines": [
+                {"handle": "4877", "from": [99645.31, 102672.35], "to": [93972.38, 129452.59]}
+            ]
+        },
+        {
+            "between": ["B", "C"],
+            "lines": [
+                {"handle": "4879", "from": [88898.19, 98072.16], "to": [78453.23, 111497.48]}
+            ]
+        },
+        {
+            "between": ["A", "B"],
+            "lines": [
+                {"handle": "489b", "from": [82896.65, 89386.35], "to": [69539.73, 93504.46]}
+            ]
+        },
+        {
+            "between": ["U", "A"],
+            "lines": [
+                {"handle": "489c", "from": [82896.65, 78813.65], "to": [69547.30, 74637.81]}
+            ]
+        },
+        {
+            "between": ["T", "U"],
+            "lines": [
+                {"handle": "486c", "from": [88898.19, 70127.85], "to": [78453.23, 56702.52]}
+            ]
+        },
+        {
+            "between": ["R", "T"],
+            "lines": [
+                {"handle": "4863", "from": [99645.31, 65527.65], "to": [93728.57, 38815.05]}
+            ]
+        },
+        {
+            "between": ["O", "R"],
+            "main_entrance": true,
+            "lines": [
+                {"handle": "404b", "layer": "R-RADER_TELE", "from": [115988.23, 63655.41], "to": [115827.61, 58420.40], "side": "R"},
+                {"handle": "404c", "layer": "O-RADER_TELE", "from": [121517.00, 63655.41], "to": [121677.61, 58420.40], "side": "O"}
+            ]
+        },
+        {
+            "between": ["N", "O"],
+            "lines": [
+                {"handle": "4859", "from": [143776.66, 38815.05], "to": [137859.92, 65527.65]}
+            ]
+        },
+        {
+            "between": ["M", "N"],
+            "lines": [
+                {"handle": "4857", "from": [148607.04, 70127.85], "to": [161783.70, 53191.35]}
+            ]
+        },
+        {
+            "between": ["L", "M"],
+            "lines": [
+                {"handle": "1d8e4", "from": [154608.58, 78813.65], "to": [159630.43, 77242.75]}
+            ]
+        }
+    ]
+}

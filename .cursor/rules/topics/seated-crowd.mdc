@@ -1,0 +1,245 @@
+---
+description: Static seated crowd in the stadium — UsdGeomPointInstancer of ~11.5k frozen-pose characters bound to the seat instancer, crowd density VariantSet (none/sparse/medium/dense/full), runtime extension wiring, NavMesh exclusion, the three "red characters" pitfalls (GeomSubset/instanceable wrapper under PointInstancer; absolute MDL/texture paths baked into `.usdc`; MDL plugin chain missing from prod kit deps), the per-seat character hide that pairs with seat-navigation highlighting, and the **crowd-driven seat fold-state** that swaps occupied seats from Up to Down via `seat_fold_state` + `seat_proto_override`. Read when changing seated-people placement, density variants, prototypes, the crowd toggle UI/event flow, the seat-navigation crowd-character hide, the occupied-seat fold-state, or triaging "Unable to find SdrShaderNode" / red-material errors on the crowd.
+---
+
+# Seated Crowd
+
+The stadium is populated by ~11.5k static (frozen-pose) sitting characters placed on every non-wheelchair / non-companion seat. They are authored as a **single `UsdGeomPointInstancer`**, not as per-seat scene-graph instances, so the file is small (~1 MB), Hydra renders the whole crowd in 9 instanced draw calls (one per prototype), and density swaps are O(1) in USD ops.
+
+## File map
+
+| File | Role |
+|------|------|
+| `Assets/People/PeopleSitting/generate_seated_pointinstancer.py` | Generator. Reads the seat instancer, applies offsets, emits the USD. |
+| `Assets/People/PeopleSitting/bake_skinning.py` | Bakes UsdSkel-skinned characters into static frozen-pose `.usdc` (one per prototype). Final pass relativizes every `asset` path so the files are portable across machines — see "baked `.usdc` files must contain *relative* asset paths" pitfall below. |
+| `Assets/People/PeopleSitting/relativize_baked_paths.py` | One-shot/idempotent rewriter. Reuses `bake_skinning._relativize_layer_assets` to fix already-baked files in place when their asset paths are absolute (legacy bakes, or sanity check after a pull). |
+| `Assets/People/PeopleSitting/verify_mdl_refs.py` | Diagnostic. Walks every Shader prim in the baked files + `seated_people.usda`, prints which MDLs they reference, whether each resolves on disk, and counts how many `asset` attribute values are absolute paths (broken down by extension). Run after a bake or rewrite to confirm portability. |
+| `Assets/People/PeopleSitting/baked/char_NN_*_baked.usdc` | Frozen-pose baked meshes (the actual prototype geometry). |
+| `Assets/People/PeopleSitting/characters/char_NN_*.usda` | `instanceable=true` wrappers around the baked meshes. **Used by `interactions_extension` for single drop-in characters — NOT by the crowd.** See pitfall below. |
+| `Instances/seated_people.usda` | Generator output. Single PointInstancer with `crowd_density` VariantSet. |
+| `scenes/sublayers/seated_people_layer.usda` | Sublayer mounting the payload at `/World/Skandinavium/seated_people` with the scene's mm/Z-up → cm/Y-up transform stack and `NavMeshExcludeAPI`. |
+| `scenes/main_scene.usda` | Lists `seated_people_layer.usda` in `subLayers`. |
+| `Assets/Seats/seats_instanced.usda` | **Source of truth for seat positions.** The generator opens this file, switches the `seating` variant (default `all_seats`), and reads the PointInstancer's `positions` + `seatId` primvar. |
+| `Assets/Seats/Tools/seat_pivot_offset.py` | Provides `pivot_offset_dxy(rotation_deg, distance_mm)` — the rotated 2D offset used to push characters forward to the seat's backrest. |
+| `Assets/Seats/Data/extracted_seats_with_rows.json` | Per-seat metadata. Generator uses `tier` (to filter) and `rotation` (for orientation + backrest offset direction). Wheelchair tier seats use ticket-style ids (`C-6-*`) after `postprocess_wheelchair_wc_to_row6.py`; see `.cursor/rules/topics/seat-navigation.mdc` § Step 1a. |
+| `extensions/younite.people_toggle_extension/` | Runtime extension that flips the `crowd_density` VariantSet. |
+| `extensions/younite.navmesh_route_extension/.../services/kit_services/seated_crowd_highlight.py` | Hides the single character sitting on the seat-navigation target while a seat route is active (companion to `seat_highlight`). Reads `primvars:seatId` for the lookup and writes a unioned `invisibleIds` to the session layer; observes `seatedCrowdLayoutChanged` to re-apply across density flips. See `.cursor/rules/topics/seat-navigation.mdc` § "Seated-crowd character hide". |
+| `extensions/younite.navmesh_route_extension/.../services/kit_services/seat_fold_state.py` | Crowd-driven seat fold-state: every occupied seat (visible character) is rendered Down (unfolded), every empty seat stays Up (folded). Listens for `seatedCrowdLayoutChanged` and computes the occupied set from the crowd's `seatId` primvar minus the strongest `invisibleIds` opinion, then publishes per-seat Down overrides via `seat_proto_override` at `FOLD_PRIORITY`. Silent no-op until the seated-crowd payload loads — the next density change picks it up. See § "Crowd-driven seat fold-state" below. |
+| `extensions/younite.navmesh_route_extension/.../services/kit_services/seat_proto_override.py` | Single owner of the seat instancer's session-layer `protoIndices` opinion — merges fold / nav-visited / highlight overrides at three priority levels (`FOLD_PRIORITY=1`, `NAV_VISITED_PRIORITY=5`, `HIGHLIGHT_PRIORITY=10`) so callers don't clobber each other. See `.cursor/rules/topics/seat-navigation.mdc` § "Seat prototype override service". |
+| `web-viewer-sample-main/src/features/dev/controls/submenus/SceneSubmenu.tsx` | Dev-side UI: per-variant density picker (none / sparse / medium / dense / full). |
+| `web-viewer-sample-main/src/features/cu/controls/PeoplePanel.tsx` and `World3dSettings.tsx` | CU "Display crowd" toggle. Both share the same `useControl()` state (`peopleVisible` + `handlePeopleToggle`) so they always reflect the same on/off state. |
+| `web-viewer-sample-main/src/features/streaming/hooks/useControlHandlers.ts` | Owns the master `handlePeopleToggle`. Dispatches **both** `peopleToggle` (traffic crowd `/World/cctv1_crowd`) **and** `seatedCrowdLayoutChange` (seated PointInstancer crowd) so the single CU toggle drives both. |
+
+## USD output structure
+
+```
+/SeatedPeople                              (Xform, defaultPrim, crowd_density VS)
+   /PeopleInstancer                        (UsdGeomPointInstancer)
+       positions      = [...]              (one Vec3f per character)
+       orientations   = [...]              (Quath, derived from seat rotation_deg)
+       scales         = [...]              (uniform 10.0 — cm props → mm seat space)
+       protoIndices   = [...]              (deterministic md5(seatId) % 9)
+       ids            = [...]              (stable Int64 — survives recomposition)
+       primvars:seatId = [...]             (varying string array — mirrors the seat
+                                            instancer's seatId so the runtime can map
+                                            seat id → crowd instance id for the
+                                            seat-navigation per-seat hide)
+       prototypes     = [/.../char_01 .. /.../char_09]
+       invisibleIds   = [...]              (set inside each crowd_density variant; the
+                                            session layer can override with a unioned
+                                            list to additionally hide the character on
+                                            the seat-navigation target — see seat-navigation.mdc)
+   /PeopleInstancer/Prototypes
+       /char_01 .. /char_09                (Xforms, each `references = baked/char_NN_*.usdc`)
+```
+
+The `crowd_density` VariantSet is authored on `/SeatedPeople` (the root, not on the inner instancer) so the runtime extension finds it on the composed `/World/Skandinavium/seated_people` prim. Each variant only writes to `PeopleInstancer.invisibleIds` — positions/orientations/protoIndices/prototypes are shared across all variants.
+
+## Density variants
+
+Defined in the generator's `DENSITY_VARIANTS` list. Computed via a single seeded shuffle (`DENSITY_SHUFFLE_SEED = 4242`) with strict-subset semantics: every visible character at `sparse` is also visible at `medium`, etc.
+
+| Variant | Visible | Hidden |
+|---------|---------|--------|
+| `none` | 0% | 100% |
+| `sparse` | 60% | 40% |
+| `medium` | 75% | 25% |
+| `dense` | 90% | 10% |
+| `full` | 100% | 0% |
+
+**Authored default = `none`** (crowd is invisible on stage open — saves load-time geometry instantiation, and the dev UI can opt in via the Crowd Density picker). The runtime extension does not force a selection on stage open; it just respects whatever the file ships with. The extension's `SEATED_CROWD_DEFAULT_VARIANT` constant (`"dense"` = 90%) is the conceptual "what to enable to" target — currently only used as a fallback in the response payload if the variant set ever fails to resolve a current selection. If you add a single "show crowd" toggle button later, point it at this constant.
+
+## Placement constants
+
+All in mm (the seat instancer's authoring space), defined at the top of `generate_seated_pointinstancer.py`:
+
+| Constant | Current | Meaning |
+|----------|---------|---------|
+| `Z_OFFSET` | `-450.0` | Vertical drop so baked hips rest on the seat cushion. |
+| `BACKREST_OFFSET_MM` | `+160.0` | Forward shift along the seat's facing axis (positive = toward the front of the chair) so the character's spine aligns with the backrest. Applied as a rotated 2D offset via `pivot_offset_dxy(rot_deg, BACKREST_OFFSET_MM)`. |
+| `PROTO_SCALE` | `10.0` | The prototypes are authored in cm but the seat instancer is in mm; this brings them into the same space. |
+| `EXCLUDED_TIERS` | `{"wheelchair", "companion"}` | Seats whose `tier` is in this set get no character. |
+
+Adjusting any of these = regenerate (`python generate_seated_pointinstancer.py`).
+
+## Critical pitfall: prototypes must reference the baked `.usdc` directly
+
+**Do not** point the generator's `PROTOTYPES` list at the `characters/char_NN_*.usda` wrappers — only at `baked/char_NN_*_baked.usdc`.
+
+The wrappers set `instanceable = true` on the Character Xform. That's exactly what you want for **scene-graph instancing** (one Xform per character), and it is what the `interactions_extension` uses when it drops a single drop-in character into the world. But under a `UsdGeomPointInstancer` prototype it is the wrong thing: Hydra's Fabric scene delegate cannot resolve `GeomSubset` prims through an `instanceable` subtree under a PointInstancer prototype. The symptoms are unmistakable:
+
+- Console flooded with `[Error] [usdrt.hydra.fabric_scene_delegate.plugin] GeomSubset prim does not exist: /.../PeopleInstancer/Prototypes/char_NN/.../Mesh/subset_N` (one per character × per material × per recomposition).
+- Material bindings drop on every character → flat magenta/red fallback colour for the entire crowd.
+- The collapse only becomes visible after Hydra recomposes, which means it can take a `crowd_density` flip (or an LOD switch, or any other VariantSet change) before the user sees it.
+
+Bypassing the wrapper avoids the issue and saves a level of indirection. The baked `.usdc` files contain the same geometry + materials with `instanceable = false` (default), and PointInstancer is already doing the instancing for us.
+
+## Critical pitfall: baked `.usdc` files must contain *relative* asset paths
+
+`bake_skinning.py` calls `Usd.Stage.Flatten()` to produce each `char_NN_*_baked.usdc`. Flatten resolves every reference / asset path against the local filesystem, which means without intervention the produced file embeds **absolute paths** to every MDL and texture:
+
+```
+info:mdl:sourceAsset = @D:/dev/goteverse_omniverse_study/.../Materials/MI_xxx.mdl@
+inputs:Diffuse       = @D:/dev/goteverse_omniverse_study/.../Materials/Textures/T_xxx.png@
+```
+
+When a teammate clones the repo to a different drive or directory, none of those resolve, Hydra falls back to the red error material on every prototype, and RTX logs the unmistakable signature:
+
+```
+[Error] [omni.rtx.materials] Unable to find SdrShaderNode for prim:
+  '/.../seated_people/PeopleInstancer/Prototypes/char_NN/Looks/.../MI_xxx_Head'
+  with identifier: '<numeric-hash><MI_xxx_Head><mdl>'.
+```
+
+(The `<numeric-hash>` is Kit's content-hash of the absolute MDL path, which is why two machines with identical materials get *different* identifiers and only one of them shows the error — the failing machine's hash maps to a path that doesn't exist on disk.)
+
+**The fix** lives at the tail of the bake. `bake_skinning.py` defines `_relativize_layer_assets(usdc_path)` which walks every `asset` / `asset[]` attribute in the just-exported file, and for every value where `os.path.isabs() and os.path.isfile()` is true rewrites it to a relative path anchored at the `.usdc`'s own directory (`os.path.relpath` → forward slashes). It is called automatically at the end of `bake_one()` — no extra step needed when re-baking.
+
+Two design choices to know about:
+
+- **Unreal-style metadata strings such as `info:unreal:sourceAsset = "/Game/AXYZAssets/Materials/MI_xxx.MI_xxx"` are intentionally left alone.** They look absolute (`/Game/...`) but are not file paths — they're string metadata Kit doesn't dereference. The `os.path.isfile` filter is what excludes them; do not "improve" the helper to rewrite them on appearance alone or you'll corrupt what those strings actually mean.
+- **`relativize_baked_paths.py` (sibling script) reuses the same helper to fix files that were baked before this pass existed.** It's idempotent — running it on already-relative files is a no-op — so if you ever suspect a pulled `.usdc` has stale absolute paths (e.g. a teammate force-pushed an old bake), just run it from `Assets/People/PeopleSitting/`.
+
+This pitfall, the GeomSubset one above, and the **missing-MDL-plugin-deps-in-prod-kit** pitfall (see `streaming-profiles.mdc` § "Critical pitfall: production kit must explicitly list every runtime-required extension") all produce the same visual symptom — entire crowd renders as flat red — and the same `[omni.rtx.materials] Unable to find SdrShaderNode` log line. Triage decision tree when you see red characters:
+
+| Quick check | If… | Cause | Fix |
+|---|---|---|---|
+| `python verify_mdl_refs.py` reports any **real-file absolute paths** in the baked `.usdc` | yes | Stale absolute paths from an old bake | Run `python relativize_baked_paths.py` (or rebake) |
+| `usdcat` the seated_people.usda — does any prototype reference an `instanceable=true` wrapper? | yes | GeomSubset binding lost under PointInstancer prototype | Switch the `PROTOTYPES` list back to `baked/char_NN_*_baked.usdc` directly (it should already be) |
+| Reproduces only on a fresh-clone or post-`cleanbuild.bat` machine that ran `startstream_prod.bat` first, and goes away after running `startstream.bat` once | yes | Missing MDL plugin chain in the prod kit's resolution closure | Already fixed via explicit deps in `younite.usd_viewer_streaming_base.kit`. If a new render-related symptom appears after a Kit SDK bump, repeat the same pattern — see `streaming-profiles.mdc` § "Critical pitfall: production kit must explicitly list every runtime-required extension". |
+
+## Runtime extension — `younite.people_toggle_extension`
+
+**Path constants** (top of `extension.py`):
+
+```python
+SEATED_CROWD_PRIM_PATH = "/World/Skandinavium/seated_people"
+SEATED_CROWD_VARIANT_SET = "crowd_density"
+SEATED_CROWD_DEFAULT_VARIANT = "full"
+```
+
+**Event wiring** (Events 2.0):
+
+| Event | Direction | Payload | Behaviour |
+|-------|-----------|---------|-----------|
+| `seatedCrowdLayoutChange` | web → Kit | `{ variant: "none" \| "sparse" \| "medium" \| "dense" \| "full" }` (or `layout`; empty = query current) | Looks up the `crowd_density` VariantSet on `SEATED_CROWD_PRIM_PATH`, validates the requested variant, and calls `vset.SetVariantSelection(...)`. |
+| `seatedCrowdLayoutChanged` | Kit → web | `{ variant, success, variants, error? }` | Always emitted — used by the UI to confirm or roll back. `error` ∈ `seated_crowd_not_found`, `unknown_variant`. |
+
+The `peopleToggle` / `peopleDensityUpdate` events on the same extension are **separate** — they control the traffic crowd `/World/cctv1_crowd` (per-child slider density), not the seated crowd. The legacy animated `/World/test_people` layer was removed; only the seated PointInstancer crowd and the traffic crowd remain.
+
+## Per-seat character hide (seat-navigation companion)
+
+When the user starts a seat route, the green `ChairHighlight` prototype is swapped in for the target seat (see `seat-navigation.mdc` § "Seat highlighting"). To stop the seated character from occluding that highlight, the **same** highlight call additionally hides the single crowd character that sits on it.
+
+| Module | Lives in | Role |
+|---|---|---|
+| `seated_crowd_highlight.py` | `younite.navmesh_route_extension/services/kit_services/` | Owns the per-seat hide. Maps `seatId → crowd instance id`, writes a unioned `invisibleIds` opinion to the **session layer**, restores by clearing it. |
+| `seat_highlight.py` | same folder | Drives the hide: `highlight_seat()` → `seated_crowd_highlight.hide_for_seat(seat_id)`; `unhighlight_seat()` → `restore()`; `invalidate_cache()` → invalidates both. |
+| `extension.py` | same extension | Observes `seatedCrowdLayoutChanged` → calls `seated_crowd_highlight.on_variant_changed()` so the hide survives density flips during an active route. |
+
+**Mechanism**:
+
+1. The seated crowd's `PointInstancer` carries a `primvars:seatId` (varying string array) added by the generator. At first hide call, the runtime caches `{ seat_id → crowd_id }` from this primvar + the `ids` array.
+2. `hide_for_seat(seat_id)` reads the **strongest non-session** `invisibleIds` opinion via `attr.GetPropertyStack()` — that's the active `crowd_density` variant's authored value. It unions our crowd id into that list and writes the result to the session layer. The variant data on the root layer is never touched.
+3. `restore()` clears the session-layer opinion → the variant value flows through unchanged.
+4. On `seatedCrowdLayoutChanged`, `on_variant_changed()` re-resolves the (now post-flip) baseline and rewrites the union, so toggling "Display crowd" off/on or switching density mid-route keeps the target seat uncovered.
+
+**No-op cases** (all silent, expected):
+- Seated-crowd payload not yet loaded (early in startup).
+- Wheelchair / companion seats (no character ever placed there — `EXCLUDED_TIERS` in the generator).
+- The character is already hidden by the current density variant (set semantics — appending an existing id is harmless).
+
+**Regen requirement**: anything that changes the existence/order of crowd characters requires a regen of `seated_people.usda` to keep `primvars:seatId` aligned with the `ids` array. The "When to regenerate" list below already covers all such cases.
+
+**Lifecycle**: every existing `unhighlight_seat()` call site (route stop, seat layout switch, seat teleport completion, bird-eye seat-directions teardown, etc.) automatically restores the crowd character — no per-call-site wiring.
+
+## Crowd-driven seat fold-state
+
+The seat instancer's prototype set (5 prototypes — see `seat-navigation.mdc` § "Seat prototypes") includes both folded-Up and unfolded-Down variants per chair colour. The seated crowd drives a runtime override that flips every **occupied** seat to its Down prototype while leaving **empty** seats Up. A "you arrived here" Down state is also written by the seat-nav unhighlight (see `seat-navigation.mdc` § "Nav-visited Down state").
+
+| Step | What happens |
+|---|---|
+| 1 | `seatedCrowdLayoutChanged` fires (web → Kit response on every density flip, including the empty-payload query the web sends on stream start). |
+| 2 | `extension.py` calls `seat_fold_state.refresh()`. |
+| 3 | `seat_fold_state` reads the seated-crowd `PointInstancer.invisibleIds` (strongest opinion, including the active variant's mask) and the `primvars:seatId` array → derives the set of seat ids whose character is **visible**. |
+| 4 | For each occupied seat, looks up the seat instancer's instance index (via the seat instancer's own `primvars:seatId`), reads the variant baseline proto (0 or 1), and produces `{idx: (down_proto, FOLD_PRIORITY)}` — `0→2` orange, `1→3` white. |
+| 5 | `seat_proto_override.set_overrides(updates, clear_priority=FOLD_PRIORITY)` drops every existing fold opinion in one shot and writes the new merged `protoIndices` to the **session layer**. Highlight (priority 10) and nav-visited (priority 5) overrides survive. |
+
+**Coupling to crowd density**: every density variant produces a different `invisibleIds`, so flipping `none → sparse → … → full` automatically promotes more empty seats to Down. The single CU "Display crowd" toggle dispatches `seatedCrowdLayoutChange { variant: 'dense' | 'none' }`; the response triggers fold-state refresh exactly as a dev picker pick would.
+
+**Coupling to seating layout**: changing the `seating` variant on the seat instancer rewrites the variant baseline (0/1 per seat). `_on_seat_layout_change` in `extension.py` calls `seat_proto_override.reapply()` (re-flushes existing overrides against the new baseline) followed by `seat_fold_state.refresh()` (re-derives Down for the new instance order). Variant order is generator-stable so visited / fold overrides land on the right seats.
+
+**Silent no-op cases**:
+
+- Seated-crowd payload not yet loaded → no overrides written; the next density change retries.
+- Seat instancer not yet loaded → no overrides written.
+- `crowd_density = none` → empty occupied set → bulk-clear of all FOLD priority entries → all non-visited seats revert to baseline Up.
+
+**Regen requirement**: same as the per-seat character hide — any change to `seated_people.usda` that reorders characters requires regen so `primvars:seatId` stays aligned with the `ids` array. No regen needed when only flipping `crowd_density`.
+
+## NavMesh
+
+The sublayer applies `NavMeshExcludeAPI` to `def "seated_people"` so the character meshes do **not** participate in NavMesh baking. That means players can walk through seated characters (intentional — the crowd is decorative). If you ever need them to be obstacles, register a custom NavMeshAreaProvider rather than removing the exclude API (otherwise every NavMesh rebake spends seconds on 11k decorative meshes).
+
+## Sourcing positions from the seat instancer
+
+The generator opens `Assets/Seats/seats_instanced.usda`, finds `/World/SeatInstancer`, switches the `seating` variant (CLI `--variant`, default `all_seats`), and reads:
+
+- `instancer.GetPositionsAttr().Get()` — per-seat XY/Z in mm.
+- `PrimvarsAPI(instancer).GetPrimvar("seatId").Get()` — per-seat ID, used to look up `tier`/`rotation` in `extracted_seats_with_rows.json` and to deterministically pick a prototype.
+
+This means **composer-time XY/Z overrides on the seat instancer flow through to the crowd on next regen**. Rotations come from the JSON, so seat-only manual rotations (without a JSON edit) will not propagate — if you rotate a seat in Composer, also update its `rotation` in `extracted_seats_with_rows.json` before regenerating.
+
+## Web UI
+
+### CU — single "Display crowd" toggle
+
+`features/cu/controls/PeoplePanel.tsx` (Quick settings) and `features/cu/controls/World3dSettings.tsx` (Settings → 3D world) both render a single "Display crowd" toggle. They share state via `useControl()` → `peopleVisible` / `handlePeopleToggle`, so flipping one updates the other immediately. There is intentionally no per-variant picker in CU — production users get a binary on/off.
+
+The master `handlePeopleToggle` (in `features/streaming/hooks/useControlHandlers.ts`) dispatches **two** events on every flip:
+
+1. `peopleToggle` — toggles the traffic crowd at `/World/cctv1_crowd` (the slider-driven density group). The legacy `/World/test_people` layer this used to also control was removed; the event is kept because the traffic crowd still needs the on/off signal.
+2. `seatedCrowdLayoutChange` with `variant: 'dense'` (ON) or `'none'` (OFF) — toggles the seated PointInstancer crowd.
+
+The "ON variant" is hard-coded as `dense` (90%) at the top of `useControlHandlers.ts` (`SEATED_CROWD_ON_VARIANT`). It mirrors the Kit-side `SEATED_CROWD_DEFAULT_VARIANT` constant. Change both together if the chosen "default populated" variant ever moves.
+
+### Dev — per-variant picker in `SceneSubmenu.tsx`
+
+The dev panel exposes the full density picker (one button per variant) labelled with friendly names from a local `CROWD_LABELS` map. Each button fires `seatedCrowdLayoutChange` directly via `handleSeatedCrowdLayoutChange` from `useSeatNavigation`. The active button is highlighted by comparing against `seatedCrowdLayout` (the authoritative state set by the `seatedCrowdLayoutChanged` response handler in `seatHandlers.ts`).
+
+### State / sync notes
+
+- The CU toggle's visual on/off is driven by `peopleVisible` (local to `useControl`), not by `seatedCrowdLayout`. That means: if a developer uses the dev picker to switch from `dense` to `medium`, the CU toggle still shows ON (correct), but if they switch to `none`, the CU toggle still shows ON (small desync — only matters when both UIs are open at once, which only happens to developers).
+- The dev picker IS driven by the authoritative backend state (`seatedCrowdLayout`), so flipping the CU toggle correctly highlights `dense` or `none` in the dev picker.
+- On scene load, `useStreamConnection.ts` sends an empty `seatedCrowdLayoutChange` to query the current variant; the response populates `availableSeatedCrowdLayouts` and `seatedCrowdLayout`.
+
+## When to regenerate
+
+Run `python generate_seated_pointinstancer.py` from the `Assets/People/PeopleSitting/` directory after:
+
+- Adding/removing seats in `extracted_seats_with_rows.json` (or changing tiers).
+- Editing the seat rotations in the JSON.
+- Changing `BACKREST_OFFSET_MM` / `Z_OFFSET` / `PROTO_SCALE` / `DENSITY_VARIANTS` in the generator.
+- Editing `seat_pivot_offset.py` (regen seats first, then this).
+- Manual composer-time edits to seat positions in `seats_instanced.usda`.
+- Adding/removing prototype characters (update `PROTOTYPES` list — IDs in `invisibleIds` stay stable across regens because `next_id` is just the running count, but density assignments will re-shuffle if the character count changes; the seed keeps it deterministic per character count).

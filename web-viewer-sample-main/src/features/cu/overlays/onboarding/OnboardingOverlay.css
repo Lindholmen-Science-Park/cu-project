@@ -1,0 +1,325 @@
+/* Onboarding intro overlay — 4-slide carousel */
+
+.onboarding-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 10060;
+    display: flex;
+    flex-direction: column;
+    background: var(--Dark-Purple, #351a84);
+    overflow: hidden;
+    touch-action: pan-y;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.onboarding-carousel {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+}
+
+/* ── Carousel track ── */
+
+.onboarding-track {
+    display: flex;
+    width: 300%;
+    height: 100%;
+    transition: transform 0.4s cubic-bezier(0.32, 0.72, 0, 1);
+    will-change: transform;
+}
+
+.onboarding-track--dragging {
+    transition: none;
+}
+
+/* ── Individual slide ── */
+
+.onboarding-slide {
+    flex: 0 0 calc(100% / 3);
+    width: calc(100% / 3);
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    position: relative;
+    overflow: hidden;
+}
+
+/* ── Avatar background — fills entire slide, panel overlaps from bottom ── */
+
+.onboarding-avatar-bg {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+.onboarding-avatar-img {
+    width: 100%;
+    height: 91%;
+    object-fit: contain;
+    object-position: bottom center;
+    user-select: none;
+    pointer-events: none;
+    filter: drop-shadow(0 8px 32px rgba(0, 0, 0, 0.3));
+}
+
+.onboarding-avatar-img--mirrored {
+    transform: scaleX(-1);
+}
+
+/* ── Bottom content panel (overlaps avatar from below) ── */
+
+.onboarding-panel {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    width: 100%;
+    min-height: 301px;
+    box-sizing: border-box;
+    padding: 40px 24px 40px;
+    border-radius: 32px 32px 0 0;
+    background: #211740d9;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    box-shadow: 0 -3px 15px rgba(0, 0, 0, 0.15);
+}
+
+@media (orientation: landscape) and (max-height: 500px) {
+    .onboarding-panel {
+        min-height: 180px;
+        max-height: 55vh;
+        padding: 20px 24px 12px;
+    }
+}
+
+@media (orientation: landscape) and (min-height: 501px) {
+    .onboarding-panel {
+        min-height: 240px;
+        max-height: 60vh;
+        padding: 28px 24px 20px;
+    }
+}
+
+.onboarding-panel-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    flex: 1 1 auto;
+    width: 100%;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    padding-bottom: 8px;
+}
+
+/* ── Typography ── */
+
+.onboarding-heading {
+    margin: 0;
+    font-family: Lexend, sans-serif;
+    font-weight: 500;
+    font-size: 24px;
+    line-height: 110%;
+    letter-spacing: 0%;
+    text-align: center;
+    color: var(--Off-white, #f6f6f6);
+}
+
+.onboarding-body {
+    margin: 0;
+    font-family: Lexend, sans-serif;
+    font-weight: 500;
+    font-size: 16px;
+    line-height: 140%;
+    text-align: center;
+    color: var(--Off-white, #f6f6f6);
+    opacity: 0.85;
+    max-width: 320px;
+}
+
+/* ── Language dropdown wrapper ── */
+
+.onboarding-language-wrap {
+    width: 100%;
+    max-width: 340px;
+}
+
+.onboarding-overlay .cu-lang-dropdown-trigger:focus-visible,
+.onboarding-overlay .cu-lang-dropdown-option:focus-visible {
+    outline-color: var(--Lemon, #dcff7d);
+}
+
+/* ── "Start exploring" CTA ── */
+
+.onboarding-cta {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    width: 100%;
+    max-width: 340px;
+    min-height: 56px;
+    padding: 16px 24px;
+    box-sizing: border-box;
+    border: none;
+    border-radius: 18px;
+    background: var(--Medium-Purple, #5421cc);
+    cursor: pointer;
+    transition: background 0.15s ease, box-shadow 0.15s ease;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.onboarding-cta:hover {
+    background: #6030df;
+    box-shadow: 0 4px 16px rgba(84, 33, 204, 0.35);
+}
+
+.onboarding-cta:active {
+    background: #4a1db8;
+}
+
+.onboarding-cta:focus {
+    outline: none;
+}
+
+.onboarding-cta:focus-visible {
+    outline: 2px solid var(--Lemon, #dcff7d);
+    outline-offset: 2px;
+}
+
+.onboarding-cta-logo {
+    width: 24px;
+    height: 24px;
+    user-select: none;
+    pointer-events: none;
+}
+
+.onboarding-cta-label {
+    font-family: Lexend, sans-serif;
+    font-weight: 500;
+    font-size: 17px;
+    line-height: 100%;
+    color: var(--Lemon, #dcff7d);
+}
+
+/* ── Dot indicators ── */
+
+.onboarding-dots {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 24px;
+    height: 16px;
+    padding: 16px 0 calc(20px + env(safe-area-inset-bottom, 0px));
+    background: #211740d9;
+}
+
+.onboarding-dot {
+    /*
+     * WCAG 2.5.5 (Target Size, Level AAA) requires interactive targets to be
+     * at least 44×44 CSS pixels. The visible dot stays 9×9 for the original
+     * design, but the actual touch/click hit area is expanded via a fully
+     * transparent border so it meets the minimum without changing layout.
+     *
+     * `background-clip: padding-box` keeps the colour fill confined to the
+     * inner 9×9 area so the 18 px transparent border never paints — this is
+     * load-bearing and is re-asserted with `!important` everywhere to defeat
+     * any UA / library override on interaction states.
+     */
+    box-sizing: content-box;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    border: 18px solid transparent !important;
+    padding: 0;
+    background-color: var(--Medium-Purple, #5421cc);
+    background-clip: padding-box !important;
+    background-image: none !important;
+    margin: -18px -18px; /* compensate so visible dot spacing matches the original 24px gap */
+    cursor: pointer;
+    transition: background-color 0.25s ease;
+    /* Strip iOS/Android default <button> chrome that can flash a fill on tap. */
+    -webkit-appearance: none;
+    appearance: none;
+    -webkit-tap-highlight-color: transparent;
+    /* No need for the 300 ms "double-tap to zoom" delay on a tab control. */
+    touch-action: manipulation;
+    /*
+     * Without this, double-clicking/tapping the dot draws a text-selection
+     * rectangle on the 45×45 hit area (the visible box behind the 9×9 dot).
+     */
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+/*
+ * Use `background-color` (longhand) — the `background:` shorthand would reset
+ * `background-clip` back to `border-box`, causing the yellow to fill the
+ * entire 45×45 hit area instead of the visible 9×9 padding-box.
+ */
+.onboarding-dot--active {
+    background-color: var(--Lemon, #dcff7d);
+}
+
+/*
+ * Kill every inherited interaction effect (Bootstrap reboot box-shadow,
+ * browser-default focus ring, mobile <button> tap fill) for ALL pointer
+ * interaction states. The dot's own colour change (purple ⇄ yellow) IS the
+ * visual feedback — no halo, no border-paint, no extra ring. Keyboard users
+ * still get a clear yellow ring via :focus-visible further below.
+ */
+.onboarding-dot:hover,
+.onboarding-dot:focus,
+.onboarding-dot:active,
+.onboarding-dot--active:hover,
+.onboarding-dot--active:focus,
+.onboarding-dot--active:active {
+    outline: none !important;
+    box-shadow: none !important;
+    background-image: none !important;
+    border-color: transparent !important;
+}
+
+/*
+ * Keyboard focus indicator (WCAG 2.4.7). Pointer interaction never reaches
+ * this rule because we preventDefault() on mousedown in the TSX, so the
+ * button is never focused by mouse/touch.
+ *
+ * On touch-primary devices (no hover capability), some Chromium builds still
+ * (incorrectly) match :focus-visible on tap — hide the ring there because
+ * the dot's colour change already indicates the active page, and a stuck
+ * yellow ring on the just-tapped dot reads as a bug to users.
+ */
+.onboarding-dot:focus-visible {
+    outline: 2px solid var(--Lemon, #dcff7d) !important;
+    outline-offset: 2px;
+    box-shadow: none !important;
+}
+@media (hover: none) and (pointer: coarse) {
+    .onboarding-dot:focus-visible {
+        outline: none !important;
+    }
+}
+
+/* ── Reduced motion ── */
+
+@media (prefers-reduced-motion: reduce) {
+    .onboarding-track {
+        transition: none;
+    }
+
+    .onboarding-dot {
+        transition: none;
+    }
+}

@@ -1,0 +1,27 @@
+{
+    "speed": 200,
+    "loop": true,
+    "drawPath": false,
+    "defaultModel": "Assets/NPC/npc_capsule.usda",
+    "npcs": [
+        {
+            "npcId": "test_npc_01",
+            "primPath": "/World/TestNpc_01",
+            "start": "/World/npc/npc_1_start_point",
+            "end": "/World/npc/npc_1_end_point"
+        },
+        {
+            "npcId": "test_npc_02",
+            "primPath": "/World/TestNpc_02",
+            "start": "/World/npc/npc_2_start_point",
+            "end": "/World/npc/npc_2_end_point",
+            "model": "Assets/NPC/npc_sphere.usda"
+        },
+        {
+            "npcId": "test_npc_03",
+            "primPath": "/World/TestNpc_03",
+            "start": "/World/npc/npc_3_start_point",
+            "end": "/World/npc/npc_3_end_point"
+        }
+    ]
+}

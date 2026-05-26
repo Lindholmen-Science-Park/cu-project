@@ -1,0 +1,351 @@
+/* VideoBook Player — fullscreen video with chapter-aware controls */
+.vbp-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 10051;
+    display: flex;
+    flex-direction: column;
+    background: #000;
+    animation: vbp-fade-in 0.22s ease;
+    /*
+     * Approx. height the bottom controls occupy when visible (seek row + button row + safe-area).
+     * The captions strip is lifted by this amount + a small gap so it sits cleanly above the
+     * controls; tweak in lockstep with the `.vbp-controls` padding/content if the row grows.
+     */
+    --vbook-controls-block: 132px;
+}
+
+/*
+ * Custom caption strip — we drive cue scheduling via a hidden `<track>` and render the active
+ * cue text into this DOM node so we can use the brand Lexend font, the dark "chip" treatment,
+ * and lift the strip above the bottom controls when they are visible (none of which native
+ * `::cue` rendering allows). See the `useEffect` that wires `cuechange` in `VideoBookPlayer.tsx`.
+ */
+.vbp-captions {
+    position: absolute;
+    left: 50%;
+    bottom: 24px;
+    transform: translateX(-50%);
+    width: min(358px, calc(100% - 32px));
+    display: flex;
+    justify-content: center;
+    pointer-events: none;
+    z-index: 5;
+    transition: bottom 0.3s ease;
+}
+
+.vbp-captions--with-controls {
+    /*
+     * Lift above the controls bar with an 8px gap. The controls bar's own bottom padding
+     * already uses `max(24px, env(safe-area-inset-bottom))`, so the safe-area is rolled
+     * into `--vbook-controls-block` rather than added a second time here.
+     */
+    bottom: calc(var(--vbook-controls-block, 132px) + 8px);
+}
+
+.vbp-caption-chip {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    width: 100%;
+    padding: 8px;
+    background: rgba(0, 0, 0, 0.7);
+    border: 1px solid rgba(168, 190, 255, 0.2);
+    border-radius: 8px;
+    text-align: left;
+}
+
+/*
+ * Cue text — Lexend caption tokens (Figma: small 14px / default 18px / large 30px;
+ * line-height 130% for small+default, 120% for large).
+ */
+.vbp-caption-line {
+    color: #F6F6F6;
+    font-family: 'Lexend', sans-serif;
+    font-weight: 400;
+    font-size: 18px;
+    line-height: 130%;
+    letter-spacing: 0;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+}
+
+.vbp-captions[data-caption-size="0"] .vbp-caption-line { font-size: 14px; }
+.vbp-captions[data-caption-size="2"] .vbp-caption-line { font-size: 30px; line-height: 120%; }
+
+@keyframes vbp-fade-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+/* Video area */
+.vbp-video-area {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+
+.vbp-video-area video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    outline: none;
+}
+
+.vbp-big-play {
+    position: absolute;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 72px;
+    height: 72px;
+    background: rgba(0, 0, 0, 0.45);
+    border-radius: 50%;
+    pointer-events: none;
+}
+
+/* Top bar */
+.vbp-top-bar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 10052;
+    display: flex;
+    align-items: flex-start;
+    justify-content: flex-end;
+    /* Match .vbook-floating-stack top inset; respect notch */
+    padding: max(40px, env(safe-area-inset-top, 0px)) var(--page-edge-right, 16px) 0 var(--page-edge-left, 16px);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.vbp-top-bar.vbp-visible {
+    opacity: 1;
+}
+
+.vbp-top-bar-right {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    pointer-events: auto;
+}
+
+.vbp-close-btn {
+    width: 48px;
+    height: 48px;
+}
+
+/* Design: solid white circle (match Figma stack) */
+.vbp-top-bar-right .vbp-top-bar-close.cu-panel-close-btn {
+    background: #ffffff;
+}
+
+.vbp-top-bar-right .vbp-top-bar-close.cu-panel-close-btn:hover {
+    background: #ffffff;
+}
+
+/* Middle (settings): now provided by `MediaSettingsButton`/`mpc-btn--settings`. */
+
+/* Bottom: chapter chip — same lavender squircle as `vbook-floating-btn--videobook` (see VideoBookOverlay.css) */
+/* Bottom controls */
+.vbp-controls {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 10052;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 0 var(--page-edge-right, 16px) max(24px, env(safe-area-inset-bottom, 24px)) var(--page-edge-left, 16px);
+    background: linear-gradient(0deg, rgba(0, 0, 0, 0.7) 0%, transparent 100%);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    pointer-events: none;
+}
+
+.vbp-controls.vbp-visible,
+.vbp-controls:focus-within {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.vbp-top-bar:focus-within {
+    opacity: 1;
+}
+
+/* Seek bar */
+.vbp-seek-row {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    max-width: min(420px, var(--page-max-width-gutter, 100%));
+    gap: 10px;
+    margin-bottom: 4px;
+}
+
+.vbp-seek-dot-left {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #DCFF7D;
+    flex-shrink: 0;
+}
+
+.vbp-seek-bar {
+    position: relative;
+    flex: 1;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    touch-action: none;
+}
+
+.vbp-seek-track {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: rgba(255, 255, 255, 0.35);
+    border-radius: 2px;
+}
+
+.vbp-seek-fill {
+    position: absolute;
+    left: 0;
+    height: 3px;
+    background: var(--Dark-Purple, #351a84);
+    border-radius: 2px;
+    pointer-events: none;
+}
+
+.vbp-seek-thumb {
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #DCFF7D;
+    transform: translateX(-50%);
+    pointer-events: none;
+    box-shadow: 0 0 4px rgba(0, 0, 0, 0.3);
+    transition: transform 0.1s ease;
+}
+
+.vbp-seek-bar:hover .vbp-seek-thumb {
+    transform: translateX(-50%) scale(1.2);
+}
+
+.vbp-chapter-dot {
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.7);
+    transform: translate(-50%, -50%);
+    top: 50%;
+    pointer-events: none;
+    transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.vbp-chapter-dot--active {
+    background: #DCFF7D;
+    transform: translate(-50%, -50%) scale(1.3);
+}
+
+/* Time row */
+.vbp-time-row {
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+    max-width: min(420px, var(--page-max-width-gutter, 100%));
+    padding: 0 0 8px 22px;
+}
+
+.vbp-time {
+    font-family: Lexend, sans-serif;
+    font-size: 12px;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.8);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.02em;
+}
+
+/* Transport buttons */
+.vbp-transport {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    width: 100%;
+    max-width: min(420px, var(--page-max-width-gutter, 100%));
+}
+
+.vbp-ctrl-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: background 0.15s ease, transform 0.1s ease, border-color 0.15s ease;
+    padding: 0;
+}
+
+.vbp-ctrl-btn:active {
+    transform: scale(0.9);
+}
+
+/* Mute / CC / Play / Settings buttons live in `MediaPlayerControls` (.mpc-btn--*).
+   The transport row only needs to know about the videobook-only chapter-skip buttons. */
+
+.vbp-ctrl-btn--md {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background: transparent;
+    color: #fff;
+}
+
+.vbp-ctrl-btn--md:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+/* Focus-visible for the chapter-skip buttons */
+.vbp-ctrl-btn:focus-visible,
+.vbp-top-bar-right .vbook-floating-btn:focus-visible {
+    outline: 2px solid #DCFF7D;
+    outline-offset: 2px;
+}
+
+/* Responsive — landscape / short viewports */
+@media (max-height: 500px) {
+    .vbp-controls {
+        padding-bottom: 12px;
+    }
+
+    .vbp-ctrl-btn--md {
+        width: 44px;
+        height: 44px;
+    }
+
+    .vbp-captions {
+        bottom: 12px;
+    }
+
+    .vbp-captions--with-controls {
+        /* Controls are shorter in landscape; keep the strip just above them. */
+        bottom: calc(96px + 8px);
+    }
+
+    .vbp-transport {
+        gap: 8px;
+    }
+}

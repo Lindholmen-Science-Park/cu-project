@@ -1,0 +1,16 @@
+[package]
+title = "USD Editing Extension"
+version = "0.1.0"
+description = "Dev-mode lightweight USD editing: vertex nudging, prim transforms, persistent sublayer"
+
+[dependencies]
+"younite.picking_extension" = {}
+"younite.messaging_core_extension" = {}
+"younite.payload_orchestrator_core_extension" = {}
+"omni.usd" = {}
+
+[[python.module]]
+name = "younite.usd_edit_extension"
+
+[build]
+enabled = true

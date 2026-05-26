@@ -1,0 +1,19 @@
+#usda 1.0
+
+over "World"
+{
+    def "Symbolbyggnader" (
+        displayName = "Symbolbyggnader"
+        prepend payload = @../../nucleus/symbolic_buildings/Symbolbyggnader.usd@
+    )
+    {
+        token visibility = "inherited"
+        float3 xformOp:rotateXYZ = (0, 0, 0)
+        float3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (-426157.4063502401, 1665.9000248238444, -221327.70329803973)
+        double3 xformOp:translate:pivot = (241485.88327424478, 6928.732531419053, 176873.92145789712)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:translate:pivot", "xformOp:rotateXYZ", "xformOp:scale", "!invert!xformOp:translate:pivot"]
+    }
+
+}
+

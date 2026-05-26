@@ -1,0 +1,93 @@
+---
+description: End-of-route flag marker — green emissive USD asset placed 50 cm before the polyline endpoint on every drawn route (FP sphere trail only, never on the bird-eye SVG overlay). Cached at startup, single-frame session-layer authoring, asset-agnostic.
+---
+
+# End-of-route flag (FP sphere trail marker)
+
+A flag-shaped marker that sits a short distance **before the true destination** of every drawn navigation polyline (seat / restroom / quiet-zone / exit / map-marker directions). Pure cosmetic: it does **not** affect routing, the auto-mover, segment speeds, or arrival detection — it only reads the polyline that has already been computed.
+
+**Code**: `route_end_flag.py` in `scripts/navmesh_shortest_path/` (see `navmesh-shortest-path-package.mdc`). Visualization calls `update_route_end_flag` from `path_visualization.draw_path_curve`.
+**Asset**: `kit-app-template-main/source/data/Assets/Flag/flag.usd`
+
+## Scope (FP-only, sphere-trail only)
+
+- The flag is authored from inside `draw_path_curve(...)`, so it shares the **exact same gate as the floating waypoint spheres** (`drawPath: true`). Any route that draws the FP sphere trail also gets the flag; routes that don't (point-and-click `player`/`default` default to `drawPath: false` per `navmesh-path-refinement.mdc`) get neither.
+- **Bird-eye SVG overlay is intentionally untouched.** That overlay lives browser-side (`BirdEyeRouteOverlay`); Kit's `BirdEyeRouteProjector` only supplies projected screen coordinates for the same polyline — the USD flag pipeline never runs through that path.
+
+## Pipeline
+
+```
+extension on_startup
+   set_route_flag_data_root(data_dir)
+   └─ _load_route_flag_geometry(asset_path)            # one-shot
+        ├─ Usd.Stage.Open(asset_path)                  # side stage
+        ├─ walk every UsdGeomMesh under default prim
+        ├─ flatten through asset's internal Xforms
+        └─ cache (points, faceVertexCounts, faceVertexIndices, native_height_cm)
+
+draw_path_curve(points_gf, …) — per-route, after _resample_path / _place_spheres
+   └─ update_route_end_flag(stage, group_path, points_gf)
+        ├─ _world_pos_before_path_end(points_gf, FLAG_ROUTE_END_OFFSET_CM)
+        ├─ _route_flag_yaw_deg_toward(anchor → endpoint) + FLAG_ROUTE_END_YAW_OFFSET_DEG
+        └─ _author_route_flag_from_cache(...)          # session-layer, single frame
+             ├─ Usd.EditContext(stage, session)
+             ├─ DefinePrim(flag_path, "Xform") + translate / rotate-Y / uniform-scale
+             └─ for each cached mesh: DefinePrim Mesh + bind ROUTE_FLAG_FALLBACK_MAT
+```
+
+Single-shot, single-frame, no USD reference, no async compose follow-up. This avoids the WebRTC/RTX Fabric sync gap that plagues runtime references in the streaming kit (the same reason `osm_route_overlay`, `navmesh_dev_overlays`, the waypoint spheres, and the IoT marker overlays all author native session-layer prims).
+
+## Tunables (constants in `scripts/navmesh_shortest_path/constants.py`)
+
+| Constant | Default | Purpose |
+|---|---|---|
+| `FLAG_ROUTE_END_OFFSET_CM` | `35.0` | Distance walked back along the polyline from the true endpoint. |
+| `FLAG_ROUTE_END_TARGET_HEIGHT_CM` | `100.0` | Scaled visual height in cm (uniform scale = target / native bbox Y). |
+| `FLAG_ROUTE_END_TOP_ABOVE_ANCHOR_CM` | `200.0` | Approximate world Y from path anchor to flag top (cm). Base Y = `anchor.y + TOP − TARGET`. |
+| `FLAG_ROUTE_END_ROT_X_DEG` | `0.0` | X-axis tilt — set to `90.0` if the asset is exported Z-up. |
+| `FLAG_ROUTE_END_YAW_OFFSET_DEG` | `180.0` | Added to the computed yaw (faces the opposite way along the path tangent). |
+
+The base yaw aims the asset's local **+Z** from the anchor toward the actual destination; the offset rotates that (default 180°) so art direction can flip which way the mesh “points”.
+
+## Fallback (cache empty)
+
+If the asset file is missing at startup, or contains no `UsdGeomMesh` prims, `_ROUTE_FLAG_GEOMETRY` stays empty and `_update_route_end_flag` falls back to `_ensure_route_flag_placeholder_sphere` — a large green-emissive `UsdGeom.Sphere` (~28 cm radius) bound to the same `GlowMaterial` as the waypoint spheres. The startup log line says exactly which path is active:
+
+```
+[navmesh_route] Route end flag asset: …/flag.usd (N mesh(es), native height H cm)
+[navmesh_route] Route end flag asset NOT FOUND under source/data/Assets/Flag/flag.usd (or .usdc)
+[navmesh_route] Route end flag asset … contains no meshes — using placeholder sphere fallback
+```
+
+## Material
+
+Every cached mesh is bound to `ROUTE_FLAG_FALLBACK_MAT` — a `UsdPreviewSurface` with the same green diffuse + emissive as the sphere trail (slightly brighter to compensate for thin-plane geometry). The asset's own materials are deliberately **ignored**:
+
+- Keeps the visual language consistent with the FP sphere trail.
+- No dependency on the MDL plugin chain in the streaming kit (cf. `streaming-profiles.mdc`'s prod-MDL caveat that bites the seated crowd asset).
+- Asset can be any USD without worrying about `OmniPBR` vs `UsdPreviewSurface` vs missing texture references.
+
+If a designer wants the asset's own materials to render, that requires a small extension to `_load_route_flag_geometry` (cache material binding paths) and `_author_route_flag_from_cache` (replicate bindings instead of forcing the fallback).
+
+## Replacing the asset
+
+The pipeline is **asset-agnostic** — drop a new `flag.usd` (or `flag.usdc`) at `kit-app-template-main/source/data/Assets/Flag/` and restart Kit. The cache is rebuilt once at extension startup, not per route.
+
+Asset assumptions the new file should satisfy (otherwise tweak the asset or the tunables above):
+
+1. **Default prim** (or `/World`) is the asset root.
+2. **Y-up**, **`metersPerUnit = 0.01`** (cm).
+3. **Origin at the base** so vertical placement matches `anchor.y + FLAG_ROUTE_END_TOP_ABOVE_ANCHOR_CM − FLAG_ROUTE_END_TARGET_HEIGHT_CM` (see code for interaction with `SPHERE_Y_OFFSET` on the sphere trail).
+4. **Faces +Z** in its local frame.
+5. **Native `UsdGeomMesh` geometry** — `PointInstancer`, `SkelRoot`, NURBS, etc. are skipped by the cache walker.
+
+## Lifecycle / cleanup
+
+- `_remove_route_end_flag(stage, group_path)` deletes the flag Xform plus three legacy prim names (`route_end_flag_baked`, `route_end_flag_placeholder`, `route_end_beacon`) so old sessions never leave stragglers when the file is hot-reloaded.
+- `remove_path_curve` (called when the route is cleared) removes the entire `path_prim` group, which drops the flag along with the spheres.
+
+## Related
+
+- **Path sphere visualization gating + which routes render the trail**: `navmesh-path-refinement.mdc` § "Path sphere visualization"
+- **Streaming MDL caveat** (why we use `UsdPreviewSurface` not `OmniPBR`): `streaming-profiles.mdc`
+- **Same session-layer authoring pattern**: `osm-route-overlay.mdc`, `navmesh-dev-overlays.mdc`

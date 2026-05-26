@@ -1,0 +1,20 @@
+[package]
+title = "Younite Open Data Live (Dev)"
+description = "Dev: WAQI air-quality station markers + Västtrafik live transit overlay (shared extension, separate services)."
+version = "0.1.0"
+authors = ["Younite"]
+category = "Feature"
+
+[dependencies]
+"younite.messaging_core_extension" = {}
+"younite.payload_orchestrator_core_extension" = {}
+"younite.usd_viewer_stage_core_extension" = {}
+"younite.osm_navigation_extension" = {}
+"omni.usd" = {}
+"omni.physx" = {}
+
+[[python.module]]
+name = "younite.open_data_live_extension"
+
+[build]
+include = ["younite/**/*.py", "*.toml"]

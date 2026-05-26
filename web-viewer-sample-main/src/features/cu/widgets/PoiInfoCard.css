@@ -1,0 +1,223 @@
+/* Info-only POI detail card — slides up from the bottom of the viewport.
+   Visual language mirrors the restroom/quiet-zone widget detail sheets
+   (`RestroomWidget.css` § sheet) but action-less. */
+
+.cu-poi-info-card-root {
+    position: fixed;
+    inset: 0;
+    z-index: 1300;
+    pointer-events: none;
+    isolation: isolate;
+}
+
+.cu-poi-info-card__backdrop {
+    position: absolute;
+    inset: 0;
+    margin: 0;
+    padding: 0;
+    border: none;
+    background: rgba(0, 0, 0, 0.18);
+    cursor: pointer;
+    pointer-events: auto;
+    animation: cu-poi-info-card-backdrop-in 0.22s ease-out;
+}
+
+@keyframes cu-poi-info-card-backdrop-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.cu-poi-info-card__sheet {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    margin-left: auto;
+    margin-right: auto;
+    z-index: 1;
+    display: flex;
+    width: 390px;
+    max-width: 100%;
+    padding: 12px 16px 32px 16px;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    border-radius: 32px 32px 0 0;
+    background: rgba(234, 231, 229, 0.95);
+    box-shadow: 0 -3px 15px 0 rgba(0, 0, 0, 0.15);
+    max-height: min(68vh, 560px);
+    overflow-x: hidden;
+    overflow-y: auto;
+    pointer-events: auto;
+    font-family: Lexend, system-ui, sans-serif;
+    color: #351a84;
+    box-sizing: border-box;
+    animation: cu-poi-info-card-sheet-in 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.cu-poi-info-card__sheet * { box-sizing: border-box; }
+
+@keyframes cu-poi-info-card-sheet-in {
+    from { transform: translateY(100%); opacity: 0.85; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+.cu-poi-info-card__handle {
+    width: 80px;
+    height: 4px;
+    margin: 10px auto 0;
+    border-radius: 8px;
+    background: var(--Dark-Purple, #351a84);
+    flex-shrink: 0;
+}
+
+.cu-poi-info-card__head {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    align-self: stretch;
+    justify-content: space-between;
+    gap: 24px;
+}
+
+.cu-poi-info-card__title {
+    margin: 0;
+    flex: 1;
+    color: var(--Dark-Purple, #351a84);
+    font-family: Lexend, system-ui, sans-serif;
+    font-size: 20px;
+    font-weight: 500;
+    line-height: 115%;
+}
+
+.cu-poi-info-card__close {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border: none;
+    border-radius: 999px;
+    background: #ffffff;
+    cursor: pointer;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    line-height: 0;
+}
+
+.cu-poi-info-card__close:hover { background: #fafafa; }
+
+.cu-poi-info-card__close:focus-visible {
+    outline: 2px solid #351a84;
+    outline-offset: 2px;
+}
+
+.cu-poi-info-card__close-img {
+    display: block;
+    width: 23px;
+    height: 23px;
+}
+
+.cu-poi-info-card__info {
+    align-self: stretch;
+    width: 100%;
+    padding: 14px 16px;
+    border-radius: 12px;
+    border: 1px solid rgba(33, 23, 64, 0.12);
+    background: #ffffff;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.cu-poi-info-card__row {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+    color: var(--Dark-Purple, #351a84);
+    font-family: Lexend, system-ui, sans-serif;
+    font-size: 14px;
+    font-weight: 400;
+    line-height: 140%;
+}
+
+.cu-poi-info-card__row-icon {
+    display: block;
+    flex-shrink: 0;
+    width: 16px;
+    height: 16px;
+    object-fit: contain;
+}
+
+.cu-poi-info-card__row-label {
+    flex: 1;
+    min-width: 0;
+    text-align: left;
+}
+
+.cu-poi-info-card__row-value {
+    flex-shrink: 0;
+    max-width: 52%;
+    text-align: right;
+}
+
+.cu-poi-info-card__elevator {
+    align-self: stretch;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.cu-poi-info-card__elevator-heading {
+    margin: 0;
+    align-self: stretch;
+    color: var(--Dark-Purple, #351a84);
+    font-family: Lexend, system-ui, sans-serif;
+    font-size: 16px;
+    font-weight: 500;
+    line-height: 120%;
+}
+
+.cu-poi-info-card__elevator-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.cu-poi-info-card__elevator-btn {
+    width: 100%;
+    min-height: 44px;
+    padding: 12px 16px;
+    border: none;
+    border-radius: 12px;
+    background: var(--Dark-Purple, #351a84);
+    color: #ffffff;
+    font-family: Lexend, system-ui, sans-serif;
+    font-size: 15px;
+    font-weight: 500;
+    line-height: 130%;
+    text-align: center;
+    cursor: pointer;
+}
+
+.cu-poi-info-card__elevator-btn:hover {
+    background: #4a2599;
+}
+
+.cu-poi-info-card__elevator-btn:focus-visible {
+    outline: 2px solid #351a84;
+    outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .cu-poi-info-card__backdrop,
+    .cu-poi-info-card__sheet {
+        animation: none;
+    }
+}

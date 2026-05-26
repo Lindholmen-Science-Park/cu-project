@@ -1,0 +1,544 @@
+#usda 1.0
+(
+    defaultPrim = "World"
+)
+
+over "World"
+{
+    def Xform "nav_waypoint_R"
+    {
+        double3 xformOp:rotateXYZ = (0, 0, 0)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (-3848.9650835263233, 2376.5139103537945, -200.95262181293373)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "nav_waypoint_O"
+    {
+        double3 xformOp:rotateXYZ = (0, 0, 0)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (-3524.1900993040185, 2373.4995081971983, 2420.6177342505307)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "nav_waypoint_N"
+    {
+        double3 xformOp:rotateXYZ = (0, 0, 0)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (-2797.5877857895566, 2371.801025390625, 4303.034623799962)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "nav_waypoint_M"
+    {
+        double3 xformOp:rotateXYZ = (0, 0, 0)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (-1136.983997976598, 2372.8820271079176, 5558.908432961055)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "nav_waypoint_L"
+    {
+        double3 xformOp:rotateXYZ = (0, 0, 0)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (834.3513793945312, 2371.801025390625, 5695.852138356578)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "nav_waypoint_K"
+    {
+        double3 xformOp:rotateXYZ = (0, 0, 0)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (2654.987189129301, 2372.349224839885, 5049.468742781337)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "nav_waypoint_J"
+    {
+        double3 xformOp:rotateXYZ = (0, 0, 0)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (4058.3025097487593, 2372.681647002276, 3489.813554206346)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "nav_waypoint_G"
+    {
+        double3 xformOp:rotateXYZ = (0, 0, 0)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (4291.45068359375, 2371.801025390625, 1520.8846435546875)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "nav_waypoint_D"
+    {
+        double3 xformOp:rotateXYZ = (0, 0, 0)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (3956.317574457577, 2371.801025390625, -1120.3355712890625)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "nav_waypoint_C"
+    {
+        double3 xformOp:rotateXYZ = (0, 0, 0)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (3274.0856495394814, 2371.801025390625, -3042.010298718175)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "nav_waypoint_B"
+    {
+        double3 xformOp:rotateXYZ = (0, 0, 0)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (1438.2268213683612, 2264.199379992955, -4030.1657771399773)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "nav_waypoint_A"
+    {
+        double3 xformOp:rotateXYZ = (0, 0, 0)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (-382.5536804199219, 2263.19765528358, -4278.72900390625)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "nav_waypoint_U"
+    {
+        double3 xformOp:rotateXYZ = (0, 0, 0)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (-2095.7483381494353, 2261.800048828125, -3556.436041240931)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "nav_waypoint_T"
+    {
+        double3 xformOp:rotateXYZ = (0, 0, 0)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (-3631.104830078807, 2371.801025390625, -2222.202764161371)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "nav_waypoint_RT"
+    {
+        double3 xformOp:rotateXYZ = (0, 0, 0)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (-3839.621337890625, 2373.460381637133, -1103.1912841796875)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "nav_waypoint_OR"
+    {
+        double3 xformOp:rotateXYZ = (0, 0, 0)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (-3749.084731146017, 2378.2141382763734, 1103.5205078125)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "nav_waypoint_NO"
+    {
+        double3 xformOp:rotateXYZ = (0, 0, 0)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (-3258.3662109375, 2371.801025390625, 3306.99658203125)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "nav_waypoint_MN"
+    {
+        double3 xformOp:rotateXYZ = (0, 0, 0)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (-2078.412353515625, 2371.801025390625, 5102.5986328125)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "nav_waypoint_LM"
+    {
+        double3 xformOp:rotateXYZ = (0, 0, 0)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (53.289955139160156, 2371.801025390625, 5787.0419921875)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "nav_waypoint_KL"
+    {
+        double3 xformOp:rotateXYZ = (0, 0, 0)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (1757.7059326171875, 2371.801025390625, 5496.89892578125)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "nav_waypoint_JK"
+    {
+        double3 xformOp:rotateXYZ = (0, 0, 0)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (3757.507080078125, 2371.801025390625, 4213.3798828125)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "nav_waypoint_GJ"
+    {
+        double3 xformOp:rotateXYZ = (0, 0, 0)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (4257.9580078125, 2371.801025390625, 2592.4140625)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "nav_waypoint_DG"
+    {
+        double3 xformOp:rotateXYZ = (0, 0, 0)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (4237.51611328125, 2371.801025390625, 450.73724365234375)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "nav_waypoint_CD"
+    {
+        double3 xformOp:rotateXYZ = (0, 0, 0)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (3697.523681640625, 2371.801025390625, -2185.288818359375)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "nav_waypoint_BC"
+    {
+        double3 xformOp:rotateXYZ = (0, 0, 0)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (2597.35595703125, 2371.801025390625, -3514.654541015625)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "nav_waypoint_AB"
+    {
+        double3 xformOp:rotateXYZ = (0, 0, 0)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (284.6974792480469, 2261.800048828125, -4313.84375)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "nav_waypoint_UA"
+    {
+        double3 xformOp:rotateXYZ = (0, 0, 0)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (-1595.1176585289159, 2261.800048828125, -3912.1672220265737)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "nav_waypoint_P"
+    {
+        double3 xformOp:rotateXYZ = (0, 0, 0)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (-3850.875, 3257.19970703125, 2564.947509765625)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "nav_waypoint_H"
+    {
+        double3 xformOp:rotateXYZ = (0, 0, 0)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (4658.86767578125, 3257.19970703125, 1453.1700439453125)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "nav_waypoint_E"
+    {
+        double3 xformOp:rotateXYZ = (0, 0, 0)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (4281.384765625, 3257.25, -1234.3043212890625)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "nav_waypoint_S"
+    {
+        double3 xformOp:rotateXYZ = (0, 0, 0)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (-4175.1494140625, 3257.25, -130.2652587890625)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "nav_waypoint_F"
+    {
+        double3 xformOp:rotateXYZ = (0, 0, 0)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (3766.55029296875, 2836.7998046875, -230.2327423095703)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "nav_waypoint_OP"
+    {
+        double3 xformOp:rotateXYZ = (0, 0, 0)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (-4431.70263671875, 2596.7998046875, 2698.490234375)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "nav_waypoint_GH"
+    {
+        double3 xformOp:rotateXYZ = (0, 0, 0)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (5252.890625, 2596.7998046875, 1436.7022705078125)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "nav_waypoint_RS"
+    {
+        double3 xformOp:rotateXYZ = (0, 0, 0)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (-4791.1826171875, 2596.7998046875, -123.07568359375)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "nav_waypoint_DEF"
+    {
+        double3 xformOp:rotateXYZ = (0, 0, 0)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (4880.7109375, 2596.7998046875, -1340.9302978515625)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "nav_waypoint_OP_2"
+    {
+        double3 xformOp:rotateXYZ = (0, 0, 0)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (-3725.795528808277, 2836.7998046875, 2578.2342247023853)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "nav_waypoint_OP_3"
+    {
+        double3 xformOp:rotateXYZ = (0, 0, 0)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (-4448.26513671875, 3077.19970703125, 2703.86083984375)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "nav_waypoint_DE_1"
+    {
+        double3 xformOp:rotateXYZ = (0, 0, 0)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (4861.8349292342255, 3080.2448736885112, -1421.6834353409456)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "nav_waypoint_DEF_2"
+    {
+        double3 xformOp:rotateXYZ = (0, 0, 0)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (4242.051434810508, 2838.0928507127305, -1229.685302734375)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "nav_waypoint_DF_1"
+    {
+        double3 xformOp:rotateXYZ = (0, 0, 0)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (4363.85009765625, 2836.800048828125, -337.4049072265625)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "nav_waypoint_RS_2"
+    {
+        double3 xformOp:rotateXYZ = (0, 0, 0)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (-4143.599609375, 2836.7998046875, -126.22069549560547)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "nav_waypoint_RS_3"
+    {
+        double3 xformOp:rotateXYZ = (0, 0, 0)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (-4809.36865234375, 3077.19970703125, -120.96237182617188)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "nav_waypoint_GH_2"
+    {
+        double3 xformOp:rotateXYZ = (0, 0, 0)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (4585.90234375, 2836.7998046875, 1435.578125)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "nav_waypoint_GH_3"
+    {
+        double3 xformOp:rotateXYZ = (0, 0, 0)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (5258.65673828125, 3077.19970703125, 1455.2081298828125)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "nav_waypoint_entrance_01"
+    {
+        double3 xformOp:rotateXYZ = (0, 0, 0)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (-2455.9592540756366, 2264.300048828125, -6396.945589545914)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "nav_waypoint_entrance_02"
+    {
+        double3 xformOp:rotateXYZ = (0, 0, 0)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (-2704.745548511405, 2264.300048828125, -6247.951316721482)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "nav_waypoint_entrance_03"
+    {
+        double3 xformOp:rotateXYZ = (0, 0, 0)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (-2987.2339761309454, 2264.300048828125, -6139.071726228035)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "nav_waypoint_U_arena"
+    {
+        float3 xformOp:rotateXYZ = (0, 225, 0)
+        float3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (-1620.4532470703125, 2373.801025390625, -2969.57080078125)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "nav_waypoint_A_arena"
+    {
+        float3 xformOp:rotateXYZ = (180, 0, 0)
+        float3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (-334.69744873046875, 2374.801025390625, -3573.1982421875)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "nav_waypoint_B_arena"
+    {
+        float3 xformOp:rotateXYZ = (0, 155, 0)
+        float3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (1066.84619140625, 2374.80078125, -3346.74951171875)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "nav_waypoint_C_arena"
+    {
+        float3 xformOp:rotateXYZ = (0, 123, 0)
+        float3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (2153.746337890625, 2374.801025390625, -2376.33203125)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "nav_waypoint_D_arena"
+    {
+        float3 xformOp:rotateXYZ = (0, 106, 0)
+        float3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (2721.98828125, 2375.801025390625, -850.828369140625)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "nav_waypoint_G_arena"
+    {
+        float3 xformOp:rotateXYZ = (0, 90, 0)
+        float3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (3027.103515625, 2374.801025390625, 1467.769775390625)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "nav_waypoint_J_arena"
+    {
+        float3 xformOp:rotateXYZ = (1, 73, 0)
+        float3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (2875.3681640625, 2374.801025390625, 3098.2333984375)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "nav_waypoint_K_arena"
+    {
+        float3 xformOp:rotateXYZ = (0, 45, 0)
+        float3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (2139.648193359375, 2374.801025390625, 4348.24755859375)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "nav_waypoint_L_arena"
+    {
+        float3 xformOp:rotateXYZ = (-1, 7, 0)
+        float3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (806.2028198242188, 2376.801025390625, 4882.8740234375)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "nav_waypoint_M_arena"
+    {
+        float3 xformOp:rotateXYZ = (0, -33, 0)
+        float3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (-620.3941040039062, 2375.801025390625, 4675.27099609375)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "nav_waypoint_N_arena"
+    {
+        float3 xformOp:rotateXYZ = (0, -54, 0)
+        float3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (-1647.6500244140625, 2375.801025390625, 3680.085205078125)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "nav_waypoint_O_arena"
+    {
+        float3 xformOp:rotateXYZ = (0, -90, 0)
+        float3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (-2199.01220703125, 2374.801025390625, 2162.439697265625)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "nav_waypoint_R_arena"
+    {
+        float3 xformOp:rotateXYZ = (0, -75, 0)
+        float3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (-2468.990966796875, 2374.80078125, -150.56411743164062)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "nav_waypoint_T_arena"
+    {
+        float3 xformOp:rotateXYZ = (0, -104, 0)
+        float3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (-2349.341064453125, 2374.801025390625, -1747.1385498046875)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "nav_waypoint_E_arena"
+    {
+        float3 xformOp:rotateXYZ = (0, -255, 0)
+        float3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (4148.9453125, 3261.199951171875, -1193.8902587890625)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "nav_waypoint_F_arena"
+    {
+        float3 xformOp:rotateXYZ = (0, 100, 0)
+        float3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (3658.670166015625, 2840.7998046875, -210.0916748046875)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "nav_waypoint_H_arena"
+    {
+        float3 xformOp:rotateXYZ = (0, 90, 0)
+        float3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (4513.38916015625, 3261.199951171875, 1459.385986328125)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "nav_waypoint_S_arena"
+    {
+        float3 xformOp:rotateXYZ = (0, -90, 0)
+        float3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (-4050.21923828125, 3260.199951171875, -126.04873657226562)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "nav_waypoint_P_arena"
+    {
+        float3 xformOp:rotateXYZ = (0, -73, 0)
+        float3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (-3686.26123046875, 3260.199951171875, 2554.223876953125)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+}
+

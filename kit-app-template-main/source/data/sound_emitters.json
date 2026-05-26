@@ -1,0 +1,5 @@
+{
+  "version": 1,
+  "_comment": "Ambient sound emitters for the world. Each entry references an empty Xform in the USD scene by name (id == Xform name). Position comes from the prim's local-to-world transform, so parenting the Xform under an NPC or any moving prim makes the sound follow it. All other behaviour (file, radius, volume, loop) is defined here. See .cursor/rules/topics/spatial-audio.mdc for full schema.",
+  "emitters": []
+}

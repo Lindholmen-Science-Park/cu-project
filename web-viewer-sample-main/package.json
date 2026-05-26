@@ -1,0 +1,58 @@
+{
+    "name": "@nvidia/web-viewer-sample",
+    "version": "1.5.2",
+    "description": "Sample application to showcase streaming of Omniverse Kit applications to a web client application.",
+    "author": "Nvidia",
+    "license": "SEE LICENSE IN LICENSE",
+    "private": true,
+    "type": "module",
+    "engines": {
+        "node": ">=18.0.0",
+        "npm": ">=10.0.0"
+    },
+    "scripts": {
+        "dev": "vite",
+        "build": "vite build",
+        "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+        "preview": "vite preview"
+    },
+    "eslintConfig": {
+        "extends": [
+            "react-app",
+            "react-app/jest"
+        ],
+        "globals": {
+            "GFN": "readonly"
+        }
+    },
+    "dependencies": {
+        "@nvidia/omniverse-webrtc-streaming-library": "5.18.0",
+        "@types/three": "^0.184.0",
+        "bootstrap": "^5.3.3",
+        "cesium": "^1.140.0",
+        "i18next": "^26.0.3",
+        "i18next-browser-languagedetector": "^8.2.1",
+        "omnitone": "^1.3.0",
+        "prop-types": "^15.8.1",
+        "react": "^18.2.0",
+        "react-bootstrap": "^2.9.1",
+        "react-dom": "^18.2.0",
+        "react-i18next": "^17.0.2",
+        "resium": "^1.20.1",
+        "three": "^0.184.0",
+        "vite-plugin-cesium": "^1.2.23",
+        "vite-plugin-externals": "^0.6.2"
+    },
+    "devDependencies": {
+        "@types/react": "^18.2.43",
+        "@types/react-dom": "^18.2.17",
+        "@typescript-eslint/eslint-plugin": "^6.14.0",
+        "@typescript-eslint/parser": "^6.14.0",
+        "@vitejs/plugin-react": "^4.2.1",
+        "eslint": "^8.55.0",
+        "eslint-plugin-react-hooks": "^4.6.0",
+        "eslint-plugin-react-refresh": "^0.4.5",
+        "typescript": "^5.2.2",
+        "vite": "^5.0.8"
+    }
+}

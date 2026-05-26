@@ -1,0 +1,29 @@
+[package]
+title = "Younite Interactions Extension"
+description = "Range-based interaction overlays + clickable interactions (config-driven)"
+version = "0.1.0"
+authors = ["Younite"]
+keywords = ["interaction", "click", "range", "overlay", "actions"]
+category = "Feature"
+
+[dependencies]
+"younite.messaging_core_extension" = {}
+"younite.payload_orchestrator_core_extension" = {}
+"younite.picking_extension" = {}
+"younite.usd_viewer_player_core_extension" = {}
+"omni.usd" = {}
+"omni.kit.viewport.utility" = {}
+
+[[python.module]]
+name = "younite.interactions_extension"
+
+[build]
+include = [
+    "younite/**/*.py",
+    "config/*.toml",
+]
+
+[settings.exts."younite.interactions_extension"]
+data_file = ""
+range_overlays_enabled = true
+update_interval_ms = 100

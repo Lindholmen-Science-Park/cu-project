@@ -1,0 +1,112 @@
+---
+description: World state sync — Kit-side central registry, reconnect snapshot, worldStateSync event, web handler
+globs:
+  - kit-app-template-main/source/extensions/younite.usd_viewer_stage_core_extension/younite/usd_viewer_stage_core_extension/services/core_services/world_state_sync_service.py
+  - web-viewer-sample-main/src/features/streaming/hooks/eventHandlers/worldStateHandlers.ts
+---
+
+# World State Sync Service
+
+Centralised Kit-side registry that tracks resolved world settings and pushes the full snapshot to web clients on connect/reconnect via a single `worldStateSync` outbound event.
+
+## Why it exists
+
+Without this service, browser refresh resets all UI state to web-side defaults (time of day, weather, camera height, etc.) even though Kit continues running with the previously applied values. The service ensures Kit is the single source of truth for world state.
+
+## Architecture
+
+```
+Kit Side                                    Web Side
+─────────────────────────────────           ───────────────────────────
+WorldStateSyncService (central dict)        useCustomEventHandler
+  ├── SkyControlService writes resolved     worldStateHandlers.ts
+  │   sky state after _apply_with_retry       ├── maps weatherPreset → WeatherOption
+  ├── FeatureCommandsService writes           ├── maps dayOfYear → SeasonOption
+  │   fog/height/speed/physics/camera         ├── maps timeOfDay → minutes
+  ├── observes peopleToggleStatus             └── updates all React state
+  ├── observes navmeshModeStatus
+  └── pushes snapshot on ui.ready
+```
+
+## Kit side
+
+### File: `world_state_sync_service.py`
+
+Lives in `younite.usd_viewer_stage_core_extension/services/core_services/`.
+
+- Flat `dict` of current world state, initialized from `_DEFAULTS`
+- `set(key, value)` — update one key, dispatch full snapshot
+- `set_many(mapping)` — update multiple keys in a single dispatch
+- `push_snapshot()` — re-dispatch current snapshot without mutation (used on reconnect)
+- `get_all()` — return current state dict
+
+### Observers (external extensions)
+
+The service observes these events to keep in-memory state correct for snapshots. It does **not** re-dispatch `worldStateSync` on these events because the external extensions already push their own status events to the web:
+
+- `peopleToggleStatus` → stores `peopleVisible`
+- `navmeshModeStatus` → stores `navmeshMode` and `navmeshBaking`
+
+### Writers (stage_core services)
+
+These services receive a `world_state` reference in their constructor and call `set()` / `set_many()` directly:
+
+- **`SkyControlService`**: after successful `_apply_with_retry`, publishes **resolved** state including preset-expanded values (cloudCoverage, cumulusEnabled, fog from weather presets)
+- **`FeatureCommandsService`**: publishes `fogEnabled`/`fogIntensity`, `cameraViewType`, `movementSpeed`, `cameraHeight`, `physicsState`
+- **`UiStageService`**: calls `push_snapshot()` after dispatching `scene.loaded` on `ui.ready`
+
+### State keys
+
+**CU-facing:** `weatherPreset`, `timeOfDay` (float hours), `dayOfYear` (int 1–365), `cameraHeight` (int cm), `navmeshMode`, `navmeshBaking`, `peopleVisible`
+
+**Dev/env-facing:** `fogEnabled`, `fogIntensity`, `movementSpeed`, `cameraViewType`, `cloudCoverage`, `cumulusEnabled`, `physicsState`
+
+### Important: resolved state, not request payloads
+
+A `weatherPreset` request expands into multiple applied values. `SkyControlService._publish_resolved_state` stores **what Kit actually applied** (e.g. `cloudCoverage`, `cumulusEnabled`, fog values from the preset lookup), not just the raw payload keys.
+
+## Web side
+
+### `worldStateHandlers.ts`
+
+Handles `event_type === 'worldStateSync'` in the central event handler chain. Maps Kit values to React state:
+
+- `weatherPreset` → `WeatherOption` via `PRESET_TO_WEATHER` (`partlyCloudy→sun`, `rainy→rain`, `foggy→fog`)
+- `dayOfYear` → `SeasonOption` via `dayOfYearToSeason()` (spring 60–151, summer 152–243, autumn 244–334, winter rest)
+- `timeOfDay` (hours) → `timeOfDayMinutes` (`Math.round(hours * 60)`)
+- `cameraViewType` → `CameraType` (`firstPerson→first_person`, `birdEye→bird_eye`)
+- Direct passthrough for: `cameraHeight`, `fogIntensity`, `cloudCoverage`, `cumulusEnabled`, `physicsState`, `navmeshMode`, `navmeshBaking`, `peopleVisible`
+
+Those handlers update **`Environment`** / **`Control`** / **`Navigation`** context
+setters so CU **World 3D** settings, dev environment widgets, and
+`worldStateSync` reconnect snapshots all reflect the same fields — no parallel
+React state for the same Kit knob between dev panels, CU quick controls, and
+CU full settings.
+
+### `EventStateSetters` additions
+
+Optional setters for world state sync (defined in `types.ts`): `setWeather`, `setSeason`, `setTimeOfDayMinutes`, `setCameraHeight`, `setFogIntensity`, `setTimeOfDay`, `setDayOfYear`, `setCloudCoverage`, `setCumulusEnabled`, `setWeatherPreset`, `setCurrentPhysics`.
+
+## Connect-time default removal
+
+The connect-time `skyControlRequest` in `useStreamConnection.ts` was **removed**. Previously, every browser refresh sent default sky values that overwrote Kit's actual state. Now:
+
+- `ui.ready` still sends on connect/reconnect
+- No connect-time sky defaults are sent from the browser
+- Initial UI state comes from `worldStateSync` snapshot pushed by Kit on `ui.ready`
+
+## Outbound event registration
+
+`worldStateSync` is registered in `messaging_core_extension/extension.py` outbound events list.
+
+## Adding new state keys
+
+1. Add the key + default to `_DEFAULTS` in `world_state_sync_service.py`
+2. Have the owning service call `world_state.set(key, value)` after applying the change
+3. Add the setter to `EventStateSetters` (optional) in `types.ts`
+4. Handle the key in `worldStateHandlers.ts`
+5. Wire the setter in `StreamOnlyWindow.tsx`'s `useCustomEventHandler` call
+
+## No localStorage / sessionStorage
+
+World state is **never** persisted in browser storage. Kit is the single source of truth. User preferences (theme, text size, sound) correctly use `localStorage` — those are not world state.

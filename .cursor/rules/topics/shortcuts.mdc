@@ -1,0 +1,371 @@
+---
+description: Navigation shortcuts (elevators) — dev-gated cross-floor hops with fade/teleport/resume, USD Xforms + JSON config, ShortcutRouter hop planner, ShortcutTraversalService. Two dev toggles: "Use shortcuts" (gates everything) + "Prefer elevators" (always-lift-if-valid policy). Read when working on elevators, multi-floor routing, the prefer-elevators toggle, wheelchair routing via lifts, adding new shortcut types (bus stops, tunnels), or editing shortcuts.json / nav_shortcuts_layer.usda.
+alwaysApply: false
+---
+
+# Navigation Shortcuts
+
+Elevators (and future bus stops / tunnels / portals) plug into the existing route system as **shortcut hops** — single zero-walk edges with a fixed time cost. With the dev "Use shortcuts" toggle ON, the composer always evaluates both walking and elevator routes and picks the **strict shortest** by default. A second dev toggle "Prefer elevators" flips that policy: take the lift whenever it is **valid** (passes vertical filters), even if walking would be shorter. Phase 1 ships **elevators only** but the schema and runtime are intentionally type-agnostic so new shortcut types land via config alone.
+
+> **Status: v1 (committed baseline).** End-to-end for guided routes (seat / POI / quiet / exit nav) with the dev toggles on; CU unchanged. **Seat + elevator:** post-hop corridor uses the same `plan_route(section)` graph as non-shortcut seat nav (`corridor_section`), with floor trim + branch rejoin (see below). POI/quiet/exit still use `plan_route_to_position` unless the client sends `corridorSection`. Further tuning is expected — known limitations stay at the bottom.
+
+### CU elevator travel via POI coins (separate path)
+
+Production **CU** can move between floors at an elevator **without** the dev toggles or `ShortcutTraversalService`:
+
+1. Player opens an elevator **coin** (proximity pill or 3D click) → `PoiInfoCard` **Use elevator** + floor buttons (`metadata.elevator_ride` from `coins_loader` + `elevator_data.json`).
+2. Web sends **`poiTeleport`** to the destination NavShortcuts Xform `prim_path` (same nodes as `shortcuts.json`).
+3. Kit `poi_routes` teleports via `TeleportService` (spawn rotation + localized `arrivalLabel` from the shortcuts node).
+
+This reuses **`shortcuts.json` + `nav_shortcuts_layer.usda`** as the coordinate source but is **not** a route-hop: no `shortcutTraversalBegin`, no post-hop NavMesh recompose. Full workflow: **`poi-coins.mdc`** § Elevator ride; arrival/rotation: **`poi-teleport.mdc`**.
+
+---
+
+## Hard rules
+
+- **Dev-only at runtime.** Both toggles live in `features/dev/controls/submenus/NavigationSubmenu.tsx` ("Use shortcuts" + "Prefer elevators"). CU never sees them. Default states are OFF/OFF, so production users get the same NavMesh routing as before — never let shortcut behaviour leak into CU without an explicit design pass + WCAG review (elevator metaphor needs labelling, alternative routes for users who can't take an elevator IRL, etc.). The CU `PreferencesGrids.tsx` "Elevators" radio currently does **not** drive `shortcutsPreferToggle` — wiring that link is a future task explicitly held back so production stays on direct walking.
+- **Guided routes only.** Shortcuts are gated by `SHORTCUT_ROUTE_IDS` in `navmesh_route_service/constants.py` — currently `{seat_nav, exit_nav, poi_nav, quiet_zone_nav}`. The point-and-click `player` route never uses shortcuts, even with the toggle on; map clicks must remain literal walking.
+- **One hop per trip.** `ShortcutRouter.find_best_plan()` returns single-hop plans only. Multi-hop chains (e.g. elevator + bus + elevator) are YAGNI for the stadium and would invalidate the post-teleport recompose model. Don't add multi-hop without rewriting the resume flow.
+- **No direct teleport calls from frontend.** The Kit-side `ShortcutTraversalService` is the *only* place that performs the elevator teleport. The frontend's role is the fade animation handshake (`shortcutTraversalBegin` → `shortcutTraversalProceed`) — never invoke `teleport_to_coordinates` from web for shortcut hops.
+- **`prefer_shortcuts` never bypasses validity.** Three layers of filtering decide whether a hop is even considered:
+  - **Section gate (seat routes).** When `corridor_section` is set on the compose call (i.e. it's a `seat_nav` route), the router scans every loaded shortcut group and collects those whose `servesSections` (declared in `shortcuts.json`, parsed into `ShortcutGroup.serves_sections`) contains the section letter. If the resulting set is **empty** — either because the section is lower-bowl and no elevator declares it, or because it's an upper section without a nearby lift yet (E, F, H today) — `find_best_plan` returns `None` immediately. The OP/RS lifts on the opposite side of the building would force a half-ring walk-out leg for E/F/H, so until an `elevator_3` lands on the GH/DEF side, walking the staircase is the only sensible option.
+  - **Per-hop group gate (seat routes).** For sections that pass, only candidate hops whose `group_id` is in the section's allowed set survive — every other group is skipped before the spatial pre-filter. Today `elevator_2.servesSections = ["P","S"]`, so P/S routes consider only `elevator_2`. Non-seat routes (POIs / ad-hoc positions) skip this filter and consider every group.
+  - **Per-hop vertical filters.** Always: basement-dip / wrong-way / same-band-dip in `shortcut_router.vertical_filters.skip_hop_exit_vertical_backtrack`. Prefer-mode-only **and only for non-seat routes**: the exit must additionally land within `ELEVATOR_EXIT_TO_DEST_MAX_CM` in `shortcut_router/constants.py` (≈ 100 cm) of the destination Y (POIs / generic positions). Seat routes skip the landing-Y check because the seat Y is the bowl tier, not the concourse the seat is entered from — the section gate above already established a useful lift exists.
+
+  Concretely:
+  - `A-15-1` (section A) → section gate rejects (no group lists "A") → walk the bowl stairs.
+  - `P-35-5` (section P) → section gate passes (`elevator_2` lists "P") → group gate restricts candidates to `elevator_2` → vertical-valid hop wins (in strict if shorter, in prefer always). `elevator_1` is **never** considered for P even if its spatial lower bound ranks first.
+  - `H-12-3` / `E-2-1` / `F-…` → section gate rejects (no group lists "H"/"E"/"F"). When an `elevator_3` is added on the GH/DEF side, just set its `"servesSections": ["E","F","H"]` in `shortcuts.json` — no Python change.
+  - `quiet_zone_03` ("Quiet area 01" at y=1942, no section) → no section gate → all groups considered → close-Y check passes (`elevator_1.floor_0` at y=1922 is 20 cm away) → lift wins in prefer mode.
+  - Cross-building POIs (`quiet_zone_01` / `_02` near other venues) → strict mode loses on cost; prefer mode usually loses because the NavMesh leg from any lift exit to the distant POI fails or is enormous.
+
+  Adding a new upper section means: (a) extend `waypoint_router.UPPER_SECTION_BRANCH` with the section's branch chain, and (b) add the section letter to the relevant group's `"servesSections"` in `shortcuts.json`. No constants or dicts to edit under `shortcut_router/` (tuning lives in `shortcut_router/constants.py` if you change global thresholds).
+
+---
+
+## Data layout
+
+### USD: `nav_shortcuts_layer.usda`
+
+Single sublayer at `kit-app-template-main/source/data/scenes/sublayers/nav_shortcuts_layer.usda`, included from `main_scene.usda`. Each shortcut node is a plain `Xform` whose **world translation** is both:
+
+- The walk-up target the NavMesh route ends at (entrance), and
+- The teleport spawn pose when arriving via the connected node (exit).
+
+Path convention is `/World/NavShortcuts/<group_id>/<node_id>`:
+
+```
+/World/NavShortcuts
+├── elevator_1/                    # Section A elevator
+│   ├── floor_0                    # ground
+│   ├── floor_1
+│   └── floor_2
+└── elevator_2/                    # Section R elevator (only floors 1-2)
+    ├── floor_1
+    └── floor_2
+```
+
+Add new groups by creating Xforms here and mirroring `(group_id, node_id, primPath)` in `shortcuts.json`. The Xform's translation must sit on the NavMesh on every floor it represents — `surface: navmesh` in the JSON is a contract.
+
+### JSON: `shortcuts.json`
+
+Lives at `kit-app-template-main/source/data/shortcuts.json`. Schema:
+
+```json
+{
+  "version": 1,
+  "groups": [
+    {
+      "id": "elevator_1",                       // matches /World/NavShortcuts/<id>
+      "type": "elevator",                       // future: "bus", "tunnel", "portal"
+      "i18nKey": "shortcuts.elevatorSectionA",
+      "labelEn": "Section A elevator",
+      "traversalSeconds": 4.0,                  // ride time (tune vs stairs)
+      "waitSeconds": 1.0,                       // wait/dwell time
+      "servesSections": [],                     // seat sections this group may serve;
+                                                // empty/absent → POIs / generic dests only
+      "edges": "all",                           // or [["floor_0","floor_1"], …]
+      "nodes": [
+        {
+          "id": "floor_0",
+          "level": 0,
+          "labelEn": "Section A — Ground floor",
+          "i18nKey": "shortcuts.sectionA.floor0",
+          "primPath": "/World/NavShortcuts/elevator_1/floor_0",
+          "surface": "navmesh"
+        }
+      ]
+    }
+  ]
+}
+```
+
+`edges: "all"` produces a fully-connected graph between every pair of nodes in the group. Use an explicit list when an elevator skips floors or a bus route is one-way.
+
+`traversalSeconds + waitSeconds` is mapped to hop cost in cm via `shortcut_router.constants.DEFAULT_WALK_CM_PER_SEC` (130.0, ≈ 1.3 m/s). Example: **5 s** total → **650 cm** walk-equivalent per hop — lower values make the lift win more often against long stair NavMesh paths; raise them if lifts feel over-selected.
+
+`servesSections` is the **single source of truth** for which seat sections may use a group. Letters are case-insensitive (uppercased on load); unknown / typo'd letters silently fall through (the section gate just won't match). Today: `elevator_1.servesSections = []` (POIs / `quiet_zone_03` only), `elevator_2.servesSections = ["P","S"]` (upper-bowl P + S via the OP/RS branch chain). Wiring a new elevator that serves new sections is a JSON-only edit — see "Hard rules" above for the section-gate semantics.
+
+---
+
+## Runtime architecture
+
+```
+        shortcutsToggle (dev menu)        shortcutsPreferToggle (dev menu)
+                  │                                       │
+                  ▼                                       ▼
+    set_shortcuts_active(True)              set_prefer_shortcuts(True)
+                  │                                       │
+                  └─── cfg.use_shortcuts ─┬───── cfg.prefer_shortcuts ───┘
+                                          ▼
+            RouteComposer.compose(..., enable_shortcuts=True,
+                                       prefer_shortcuts=?)
+                                          │
+                       ┌──────────────────┴──────────────────┐
+                       ▼                                     ▼
+            _try_shortcut_route(start, end)         fall through to NavMesh / OSM
+                       │
+                       ▼
+            ShortcutRouter.find_best_plan(start, end, walk_len,
+                                          prefer_shortcut=?)
+                       │
+            ┌──────────┴──────────────────────┐
+            │ same-tier (|dy| < min_gap/2) ?  │  min_gap = smallest Y step
+            │ (skipped when prefer_shortcuts) │   between shortcut nodes
+            └──────────┬──────────────────────┘
+              skip ────┘                no
+                                              │
+                                              ▼
+                       prefer_shortcut == True ?
+                ┌──────────────────┬──────────────────────────────────┐
+                ▼                                                     ▼
+      best_cost = inf                                         direct_cm = walk_len(s,e)
+      (any valid hop wins)                                    best_cost = direct_cm
+                                                                                │
+                                              ┌─────────────────────────────────┘
+                                              ▼
+                              vertical filters (basement-dip / wrong-way / same-band)
+                                              │
+                                              ▼
+                              find_best_plan returns ShortcutPlan or None
+                                              │
+                                              ▼
+                ComposedRoute([navmesh leg, shortcut leg, navmesh leg])
+                                              │
+                                              ▼
+                segment_speeds + segment_classes → frontend dispatch
+                                              │
+                                              ▼
+                  PointClickAutoMover walks leg 1
+                                              │
+                                              ▼
+                  emits playerPathClassChange (next="shortcut")
+                                              │
+                                              ▼
+                  ShortcutTraversalService._on_path_class_change
+                       │
+                       ▼
+              shortcutTraversalBegin ───────────────► frontend fade-out
+                                                              │
+              shortcutTraversalProceed ◄───────────────────────┘ (onFadeOutComplete)
+                       │
+                       ▼
+              TeleportService.teleport_to_coordinates(exit_pos)
+                       │
+                       ▼
+              viewTransitionReady ──────────────────► frontend fade-in
+                       │
+                       ▼
+              shortcutTraversalComplete + recompose route from new player position
+```
+
+When `_try_shortcut_route` wins, **`compose()` still short-circuits** before `_same_navmesh`, but **outer walk legs** use corridor helpers tuned for hops:
+
+- **Walk to the lift** — **`plan_route_to_position`** whenever any corridor mode is on, so a seat **section** never pulls the full upper-bowl branch (e.g. OP→…→P) toward a foyer-level door.
+- **Walk from the lift (seat_nav with `corridor_section`)** — **`plan_route(player, seat, section, floor_hint_y=exit_y, branch_join_pos=exit_xyz)`** (same function and section letter as the initial `seatNavigate` corridor plan). Effects in `waypoint_router.py`:
+  - **`floor_hint_y`** — drops branch prims whose **Y** is below `floor_hint_y - _DEFAULT_BRANCH_FLOOR_TOL_CM` (450 cm) so landings below the exit floor are not revisited.
+  - **`branch_join_pos`** — after that trim, the branch **suffix** starts at the chain waypoint **closest in 3D** to the exit, considering only **staircase + intermediates** (not the section anchor), **unless** the exit is within **`_JOIN_AT_SECTION_ANCHOR_MAX_CM` (700 cm)** of the anchor prim — then the suffix is **anchor-only** (already at corridor end). Stops false “nearest is P” joins that skipped OP_2/OP_3.
+  - **Skip main ring** — when the first kept branch prim is **not** the staircase head (e.g. rejoin at `nav_waypoint_OP_2`), the **ring segment** is omitted; entrance-only prepend still applies if the player is outside.
+
+**`ShortcutRouter.find_best_plan`** ranks hop candidates with a **Y-alignment** term and a higher pair-evaluation cap so the exit floor matches destination height better than XZ-only ordering.  It also **drops** the entire pre-pass / individual hops on four different grounds:
+
+* **Section gate (always, both modes).** If `corridor_section` is set, the router collects every loaded group whose `serves_sections` contains the section letter. Empty result → `find_best_plan` returns `None` immediately. With today's `shortcuts.json`, P and S resolve to `{elevator_2}`; A/B/C/D/E/F/G/H/I/J/… resolve to `{}` and walk.
+* **Per-hop group gate (seat routes, always).** For sections that pass the gate, candidate hops whose `group_id` isn't in the section's allowed set are skipped before the spatial pre-filter. This stops `elevator_1` (A-side) from ever ranking first for an OP/RS-side P seat just because some XZ lower bound looks small.
+* **Per-hop vertical filters (always).** Seat above player but exit well **below** the start (basement then climb back), the symmetric case, or — when ``|ΔY|`` start→end **&lt; 900 cm** — an exit more than **~280 cm** below **both** endpoints (same-band basement dip).
+* **Per-hop landing-Y check (prefer mode + non-seat routes only).** ``|exit_y − end_y| ≤ ELEVATOR_EXIT_TO_DEST_MAX_CM`` (≈ 100 cm, `shortcut_router/constants.py`). For POIs / generic positions where the destination Y is the floor it sits on (`quiet_zone_03` at y=1942 vs `floor_0` at y=1922 = 20 cm apart → accepted). Disabled for seat routes because the seat Y is the bowl tier, not the concourse Y — the section gate already filtered out the seats that would never use a lift.
+
+**Composer** short-circuits the shortcut pre-pass when ``|ΔY| < max(min_gap/2, 750 cm)`` so nearby seats (e.g. same-tier A row) never enter lift scoring — but only after **probing direct walking** (one extra `_navmesh_leg(start, end, ctx)` call) so the optimisation is honoured only when walking actually succeeds. If the probe returns ``None`` — classic case is a wheelchair user navigating to the lower-restaurant quiet zone (~286 cm below the concourse, well under the tier_cut, but stairs blocked on the wheelchair NavMesh) — the skip is bypassed and `find_best_plan` runs with `direct_cm=None`, so any vertically-valid lift hop wins. The probe is bypassed entirely when `prefer_shortcuts` is on (the user explicitly asked for "lift if valid"). The section gate / landing-Y rule then decides whether the lift is genuinely useful.
+
+This dual mechanism is what lets `Wheelchair + Use shortcuts ON + Prefer OFF` reach destinations behind stairs without the user having to also flip "Prefer elevators". When walking succeeds the strict-shortest comparison runs as normal (so a wheelchair user on the ground floor still walks to a same-floor seat and doesn't get sent through a lift); when walking fails the lift becomes the route — same behaviour the user would get by manually toggling prefer on, just triggered automatically by an unreachable walk instead of by a UI flip.
+
+**Cost baseline:** `SHORTCUT_SLACK_FRACTION = 0.0` in `shortcut_router/constants.py` — there is no slack window any more. The decision is binary:
+
+- `prefer_shortcut == False` → `best_cost = direct_cm` → a hop must be **strictly cheaper** than the direct NavMesh walk to win.
+- `prefer_shortcut == True` → `direct_cm` is set to `None` and `best_cost` starts at infinity → **any** hop that survives the vertical filters wins, regardless of how it compares to walking. If no hop is valid (e.g. seat A-15-1 from the basement plaza with no lift opening on that band), the composer falls back to direct NavMesh walking — a route is always returned when one exists.
+
+This is what makes wheelchair routing safe: when an upper-deck quiet zone is unreachable on the wheelchair NavMesh because of stairs, toggling "Use shortcuts" + "Prefer elevators" ON still picks the lift hop instead of returning "no route" — provided a valid lift exists on both ends.
+
+Files in play (all under `younite.navmesh_route_extension/services/kit_services/`):
+
+| Path | Role |
+|---|---|
+| `shortcut_router/` (package) | Shortcut hop planning; import unchanged: `from …kit_services.shortcut_router import ShortcutRouter`. |
+| `shortcut_router/shortcut_router.py` | `ShortcutRouter` + `find_best_plan()` — section allow-set, spatial lower-bound sort, capped full NavMesh leg eval, strict vs prefer cost baseline. |
+| `shortcut_router/constants.py` | `DEFAULT_WALK_CM_PER_SEC`, elevator vertical thresholds, `SHORTCUT_SLACK_FRACTION`, log prefix. |
+| `shortcut_router/types.py` | `ShortcutNode`, `ShortcutGroup`, `ShortcutHop`, `ShortcutPlan`, `WalkLenFn`. |
+| `shortcut_router/vertical_filters.py` | `skip_hop_exit_vertical_backtrack` (basement / wrong-way / same-band / prefer landing-Y). |
+| `shortcut_router/config_io.py` | Resolve path to `shortcuts.json`, JSON load. |
+| `shortcut_router/usd_scan.py` | Scan `/World/NavShortcuts` leaf Xforms for world positions. |
+| `shortcut_router/groups.py` | Merge JSON + positions into `ShortcutGroup` map. |
+| `shortcut_router/singleton.py` | `get_shortcut_router` / `set_shortcut_router` for the composer. |
+| `route_composer/composer.py` (`_try_shortcut_route`, `_shortcut_leg_vias`) | Same-floor short-circuit (skipped when `shortcut_eval_always` or `prefer_shortcuts`). POI-list compose sets `shortcut_eval_always=True` and passes corridor via-chain length as `baseline_cm` so lifts are compared against the **stairs/corridor** walk, not a short direct segment. Builds `[navmesh, shortcut, navmesh]` legs; post-hop leg calls `plan_route` with `floor_hint_y` / `branch_join_pos` when `ctx.corridor_section` is set. |
+| `route_measure/` (`exits.compute_routes_to_exits`, `poi_list_compose.compose_poi_list_route`, `poi_list_route_cache`, `shortcut_fallback.shortcut_fallback_measure`, `resolve.resolve_ref_to_vec3`) | **Restroom / quiet-zone lists** (`poi_list_cache_type` set): when "Use shortcuts" is on, every entry is planned once via `compose_with_measure(enable_shortcuts=True)` (strict-shortest unless "Prefer elevators"), stored in `poi_list_route_cache` (polyline + `segment_speeds` / `segment_classes` for elevator hops), and reused on `fromPoiList` activation — no pathfinding re-query; periodic 5 s recalc during guided walk is unchanged. **Other bulk measures** (no cache type): failed direct/waypoint measures still fall back via `shortcut_fallback_measure` only. |
+| `events/routes_and_areas.py` | `fromPoiList` → `try_activate_from_poi_list_cache` (first draw only). Live `poi_nav` / `quiet_zone_nav` + orchestrator play/pause → `auto_move_toggle_only`: `set_auto_move` + `redispatch_cached_waypoints` on play (no `compute_poi_waypoints` / full compose). Web pause is `navigationStateSet { autoMove: false, routeId }` only. |
+| `route_composer/measure.py` | `compose_with_measure(prefer_shortcuts=...)` forwards the flag into all three internal `composer.compose()` calls (`base_route`, `cam_only_route`, `actual_route`) so route-measurement stays consistent with the chosen mode. |
+| `route_composer/types.py` | `SHORTCUT_SEGMENT_SPEED ≈ 0.01` so a stale shortcut segment doesn't let the player crawl through walls if the traversal service is missing — a defensive fallback, not the primary gate. |
+| `route_engine/types.py` + `route_engine/compute.py` | `RouteConfig.prefer_shortcuts` (defaulting to `False`); `_compute_path` passes `prefer_shortcuts=bool(self._cfg.prefer_shortcuts)` into each `compose*()` call. |
+| `shortcut_traversal_service.py` | Subscribes to `playerPathClassChange`, runs the fade/teleport/resume coroutine; resume keeps `corridor_section` so `route_engine/compute.py` can rebuild `plan_route` with `floor_hint_y` + `branch_join_pos` when `via_points` were cleared. |
+| `navmesh_route_service/service.py` | Holds the global toggles `_shortcuts_active` (`set_shortcuts_active` / `get_shortcuts_active`) and `_prefer_shortcuts` (`set_prefer_shortcuts` / `get_prefer_shortcuts`). `set_route_for_id` initialises both `cfg.use_shortcuts` and `cfg.prefer_shortcuts` from these globals; `set_prefer_shortcuts` updates active routes' `cfg.prefer_shortcuts` and triggers `recalc_now()` for any route already using shortcuts. |
+| `extension.py` | Wires the singletons and **two** event handlers: `shortcutsToggle → set_shortcuts_active` (broadcasts `shortcutsStatus`) and `shortcutsPreferToggle → set_prefer_shortcuts` (broadcasts `shortcutsPreferStatus`). |
+
+### Frontend touch points
+
+| File | Role |
+|---|---|
+| `features/dev/controls/submenus/NavigationSubmenu.tsx` | Two dev toggle buttons: "Use shortcuts" and "Prefer elevators". The prefer button is `disabled` whenever `shortcutsActive === false` so it can't be enabled in isolation. |
+| `features/streaming/hooks/navigationHandlers/useNavmeshCore.ts` | Owns both `shortcutsActive` + `preferShortcutsActive` state and the matching `handleShortcutsToggle` / `handlePreferShortcutsToggle` dispatchers. State is driven by `shortcutsStatus` / `shortcutsPreferStatus` events so reconnects sync from Kit. |
+| `features/streaming/hooks/eventHandlers/sceneHandlers.ts` | Handles `shortcutTraversalBegin` (calls `beginViewTransition`, replies with `shortcutTraversalProceed` on `onFadeOutComplete`) and `shortcutsStatus` (mirrors backend toggle to React state). |
+
+---
+
+## Shortcut decision logging
+
+Each ``compose()`` call that tries shortcuts runs ``find_best_plan``, which prints **one** ``[shortcut_router]`` line tagged with the active mode:
+
+* **Win:** ``shortcut wins: group=… shortcut_total=… cm vs direct=… cm (strict_beat|prefer)``
+  * ``strict_beat`` — default mode (``prefer_shortcut == False``); means ``shortcut_total < direct_cm`` strictly. ``direct=`` shows the actual NavMesh walk length in cm.
+  * ``prefer`` — explicit-preference mode (``prefer_shortcut == True``); a vertical-valid hop was accepted regardless of cost. ``direct=`` prints ``inf(prefer_shortcut)``.
+* **Loss:** ``no shortcut beats direct: direct_cm=… best_hop_total=… delta=… (navmesh_hop_pairs=…, full_evals=…)`` — same string in both modes; in prefer mode ``direct_cm`` prints as ``None (no direct navmesh / prefer_shortcut)`` and the loss really means "no hop survived the vertical filters and pair search". ``full_evals`` counts NavMesh pairs tried before the lower-bound early exit.
+
+The composer's follow-up line ``route accepted (… polyline_distance_cm=…)`` is the stitched **drawn** path length, not the same number as ``shortcut_total`` (corridor legs add geometry).
+
+---
+
+## Event contract
+
+All registered via `register_outbound_events` so the messaging core knows about them.
+
+| Event | Direction | Payload | Notes |
+|---|---|---|---|
+| `shortcutsToggle` | web → Kit | `{active: bool}` | "Use shortcuts" dev menu button. Triggers `set_shortcuts_active` and reloads the router. |
+| `shortcutsStatus` | Kit → web | `{active: bool}` | Backend confirms current state — drives `setShortcutsActive` so reconnects/world-state-sync stay in sync. |
+| `shortcutsPreferToggle` | web → Kit | `{active: bool}` | "Prefer elevators" dev menu button. Triggers `set_prefer_shortcuts`, which forces a `recalc_now()` on every active route already using shortcuts. |
+| `shortcutsPreferStatus` | Kit → web | `{active: bool}` | Backend confirms current prefer state — drives `setPreferShortcutsActive`. |
+| `shortcutTraversalBegin` | Kit → web | `{routeId, fromPos, toPos, groupId, type, fromLabel, toLabel, traversalSeconds}` | Player has reached the elevator entrance. Frontend fades out. |
+| `shortcutTraversalProceed` | web → Kit | `{routeId}` | Frontend's `onFadeOutComplete`. Kit unblocks teleport. |
+| `shortcutTraversalComplete` | Kit → web | `{routeId}` | Teleport done, fade-in already requested via the existing `viewTransitionReady` channel. |
+| `shortcutTraversalError` | Kit → web | `{routeId, error?}` | Teleport failed. Frontend should still release the fade overlay. |
+| `playerPathClassChange` | internal | `{prev, next, segIdx, routeId}` | Auto-mover → `ShortcutTraversalService`. The trigger that starts the whole sequence. |
+
+Safety cap: if the frontend never replies with `shortcutTraversalProceed`, `_FADE_TIMEOUT_SEC = 1.5` proceeds with the teleport anyway. Useful for headless dev.
+
+---
+
+## Adding a new shortcut group
+
+1. Open Composer (`startcomposer.bat`), navigate to `/World/NavShortcuts`.
+2. Create `def Xform "<group_id>"` and child `def Xform "<node_id>"` Xforms; place each child on the NavMesh at the floor / stop it represents.
+3. Save into `nav_shortcuts_layer.usda` (relative paths only — see `project-base.mdc`).
+4. Mirror in `shortcuts.json`:
+   - Add a group with the matching `id`, the appropriate `type` (`"elevator"` / `"bus"` / future), `traversalSeconds`, `waitSeconds`.
+   - Add one node entry per Xform with the matching `id` and `primPath`.
+   - Set `edges: "all"` for fully-connected groups (lifts) or an explicit list for one-way / skip-stop topologies (bus routes).
+   - Set `servesSections` to the list of seat-section letters this group should be picked for (e.g. `["P","S"]`). Leave empty / omit if the group is for POIs only — `find_best_plan`'s section gate will then skip it for every seat route.
+5. Add i18n strings for `i18nKey` (group-level + per-node) in all four locales (`en/sv/fr/es`). The label naming convention in `nav_shortcuts_layer.usda` doc string is `"Section <X> elevator"` — keep consistent.
+6. Restart the streaming Kit (or toggle Use shortcuts off → on, which calls `reload()`) so the router rescans USD + JSON.
+
+No code changes, no NavMesh rebake. Tested by toggling Use shortcuts ON and triggering a guided route across the new group's floors.
+
+---
+
+## Adding a new shortcut **type** (bus, tunnel, …)
+
+1. Add an entry in `shortcuts.json` with `"type": "<new>"` and the same node/edge schema. The router treats type as opaque metadata, so hop scoring works out of the box.
+2. If the new type needs visual / UX differentiation:
+   - Frontend fade message: extend `sceneHandlers.ts` to pick a different i18n key off `event.payload.type` (`'shortcut.taking.elevator'` / `'shortcut.taking.bus'` / …).
+   - Bird-eye overlay icon: handle `type` in the marker layer.
+3. Don't try to model dwell/timing per-node — that's what `traversalSeconds` + `waitSeconds` per group is for. If a bus route really needs per-edge cost, add a `cost` field to individual edges and extend `ShortcutGroup.edge_iter()` in `shortcut_router/types.py` — keep the simple "all" case fast.
+
+---
+
+## Dev testing the toggles
+
+Both toggles live under the dev sidebar → **Navigation → Use shortcuts / Prefer elevators**. The "Prefer elevators" button is locked off whenever "Use shortcuts" is off — there is no valid state where prefer is ON but shortcuts are OFF.
+
+Behaviour matrix (for the four guided routes in `SHORTCUT_ROUTE_IDS`):
+
+| Use shortcuts | Prefer elevators | Wheelchair mode | Effect |
+|---|---|---|---|
+| OFF | (locked off) | any | Strictly NavMesh walking. The codepath is **identical to master** — `cfg.use_shortcuts == False` skips the shortcut pre-pass entirely. Use this as your regression baseline. |
+| ON | OFF | OFF | "Strict shortest". `find_best_plan` picks a hop only if `shortcut_total < direct_cm`. If the lift is longer (e.g. for a same-section seat), the route stays on stairs. |
+| ON | OFF | ON | Same strict-shortest rule against the **wheelchair** NavMesh. **When walking is unreachable** (e.g. lower-restaurant quiet zone via stairs), the composer's same-tier walking probe fails and `find_best_plan` runs against `direct_cm = None`, so any vertically-valid lift hop wins automatically — no need to also flip "Prefer elevators". The discovery layer mirrors this via `compute_routes_to_exits`'s shortcut-aware fallback, so the destination shows up in POI / quiet-zone panels with `viaShortcut: true`. |
+| ON | ON | OFF | "Always lift if valid". Vertical filters still apply. Useful for reproducing CU-equivalent "Elevators preferred" behaviour and stress-testing the post-hop corridor rebuild. |
+| ON | ON | ON | Same as above for the wheelchair NavMesh. Forces the lift even when walking would have been reachable on the wheelchair mesh — used to stress-test the post-hop corridor rebuild without relying on the unreachable-walking auto-promotion. |
+
+Suggested smoke tests after touching anything in this stack:
+
+1. **Default off, default off.** Trigger seat-nav to A-15-1 from main entrance — the route must be byte-identical to a build off `master`. Watch the kit log for the **absence** of any `[shortcut_router]` line.
+2. **Use shortcuts ON, prefer OFF, walking mode.** Same A-15-1 trip should still walk the stairs (lift is longer); log shows `no shortcut beats direct` or, if the same-tier skip fires, no log at all. Now trigger a destination on a different floor where the lift is genuinely cheaper — log shows `shortcut wins … (strict_beat)` and the player rides.
+3. **Use shortcuts ON, prefer ON, walking mode.** Test four distinct destination categories — each one exercises a different gate:
+   * **Lower-bowl seat** (e.g. `A-15-1`, any seat in B/C/D/G/I/J/…) — **section gate** rejects (no group lists "A" in its `servesSections`). Route walks the stairs. No `[shortcut_router]` log line.
+   * **Upper-bowl seat with no elevator yet** (e.g. any seat in `E`, `F`, `H`) — **section gate** rejects (no group lists "E"/"F"/"H"). Route walks the staircase via the GH/DEF branch. No `[shortcut_router]` log line. When `elevator_3` lands on that side, set its `"servesSections": ["E","F","H"]` in `shortcuts.json` and re-run — no Python edit needed.
+   * **Upper-bowl seat with a mapped elevator** (e.g. `P-35-5`, any seat in `P` or `S`) — section gate passes (`elevator_2` lists those), **per-hop group gate** restricts candidates to `elevator_2`. Log shows `shortcut wins … group=elevator_2 … (prefer)`. Confirm the route never picks `elevator_1` even though it ranks higher on raw distance: with both lifts loaded, force a verbose run and verify `elevator_1` candidates are skipped before the spatial pre-filter.
+   * **Tier-aligned POI** (e.g. `quiet_zone_03` / "Quiet area 01" at y=1942 — 20 cm above `floor_0`, or any restroom on a lift landing) — no section gate (POIs skip it), landing-Y check passes, lift wins in prefer. Log shows `shortcut wins … (prefer)`.
+4. **Use shortcuts ON, prefer OFF, wheelchair mode, click the lower-restaurant quiet zone.** This is the regression test for the same-tier-skip walking probe AND the discovery fallback in one shot. The destination is only ~286 cm below the player on the concourse (well under the 750 cm tier_cut), so the same-tier skip would normally bail before reaching `find_best_plan`; and the destination is behind stairs on the wheelchair NavMesh, so the legacy `compute_route_measure` reports `success=False` and the panel would normally hide the entry.
+   * **Discovery side** — open the quiet-zones panel. The "Quiet area 01" entry must appear with a normal distance/time figure and `viaShortcut: true`. Toggle "Use shortcuts" OFF and the same destination must disappear again. Logs to look for: a single `[shortcut_router] shortcut wins: group=elevator_1 ...` line per visible entry on the panel-open compose pass.
+   * **Navigation side** — click "Get directions" / "Start navigation" on that entry. The composer detects walking is unreachable (probe returns `None`), bypasses the same-tier skip, and `find_best_plan` rescues the route with `elevator_1`. The card must stay open (no `navmeshRouteError` flash), the route is drawn, the player rides the lift on auto-move with the same instant-jump feel as walking + prefer ON.
+5. **Use shortcuts ON, prefer ON, wheelchair mode.** Same as test #4 but with prefer ON — verifies the explicit-prefer path also works on the wheelchair mesh and produces the same lift route. Useful to confirm that the prefer toggle remains independently functional in wheelchair mode (i.e. the auto-promotion in test #4 hasn't shadowed it).
+6. **Toggle prefer ON mid-trip.** While walking a strict-shortest stair route, flip "Prefer elevators" — `set_prefer_shortcuts` calls `recalc_now()` on the active route and the polyline should redraw via the lift on the next compose. Then turn it back off — the route should snap back to walking.
+
+When filing a bug, include the `[shortcut_router]` line and the surrounding `route accepted` line — those two pin down both the routing decision and the drawn polyline length.
+
+---
+
+## Known limitations (v1 → next)
+
+These are deliberate v1 trade-offs and **ongoing optimization** targets — not silent bugs:
+
+- **Shortcut hop cost still uses direct NavMesh leg lengths.** `_walk_len` inside `_try_shortcut_route` scores hops with single `_navmesh_leg` distances (not corridor polylines), so elevator vs stairs trade-offs can diverge slightly from the drawn corridor path length. Candidate **ordering** includes Y so the chosen hop usually matches destination height better than XZ-only.
+- **Branch trim is height-based, not graph-aware.** `floor_hint_y` drops branch prims below ``floor_hint_y - _DEFAULT_BRANCH_FLOOR_TOL_CM`` (450 cm). Mis-authored heights can trim too much or too little — tune the constant if needed.
+- **Branch rejoin is heuristic (3D nearest + anchor proximity).** `_suffix_upper_branch_from_join_pos` + `_JOIN_AT_SECTION_ANCHOR_MAX_CM` (700 cm) approximate “where did the lift put us?”; edge cases may still pick OP_3→P only or need threshold tweaks for other sections.
+- **POI / quiet / exit visibility (shortcut-aware fallback).** When the dev "Use shortcuts" toggle is on, `compute_routes_to_exits` retries every entry that returns `success=False` from the legacy direct/waypoint measure via `RouteComposer.compose(enable_shortcuts=True)`. If a route comes back, the entry is marked `success=True` with `viaShortcut: true` so panels can render a small "via elevator" hint. Caveats: (a) the per-source crowd / sound deltas are not populated for shortcut entries (the lift hop has no NavMesh-area cost to attribute, so `distance_meters_actual = distance_meters_base`); (b) successful direct measures are *not* re-tried, so the common case stays as fast as before — only the otherwise-failed entries pay the extra `compose()` cost; (c) strict-shortest is used (`prefer_shortcuts=False`) — discovery mirrors what the user's actual navigation would pick, leveraging the composer's same-tier walking probe to promote unreachable-walking destinations to "lift wins" automatically.
+- **POI / quiet / exit vs seat.** Guided POI routes use **`plan_route_to_position`** for auto vias and typically **omit `corridorSection`**, so post-elevator legs do **not** use seat **`UPPER_SECTION_BRANCH`** unless you extend the contract (optional `corridorSection` on `navmeshRouteCalculate`). **Seat** always ties elevator follow-up to the same section graph when `useWaypoints` + `section` set `corridor_section` on `set_route_for_id`.
+- **Post-teleport recompose can pick the same elevator again.** With both toggles still on (especially "Prefer elevators"), the resume call sees `dy = end.y - exit.y > min_gap/2` and `find_best_plan` fires again; if the elevator is the only cross-floor connection, the player can ride back and forth. Currently mitigated by the destination usually being on the exit floor so `dy ≈ 0`, the walking probe succeeds, and the same-tier short-circuit returns `None` — but the mitigation is more fragile in prefer mode (probe is bypassed) and in any case where walking on the exit floor is unreachable in the active mode (then the probe fails and `find_best_plan` runs again).
+  - *Fix path*: `disable_shortcuts: bool` parameter on `set_route_for_id` that suppresses shortcut consideration for the resume call only. One hop per trip.
+- **No "elevator preferred" UX hint.** Cross-floor routes silently use shortcuts when toggled on. There's no indicator on bird-eye, no chip in the route summary saying "via elevator". For accessibility/clarity this needs to land before CU rollout.
+- **Single-hop only.** Documented as a hard rule above; mentioned again here so iteration plans don't accidentally assume multi-hop is "almost there".
+- **CU "Elevators" preference does not yet drive `shortcutsPreferToggle`.** `PreferencesGrids.tsx` paints the radio but the wiring to dispatch the event is intentionally not in place — production stays on direct walking until the UX/WCAG pass for elevators is approved. When that lands, the bridge is a one-line dispatcher next to the existing wheelchair preference.
+
+When iterating past v1, read this section and confirm with the user which limitation is being lifted before changing code — they're each a separate scope.
+
+---
+
+## Files reference
+
+- `kit-app-template-main/source/data/shortcuts.json` — group/node config + i18n keys + `servesSections` per-group seat-section allow-list (single source of truth for the section gate)
+- `kit-app-template-main/source/data/scenes/sublayers/nav_shortcuts_layer.usda` — Xform positions
+- `kit-app-template-main/source/data/scenes/main_scene.usda` line ~144 — sublayer include
+- `kit-app-template-main/source/extensions/younite.navmesh_route_extension/younite/navmesh_route_extension/services/kit_services/`
+  - `shortcut_router/` — package: `shortcut_router.py` (`ShortcutRouter`, `find_best_plan`), `constants.py` (`SHORTCUT_SLACK_FRACTION`, walk speed, elevator thresholds), `types.py`, `vertical_filters.py`, `config_io.py`, `usd_scan.py`, `groups.py`, `singleton.py`
+  - `shortcut_traversal_service.py` — fade/teleport/resume coroutine
+  - `route_composer/composer.py` — `_try_shortcut_route`, `_shortcut_leg_vias`, finalize; `_ComposeContext.prefer_shortcuts` plumbed into `find_best_plan`
+  - `route_composer/measure.py` — `compose_with_measure(prefer_shortcuts=...)` forwards to all internal `composer.compose()` calls
+  - `route_composer/types.py` — `SHORTCUT_SEGMENT_SPEED`
+  - `route_engine/types.py` — `RouteConfig.use_shortcuts`, `RouteConfig.prefer_shortcuts`, `corridor_section`; `route_engine/compute.py` seat resume rebuilds `plan_route` with `floor_hint_y` / `branch_join_pos` when vias cleared
+  - `waypoint_router.py` — `plan_route(..., floor_hint_y=, branch_join_pos=)`, branch suffix + optional ring skip
+  - `navmesh_route_service/constants.py` — `SHORTCUT_ROUTE_IDS`; `service.py` — `set_shortcuts_active`, `set_prefer_shortcuts`
+  - `extension.py` — subscriptions for `shortcutsToggle` + `shortcutsPreferToggle`; `register_outbound_events` includes `shortcutsStatus` + `shortcutsPreferStatus`
+- `web-viewer-sample-main/src/`
+  - `features/dev/controls/submenus/NavigationSubmenu.tsx` — both dev toggle buttons
+  - `features/streaming/hooks/navigationHandlers/useNavmeshCore.ts` — `shortcutsActive` + `preferShortcutsActive` state and dispatchers
+  - `features/streaming/hooks/eventHandlers/sceneHandlers.ts` — fade handshake

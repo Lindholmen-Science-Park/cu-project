@@ -1,0 +1,92 @@
+/* ── WelcomeAvatarOverlay ──
+   Vain avatar (ei puhekuplaa). Root kiinnitetty näytön alareunaan, overflow piilottaa alaosan. */
+
+.welcome-avatar-root {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: min(50vh, 500px);
+  z-index: 2000;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.welcome-avatar-wrapper {
+  position: relative;
+  width: min(180vw, 80vh, 700px);
+  margin: 0 auto;
+}
+
+@media (min-width: 768px) {
+  .welcome-avatar-wrapper {
+    margin: 0 5vw 0 auto;
+    transform: none;
+  }
+}
+
+.welcome-avatar-image {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  height: auto;
+  pointer-events: none;
+}
+
+.welcome-avatar-image-btn {
+  display: block;
+  position: relative;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  pointer-events: auto;
+  border-radius: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.welcome-avatar-interactive-pointer {
+  position: absolute;
+  top: 23%;
+  left: 70%;
+  width: 46.634px;
+  height: 46.634px;
+  aspect-ratio: 1 / 1;
+  fill: var(--Lemon, #DCFF7D);
+  filter: drop-shadow(1px 1px 15px #FFF);
+  z-index: 3;
+  transform-origin: 50% 50%;
+  animation: welcome-avatar-pointer-spin 2.4s linear infinite;
+  pointer-events: none;
+  user-select: none;
+}
+
+@media (max-width: 767px) {
+  .welcome-avatar-interactive-pointer {
+    top: 20%;
+    left: 64%;
+  }
+}
+
+@keyframes welcome-avatar-pointer-spin {
+  from { transform: translate(-50%, -50%) rotate(0deg); }
+  to { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+.welcome-avatar-image-btn:focus {
+  outline: none;
+}
+
+.welcome-avatar-image-btn:focus-visible {
+  outline: 2px solid var(--Dark-Purple, #351a84);
+  outline-offset: 4px;
+  border-radius: 8px;
+}
+
+.welcome-avatar-image-btn:active .welcome-avatar-image {
+  transform: scale(0.99);
+  transform-origin: center bottom;
+}

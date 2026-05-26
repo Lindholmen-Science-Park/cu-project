@@ -1,0 +1,105 @@
+{
+  "_comment": "Ground-truth row ranges per section. Used to clamp/validate row assignments. lower = TELE rows (0-5), upper = numbered rows above TELE. anchor_seats pin known seats to specific rows.",
+
+  "A": {
+    "lower":  { "min_row": 0, "max_row": 5 },
+    "upper":  { "min_row": 6, "max_row": 15 }
+  },
+  "B": {
+    "lower":  { "min_row": 0, "max_row": 5 },
+    "upper":  { "min_row": 6, "max_row": 19 }
+  },
+  "C": {
+    "lower":  { "min_row": 0, "max_row": 5 },
+    "upper":  { "min_row": 9, "max_row": 32, "note": "rows 6-8 wheelchair" }
+  },
+  "D": {
+    "lower":  { "min_row": 0, "max_row": 5 },
+    "upper":  { "min_row": 7, "max_row": 25, "note": "rows 6-8 wheelchair on H side",
+    "seat_overrides": [
+        { "handle": "193EE", "seat_number": "1", "from_row": 10, "to_seat_number": "5" },
+        { "handle": "193CC", "seat_number": "1", "from_row": 8, "to_row": 9 },
+        { "handle": "193CD", "seat_number": "1", "from_row": 9, "to_row": 10 }
+      ]
+    }
+  },
+  "E": {
+    "upper":  { "min_row": 26, "max_row": 37 }
+  },
+  "F": {
+    "upper":  { "min_row": 6, "max_row": 21 }
+  },
+  "G": {
+    "lower":  { "min_row": 0, "max_row": 5 },
+    "upper":  { "min_row": 6, "max_row": 25, "note": "rows 6-8 wheelchair on V side" }
+  },
+  "H": {
+    "upper": {
+      "min_row": 26,
+      "max_row": 38,
+      "anchor_seats": [
+        { "row": 38, "text": "1", "x": 129707.23, "y": 135773.33 },
+        { "row": 38, "text": "2", "x": 130160.36, "y": 135728.98 },
+        { "row": 38, "text": "3", "x": 130607.32, "y": 135676.79 },
+        { "row": 38, "text": "4", "x": 131059.19, "y": 135592.81 }
+      ]
+    }
+  },
+  "J": {
+    "lower":  { "min_row": 0, "max_row": 5 },
+    "upper":  {
+      "min_row": 9, "max_row": 32, "note": "rows 6-8 wheelchair on both sides",
+      "seat_overrides": [
+        { "seat_number": "15", "from_row": 32, "to_row": 31 }
+      ]
+    }
+  },
+  "K": {
+    "lower":  { "min_row": 0, "max_row": 5 },
+    "upper":  {
+      "min_row": 6, "max_row": 25, "note": "rows 6-8 wheelchair on H side",
+      "seat_overrides": [
+        { "seat_number": "30", "from_row": 22, "to_row": 21 }
+      ]
+    }
+  },
+  "L": {
+    "lower":  { "min_row": 0, "max_row": 5 },
+    "upper":  { "min_row": 6, "max_row": 19 }
+  },
+  "M": {
+    "lower":  { "min_row": 0, "max_row": 5 },
+    "upper":  {
+      "min_row": 6, "max_row": 25,
+      "seat_overrides": [
+        { "handle": "18AA1", "seat_number": "1", "from_row": 21, "to_seat_number": "17" }
+      ]
+    }
+  },
+  "N": {
+    "lower":  { "min_row": 0, "max_row": 5 },
+    "upper":  { "min_row": 6, "max_row": 32 }
+  },
+  "O": {
+    "lower":  { "min_row": 0, "max_row": 5 },
+    "upper":  { "min_row": 6, "max_row": 26 }
+  },
+  "P": {
+    "upper":  { "min_row": 27, "max_row": 39 }
+  },
+  "R": {
+    "lower":  { "min_row": 0, "max_row": 5 },
+    "upper":  { "min_row": 6, "max_row": 26, "note": "rows 6-8 wheelchair on V side" }
+  },
+  "S": {
+    "upper":  { "min_row": 27, "max_row": 39 }
+  },
+  "T": {
+    "lower":  { "min_row": 0, "max_row": 5 },
+    "upper":  { "min_row": 6, "max_row": 33, "note": "rows 6-8 wheelchair on both sides" }
+  },
+  "U": {
+    "lower":  { "min_row": 0, "max_row": 5 },
+    "upper":  { "min_row": 6, "max_row": 19 }
+  }
+}

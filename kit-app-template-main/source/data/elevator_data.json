@@ -1,0 +1,50 @@
+[
+    {
+        "_comment": "coin_elevator_01 — Section A elevator, floor 1 (NavShortcuts elevator_1/floor_1).",
+        "xform_id": "elevator_01",
+        "shortcut_group_id": "elevator_1",
+        "shortcut_node_id": "floor_1",
+        "in_use": true,
+        "display_name": "Section A — Floor 1"
+    },
+    {
+        "_comment": "coin_elevator_01_floor0_elevator — same lift, ground floor (elevator_1/floor_0).",
+        "xform_id": "elevator_01_floor0",
+        "shortcut_group_id": "elevator_1",
+        "shortcut_node_id": "floor_0",
+        "in_use": true,
+        "display_name": "Section A — Ground floor"
+    },
+    {
+        "_comment": "coin_elevator_01_floor2_elevator — same lift, floor 2 (elevator_1/floor_2).",
+        "xform_id": "elevator_01_floor2",
+        "shortcut_group_id": "elevator_1",
+        "shortcut_node_id": "floor_2",
+        "in_use": true,
+        "display_name": "Section A — Floor 2"
+    },
+    {
+        "_comment": "coin_elevator_01_floor3_elevator — same lift, floor 3 (elevator_1/floor_3).",
+        "xform_id": "elevator_01_floor3",
+        "shortcut_group_id": "elevator_1",
+        "shortcut_node_id": "floor_3",
+        "in_use": true,
+        "display_name": "Section A — Floor 3"
+    },
+    {
+        "_comment": "coin_elevator_02 — Section R elevator, floor 1 (NavShortcuts elevator_2/floor_1).",
+        "xform_id": "elevator_02",
+        "shortcut_group_id": "elevator_2",
+        "shortcut_node_id": "floor_1",
+        "in_use": true,
+        "display_name": "Section R — Floor 1"
+    },
+    {
+        "_comment": "coin_elevator_02_floor2_elevator — same lift, floor 2 (elevator_2/floor_2).",
+        "xform_id": "elevator_02_floor2",
+        "shortcut_group_id": "elevator_2",
+        "shortcut_node_id": "floor_2",
+        "in_use": true,
+        "display_name": "Section R — Floor 2"
+    }
+]

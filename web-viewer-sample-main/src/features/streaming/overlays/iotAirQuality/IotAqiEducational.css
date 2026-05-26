@@ -1,0 +1,92 @@
+.iot-aqi-edu {
+    margin: 0 0 14px;
+    padding: 12px 12px 10px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(0, 0, 0, 0.28);
+}
+
+.iot-aqi-edu-short {
+    margin: 0 0 8px;
+    font-size: 12px;
+    line-height: 1.35;
+    color: rgba(255, 255, 255, 0.72);
+}
+
+.iot-aqi-scale-block {
+    margin: 0 0 6px;
+}
+
+.iot-aqi-scale {
+    position: relative;
+    height: 14px;
+}
+
+.iot-aqi-scale-track {
+    position: absolute;
+    inset: 0;
+    border-radius: 7px;
+    /* Stops at AQI/500: 0–10% = 0–50 green, 10–20% = 51–100 yellow (EPA moderate), then orange→red→purple */
+    background: linear-gradient(
+        90deg,
+        #2d8f3a 0%,
+        #2d8f3a 10%,
+        #e8c400 10%,
+        #e8c400 20%,
+        #e89400 20%,
+        #e89400 30%,
+        #c45a2a 30%,
+        #c45a2a 40%,
+        #8b2d4a 40%,
+        #6b1a3d 60%,
+        #4a1028 100%
+    );
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.35);
+}
+
+/* Cold (left) → warm (right); overrides AQI gradient when both classes apply */
+.iot-aqi-scale-track.iot-temp-scale-track {
+    background: linear-gradient(
+        90deg,
+        #1a2d4a 0%,
+        #2a5a8e 18%,
+        #4a9ec8 38%,
+        #7bc89e 52%,
+        #d4c44a 68%,
+        #e87840 84%,
+        #b83220 100%
+    );
+}
+
+.iot-aqi-scale-marker {
+    position: absolute;
+    top: -5px;
+    width: 4px;
+    height: 24px;
+    margin-left: -2px;
+    border-radius: 2px;
+    background: #fff;
+    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.65), 0 2px 8px rgba(0, 0, 0, 0.5);
+    transform: translateZ(0);
+}
+
+.iot-aqi-scale-labels {
+    position: relative;
+    height: 14px;
+    margin-top: 4px;
+    font-size: 9px;
+    color: rgba(255, 255, 255, 0.55);
+}
+
+.iot-aqi-scale-tick {
+    position: absolute;
+    top: 0;
+    transform: translateX(-50%);
+    white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .iot-aqi-scale-marker {
+        box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.65);
+    }
+}

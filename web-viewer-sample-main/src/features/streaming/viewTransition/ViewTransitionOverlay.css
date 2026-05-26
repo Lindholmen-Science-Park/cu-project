@@ -1,0 +1,49 @@
+/*
+ * Wrapper for view-transition opacity transitions. The actual visual is the
+ * <LoadingScreen> child (brand purple + arcs + spinner + label + footer) —
+ * this layer only animates opacity in/out and toggles pointer-events.
+ *
+ * Higher z-index than LoadingScreen's own (10000) so it always sits above
+ * other overlays while the transition is running.
+ */
+.view-transition-layer {
+    position: fixed;
+    inset: 0;
+    z-index: 10100;
+    opacity: 0;
+    pointer-events: none;
+    transition: none;
+}
+
+/* The inner LoadingScreen is fixed-positioned and fills its parent stacking
+   context — but during fade we want the wrapper's opacity to drive it. */
+.view-transition-layer > .loading-screen {
+    position: absolute;
+}
+
+.view-transition-layer--fadeOut {
+    opacity: 1;
+    pointer-events: auto;
+    transition: opacity var(--vt-fade-out, 1s) ease;
+}
+
+.view-transition-layer--solid {
+    opacity: 1;
+    pointer-events: auto;
+    transition: none;
+}
+
+/* Never capture hits while fading in: opacity hits 0 before transitionend in some
+   cases, leaving an invisible blocking layer if pointer-events stayed auto
+   (see useViewTransitionController fallback). */
+.view-transition-layer--fadeIn {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--vt-fade-in, 1s) ease;
+}
+
+.view-transition-layer--idle {
+    opacity: 0;
+    pointer-events: none;
+    transition: none;
+}

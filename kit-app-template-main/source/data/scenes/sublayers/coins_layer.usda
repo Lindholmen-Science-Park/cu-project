@@ -1,0 +1,315 @@
+#usda 1.0
+(
+    customLayerData = {
+        string comment = "POI coin anchors (coin_*): translate + rotate only — model size is registry modelScale on session CoinModel (not parent scale). Per-anchor rotateXYZ = sign facing. Exit: coin_exit_point_* XZ + Y+150. interactions primNamePattern coin_*. Show Markers hides coin_* via iconGroup. Runtime: coins_loader.py + coins_registry.json."
+    }
+)
+
+over "World"
+{
+    def Xform "coin_restroom_05_unisex"
+    {
+        double3 xformOp:rotateXYZ = (0, -90, 0)
+        double3 xformOp:translate = (-3644.69775390625, 2514.064368634931, 247.06503295898438)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ"]
+    }
+
+    def Xform "coin_restroom_06_unisex"
+    {
+        double3 xformOp:rotateXYZ = (0, -85, 0)
+        double3 xformOp:translate = (-3543.87744140625, 2499.9077922399156, 1375.2840576171875)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ"]
+    }
+
+    def Xform "coin_restroom_08_unisex"
+    {
+        double3 xformOp:rotateXYZ = (0, 78, 0)
+        double3 xformOp:translate = (4091.401611328125, 2514.7758676789285, 1070.4921875)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ"]
+    }
+
+    def Xform "coin_restroom_09_unisex"
+    {
+        double3 xformOp:rotateXYZ = (0, 90, 0)
+        double3 xformOp:translate = (3977.0390625, 2518.219850442134, -51.84648513793945)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ"]
+    }
+
+    def Xform "coin_ticket_office_01"
+    {
+        float3 xformOp:rotateXYZ = (0, 212, 0)
+        double3 xformOp:translate = (-4337.03515625, 2379.453369140625, -5467.833984375)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ"]
+    }
+
+    def Xform "coin_kiosk_01"
+    {
+        float3 xformOp:rotateXYZ = (0, 180, 0)
+        double3 xformOp:translate = (-1004.0602416992188, 2381.7998046875, -3911.7001953125)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ"]
+    }
+
+    def Xform "coin_elevator_01"
+    {
+        float3 xformOp:rotateXYZ = (0, -90, 0)
+        double3 xformOp:translate = (-199.77569580078125, 2401.800048828125, -5107.42578125)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ"]
+    }
+
+    def Xform "coin_exit_point_01"
+    {
+        float3 xformOp:rotateXYZ = (0, -54, 0)
+        double3 xformOp:translate = (4320.474216485803, 2505.6822271824617, -2729.991686250394)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ"]
+    }
+
+    def Xform "coin_exit_point_02"
+    {
+        float3 xformOp:rotateXYZ = (0, -90, 0)
+        double3 xformOp:translate = (4702.6382789858135, 2501.801025390627, -2122.158068086308)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ"]
+    }
+
+    def Xform "coin_exit_point_03"
+    {
+        float3 xformOp:rotateXYZ = (0, -65, 0)
+        double3 xformOp:translate = (5360.611911798323, 2535.7660167578333, -742.5011466994783)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ"]
+    }
+
+    def Xform "coin_exit_point_04"
+    {
+        float3 xformOp:rotateXYZ = (0, 251, 0)
+        double3 xformOp:translate = (4592.854587579558, 2504.3635704502326, 3539.460279082039)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ"]
+    }
+
+    def Xform "coin_exit_point_05"
+    {
+        float3 xformOp:rotateXYZ = (0, 156, 0)
+        double3 xformOp:translate = (-1150.987453436117, 2502.9016992388824, 5842.428052519686)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ"]
+    }
+
+    def Xform "coin_exit_point_06"
+    {
+        float3 xformOp:rotateXYZ = (0, 135, 0)
+        double3 xformOp:translate = (-3260.370815252525, 2522.6428930377147, 4680.923657988329)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ"]
+    }
+
+    def Xform "coin_exit_point_07"
+    {
+        float3 xformOp:rotateXYZ = (0, 135, 0)
+        double3 xformOp:translate = (-3908.0783958189313, 2503.2448537760265, 3970.0774665820627)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ"]
+    }
+
+    def Xform "coin_exit_point_08"
+    {
+        float3 xformOp:rotateXYZ = (0, 135, 0)
+        double3 xformOp:translate = (-4364.574733709553, 2503.546682770345, 3332.787915800747)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ"]
+    }
+
+    def Xform "coin_exit_point_09"
+    {
+        float3 xformOp:rotateXYZ = (0, 45, 0)
+        double3 xformOp:translate = (-4244.6410178892365, 2503.849486191965, -2218.787599946637)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ"]
+    }
+
+    def Xform "coin_exit_point_10"
+    {
+        float3 xformOp:rotateXYZ = (0, 45, 0)
+        double3 xformOp:translate = (-2478.551967596255, 2395.8359010740814, -5975.25749435601)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ"]
+    }
+
+    def Xform "coin_restroom_10_women"
+    {
+        float3 xformOp:rotateXYZ = (0, 180, 0)
+        double3 xformOp:translate = (-3151.619384765625, 2561.801025390625, -1743.177978515625)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ"]
+    }
+
+    def Xform "coin_kiosk_02"
+    {
+        float3 xformOp:rotateXYZ = (0, 264, 0)
+        double3 xformOp:translate = (-3655.984619140625, 2501.801025390625, -1091.427734375)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ"]
+    }
+
+    def Xform "coin_elevator_02"
+    {
+        float3 xformOp:rotateXYZ = (0, 92, 0)
+        double3 xformOp:translate = (-4285.39501953125, 2501.801025390625, -665.0339965820312)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ"]
+    }
+
+    def Xform "coin_kiosk_03"
+    {
+        float3 xformOp:rotateXYZ = (0, 270, 0)
+        double3 xformOp:translate = (-3038.594970703125, 2511.801025390625, 3361.052490234375)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ"]
+    }
+
+    def Xform "coin_restroom_02_accessible"
+    {
+        float3 xformOp:rotateXYZ = (0, 236, 0)
+        double3 xformOp:translate = (-2304.455810546875, 2431.7998046875, -2963.236328125)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ"]
+    }
+
+    def Xform "coin_restroom_02_changing_table"
+    {
+        float3 xformOp:rotateXYZ = (0, 232, 0)
+        double3 xformOp:translate = (-2304.7, 2371.7998046875, -2963.9345703125)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ"]
+    }
+
+    def Xform "coin_kiosk_04"
+    {
+        float3 xformOp:rotateXYZ = (0, 130, 0)
+        float3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (3532.75537109375, 2501.801025390625, -2122.819091796875)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "coin_kiosk_05"
+    {
+        float3 xformOp:rotateXYZ = (0, 90, 0)
+        float3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (4139.095703125, 2511.801025390625, 2089.283935546875)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "coin_kiosk_06"
+    {
+        float3 xformOp:rotateXYZ = (0, 180, 0)
+        float3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (207.6009521484375, 2401.7998046875, -4110.6689453125)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "coin_restroom_01_accessible"
+    {
+        float3 xformOp:rotateXYZ = (0, 170, 0)
+        float3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (1673.369873046875, 2401.7998046875, -3529.526611328125)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "coin_restroom_03_women"
+    {
+        float3 xformOp:rotateXYZ = (0, 204, 0)
+        float3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (2851.255126953125, 2511.801025390625, -2535.181884765625)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "coin_restroom_11_accessible"
+    {
+        float3 xformOp:rotateXYZ = (0, 90, 0)
+        float3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (3903.433837890625, 2501.801025390625, -699.3924560546875)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "coin_restroom_12_women"
+    {
+        float3 xformOp:rotateXYZ = (0, 105, 0)
+        float3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (3933.120849609375, 2501.801025390625, -500.3917541503906)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "coin_restroom_13_women"
+    {
+        float3 xformOp:rotateXYZ = (0, -239, 0)
+        float3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (-2235.059326171875, 2401.7999267578125, -4356.876953125)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "coin_exit_point_11"
+    {
+        float3 xformOp:rotateXYZ = (0, -82, 0)
+        float3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (5481.28271484375, 2541.801025390625, 714.732421875)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "coin_restroom_14_women"
+    {
+        float3 xformOp:rotateXYZ = (0, 73, 0)
+        float3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (3511.86279296875, 2511.801025390625, 3721.693603515625)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "coin_exit_point_12"
+    {
+        float3 xformOp:rotateXYZ = (0, 214, 0)
+        float3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (3101.956298828125, 2511.801025390625, 5158.4384765625)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "coin_restroom_15_accessible"
+    {
+        float3 xformOp:rotateXYZ = (0, -37, 0)
+        float3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (-1461.139892578125, 2530.801025390625, 5093.0869140625)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "coin_restroom_15_changing_table"
+    {
+        float3 xformOp:rotateXYZ = (0, -45, 0)
+        float3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (-1461.9, 2471.801025390625, 5093.548828125)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "coin_restroom_07_women"
+    {
+        float3 xformOp:rotateXYZ = (0, 45, 0)
+        float3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (-2383.684326171875, 2501.801025390625, 3837.086669921875)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "coin_elevator_01_floor0_elevator"
+    {
+        float3 xformOp:rotateXYZ = (0, -89, 0)
+        float3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (-218.66116333007812, 2072.7998046875, -5113.61572265625)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "coin_elevator_01_floor2_elevator"
+    {
+        float3 xformOp:rotateXYZ = (0, -90, 0)
+        float3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (-198.97772216796875, 3011.7998046875, -5112.1796875)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "coin_elevator_02_floor2_elevator"
+    {
+        float3 xformOp:rotateXYZ = (0, 90, 0)
+        float3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (-4296.5693359375, 2966.7998046875, -646.530029296875)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+
+    def Xform "coin_elevator_01_floor3_elevator"
+    {
+        float3 xformOp:rotateXYZ = (0, -91, 0)
+        float3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (-183.51934814453125, 3303.5091914216914, -5115.185546875)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+    }
+}
+

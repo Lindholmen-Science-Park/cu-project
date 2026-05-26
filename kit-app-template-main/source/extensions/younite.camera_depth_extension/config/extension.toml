@@ -1,0 +1,19 @@
+[package]
+title = "Younite Camera Depth Extension"
+description = "Captures depth from a camera and creates a USD point cloud for obstacle detection"
+version = "0.1.0"
+authors = ["Younite"]
+keywords = ["camera", "depth", "pointcloud", "obstacle", "navmesh"]
+category = "Feature"
+
+[dependencies]
+"younite.messaging_core_extension" = {}
+"younite.payload_orchestrator_core_extension" = {}
+"omni.usd" = {}
+"omni.physx" = {}
+
+[[python.module]]
+name = "younite.camera_depth_extension"
+
+[build]
+include = ["younite/**/*.py", "*.toml"]

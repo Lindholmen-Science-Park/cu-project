@@ -1,0 +1,266 @@
+---
+description: PhysX CCT movement — startup-loaded CCT, WASD/joystick input, point-and-click auto-move, bird-eye pan, frame delta time via PlayerUpdateLoop, video focus for WebRTC keyboard forwarding, jump, teleport to first-person spawn, PhysX UI suppression. Read when working on WASD, joystick, CCT, auto-move speed, FPS-linked movement, or keyboard input issues.
+globs:
+  - "**/physx_bootstrap*"
+  - "**/keyboard_mouse_input*"
+  - "**/web_input_wiring*"
+  - "**/cct_driver*"
+  - "**/manual_movement_router*"
+  - "**/speed_tuner*"
+  - "**/update_loop*"
+  - "**/auto_mover*"
+  - "**/navigation_orchestrator*"
+  - "**/touch_look_handler*"
+  - "**/StreamOnlyWindow*"
+alwaysApply: false
+---
+
+# PhysX CCT Movement (WASD / Joystick)
+
+The player can move using **point-and-click** (no physics), **WASD keyboard**, or **mobile joystick** (both use PhysX CCT). CCT is loaded at startup via the `.kit` file — it is NOT loaded dynamically.
+
+**Kit extension**: `younite.usd_viewer_player_core_extension`
+
+## Architecture
+
+```
+Desktop browser                              Kit (Omniverse)
+──────────────                               ────────────────
+WASD/Space keys                              carb.input keyboard
+      │                                            ▲
+      ▼                                            │
+ <video> element ──[WebRTC SDK forwarding]────────►│
+ (MUST have focus)                                  │
+                                                    ▼
+                                             KeyboardMouseInput
+                                             (W/A/S/D state + Space→jump)
+                                                    │
+Mobile joystick ── joystickInput msg ──────► WebInputWiring
+                                             → WebJoystickInput
+                                             (forward, right)
+                                                    │
+                                                    ▼
+                                          PlayerInputController.update()
+                                             builds movement_state
+                                                    │
+                                                    ▼
+                                          ManualMovementRouter.drive()
+                                             ├─ birdEye → BirdEyeUsdTranslateMover
+                                             └─ firstPerson → FirstPersonCctMover
+                                                                  │
+                                                                  ▼
+                                                            PhysX CCT API
+                                                         (physics-based movement)
+```
+
+## Video element focus (critical for WASD)
+
+The `@nvidia/omniverse-webrtc-streaming-library` SDK only forwards keyboard events to Kit's `carb.input` when the `<video id="remote-video">` element **has browser focus**. Clicking any UI control (hamburger menu, mode switcher, etc.) moves focus away from the video, silently breaking WASD input.
+
+**Solution**: `StreamOnlyWindow.tsx` has a `useEffect` that, when `controlMode === 'wasd'`:
+1. Sets `tabIndex=0` on the video element (makes it focusable)
+2. Calls `video.focus()` to grab focus immediately
+3. Listens for `blur` events and refocuses the video via `requestAnimationFrame`
+4. Skips refocusing only if the new focus target is a text-entry input (`<input type="text|search|email|password">` or `<textarea>`). Non-text inputs like range sliders, buttons, and checkboxes do NOT suppress refocusing.
+
+When the user switches away from WASD mode, the cleanup function removes the blur listener and focus management stops — clicks work normally for point-and-click.
+
+**Kit-side requirements**: The `.kit` file must have these settings under `[settings.exts."omni.kit.livestream.webrtc"]` so the SDK accepts forwarded keyboard events:
+```
+transferKeyboardEvents = true
+captureKeyboard = true
+transferMouseEvents = true
+enablePointerLock = true
+focusOnClick = true
+```
+
+These MUST be in the `.kit` file (not applied at runtime) because `omni.kit.livestream.webrtc` reads its settings during extension startup, before `stage_core` runs.
+
+## Why CCT is loaded at startup
+
+`omni.physx.cct` and its UI dependencies are loaded at startup via the `.kit` file (removed from the `excluded` list). Previously, CCT was loaded dynamically via `set_extension_enabled_immediate()` when the user switched to WASD mode. This caused Kit's extension dependency resolver to **restart the entire player_core extension**, destroying `KeyboardMouseInput` and its `carb.input` subscriptions mid-call. The result was that WASD keyboard input broke because the old extension instance continued executing on dead state while the new instance's subscriptions were disconnected from the CCT setup.
+
+Loading CCT at startup eliminates this cascade entirely. PhysX UI windows are suppressed via carb settings in the `.kit` file and hidden by the setup extension's layout pass.
+
+## Input path
+
+### Desktop WASD (native carb.input via WebRTC)
+
+`KeyboardMouseInput` in `inputs/desktop/keyboard_mouse_input.py` subscribes to `carb.input.subscribe_to_keyboard_events()` on the default app window's keyboard device. The WebRTC livestream SDK forwards browser keyboard events into `carb.input` — but **only when the `<video>` element has focus** (see "Video element focus" above).
+
+### Mobile joystick (custom messaging)
+
+`WebInputWiring` subscribes to `joystickInput` and `lookInput` messages sent from the mobile joystick UI over the WebRTC data channel. These feed into `WebJoystickInput` which stores analog `forward`/`right`/`yaw`/`pitch` values. This path does NOT depend on video element focus.
+
+### Aggregation
+
+`PlayerInputController.update()` merges both input sources into a unified `movement_state` dict each frame:
+- Digital keys from `KeyboardMouseInput.get_movement_state()` (W/A/S/D/Q/E)
+- Analog `forward`/`right` from `WebJoystickInput.get_move()` (overrides digital when active)
+
+## CCT lifecycle
+
+### Phase 1: Startup (no CCT active)
+
+`PhysxBootstrap.setup_player_character()` runs during `readyForPlayer`. Creates the `PlayerCharacter` prim, binds viewport camera, places at default spawn. No CCT activation.
+
+### Phase 2: Activation (`activate_cct()`)
+
+Called when user switches to WASD or joystick mode (`_on_movement_mode_changed` in `extension.py`).
+
+1. Sets `h._camera_view_type = "firstPerson"` and the carb setting
+2. Makes player capsule visible
+3. `_try_setup_cct()` — activates CCT on the player prim, enables gravity, wires CharacterController. No dynamic extension loading needed — `omni.physxcct` is already available.
+4. `_teleport_to_first_person_spawn()` — moves player prim AND CCT physics capsule to `PlayerSpawnPoint_01` (ground level). Teleport MUST happen AFTER CCT setup because the CCT overrides USD transforms with its cached physics position.
+
+### Phase 3: Deactivation (`deactivate_cct()`)
+
+Called when user switches back to point-and-click. Tears down CCT so sweep queries stop.
+
+## Teleport to first-person spawn
+
+`_teleport_to_first_person_spawn()` in `physx_bootstrap.py`:
+
+1. Looks up `PlayerSpawnPoint_01` via `find_spawn_point_prim()`
+2. Sets USD translate + rotation on the player prim
+3. Calls `cct.set_position(player_path, carb.Double3(x, y, z))` to move the physics capsule
+
+**Critical**: `cct.set_position()` expects a `carb.Double3` object, not three separate floats.
+
+## PhysX UI suppression
+
+`omni.physx.cct` depends on several PhysX UI extensions (`omni.physx.ui`, `omni.usdphysics.ui`, etc.) that create Composer windows and viewport overlays. These are suppressed in the streaming viewer via:
+
+1. **Carb settings in `.kit`**: `/persistent/physics/showSimulationToolbar`, visualisation toggles, etc. set to `false` before extensions start.
+2. **Setup extension layout pass**: `_hide_non_viewport_windows()` in `setup.py` hides all `omni.ui` windows except "Viewport" after extensions have settled.
+
+**NEVER** disable PhysX UI extensions at runtime via `set_extension_enabled_immediate(..., False)` — CCT depends on them and disabling cascades into a crash.
+
+**NEVER** load CCT dynamically via `set_extension_enabled_immediate("omni.physx.cct", True)` — it triggers a dependency re-resolution that restarts extensions and breaks `carb.input` subscriptions.
+
+## Frame delta time (`PlayerUpdateLoop`)
+
+All **USD-translate** movement (point-and-click auto-move, bird-eye drag-pan, cinematic framer tilt) is driven from `runtime/update_loop.py`, which subscribes to `GLOBAL_EVENT_UPDATE` via Events 2.0 and passes **`dt`** into movers each frame.
+
+**Critical**: read **`event.payload["dt"]`** (seconds since last update). Do **not** read `event.dt` — it is empty on Events 2.0, and the old fallback of hard-coded `1/60` per callback made walk speed proportional to FPS (120 FPS ≈ 2× speed, 30 FPS ≈ ½×). Canonical snippet: `events-api.mdc` § Delta time on `GLOBAL_EVENT_UPDATE`.
+
+WASD/joystick **first-person CCT** is different: `FirstPersonCctMover` writes `control_state.inputs` and PhysX integrates on the physics timestep (not this loop's `dt`). Face-turn before a route (`navigation_orchestrator_service._on_face_turn_update`) has its own `GLOBAL_EVENT_UPDATE` subscription and uses the same `payload["dt"]` read.
+
+### Auto-move ease-in / ease-out
+
+`PointClickAutoMover` scales each frame's **walk** time budget by a **smoothstep** factor from distance along the route (XZ polyline):
+
+- **`EASE_IN_ZONE_DISTANCE_CM`** (default 120) — acceleration ramp at start; capped to 15% of route length on very short paths.
+- **`EASE_OUT_ZONE_DISTANCE_CM`** (default 450) — deceleration ramp at end; capped to 50% of route length on short paths (`cap_out_frac=0.5`).
+- **`EASE_MIN_SPEED_SCALE`** (default 0.05) — floor so the character never fully freezes at t=0.
+
+Applies to **walk speed only** on navmesh/OSM polylines (not camera yaw or click face-turn). **`FINAL_ARRIVE_THRESHOLD_CM`** (default 10) on the last waypoint so ease-out is not cut short by the normal 50 cm arrive snap. Tune in **`auto_mover.py`** (hot-reload on save). Shared math: **`ease_helpers.ease_scale_traveled`**.
+
+### Click-to-navigate face-turn
+
+Orchestrator-owned smooth yaw lives in **`navigation_orchestrator_service.py`** (`_start_face_turn`, `_on_face_turn_update`, `face_toward_world_xz`, `_face_route_direction`). Shared math: **`inputs/point_click/ease_helpers.py`** (`ease_scale_remaining`, `smootherstep01`).
+
+**Auto-move walk (separate from face-turn):** `PointClickAutoMover` eases look-ahead yaw while walking (`YAW_SMOOTH_FACTOR` 0.095, `YAW_TURN_EASE_*`, `turn_rate_deg_per_s` 124). Seeds `_smoothed_yaw` from **`cur_yaw`** on new paths to avoid click snaps.
+
+**Conflict guard:** While orchestrator face-turn is active, auto-mover **does not write camera yaw** (`NavigationOrchestratorService.is_face_turn_active()` wired via `PointClickAutoMover.set_is_face_turn_active` in `extension.py`). Walk position still advances.
+
+**Generic ground `player` click:** No `faceDirection` on first waypoint — heading comes from auto-mover look-ahead only. Guided routes (`seat_nav`, `exit_nav`, `poi_nav`, …) set `faceDirection: true` once on first successful waypoint dispatch (see `route-measurement.mdc`).
+
+#### Face-turn profiles (`_face_turn_profile`)
+
+| Profile | Trigger | Motion model | Tuning constants |
+|---------|---------|--------------|------------------|
+| **`route`** | `_face_route_direction` when `navmeshRouteWaypoints` has `faceDirection: true` | Per-frame `max_step = FACE_ROUTE_TURN_RATE × dt × ease_scale_remaining(...)` | Rate **132°/s**, zone **62°**, min scale **0.18**, zone cap **0.62**, done **0.4°** |
+| **`stadium`** | `face_toward_world_xz` after `playerFaceWorldXZ` (seat arrival bowl center) | **Smootherstep position S-curve**: capture `start_yaw` + signed `total_delta`, `duration = clamp(span / FACE_STADIUM_AVG_DEG_PER_S, min, max)`, each frame `yaw = start + total_delta × smootherstep01(elapsed / duration)` | Avg **74°/s** (peak ~**1.875×** on smootherstep derivative), duration **0.45–1.65 s**, done **0.35°** |
+| **`default`** | Fallback / other callers | Same as pre-profile global: `FACE_TURN_*` rate × ease | Rate **175°/s**, zone **44°**, min scale **0.34** |
+
+**Why stadium ≠ route:** Route start used rate × (`ease_in × ease_out`) on angular speed, which creates a visible **cruise-speed plateau** (sharp accel → flat top → decel). Stadium arrival was retuned to **smootherstep on angle progress** so velocity stays continuous with no flat top-speed band. Route start keeps rate×ease (tuned gentler via `FACE_ROUTE_*`).
+
+**Stadium duration example:** 90° turn → `90/74 ≈ 1.22 s` (within max cap).
+
+**Cancel / snap:** `stop_face_turn_if_active()` (e.g. `immediateViewAngles` after teleport). Subscription failure falls back to `_apply_yaw_instant`.
+
+**Look-ahead for route start:** `FACE_LOOK_AHEAD_DIST` = **800** stage units along the polyline before computing world yaw.
+
+## Movement speed
+
+The UI speed slider affects all movement modes: **WASD**, **joystick** (CCT-based), **point-and-click** (auto-mover), and **bird-eye** (direct USD translate).
+
+### How speed is applied per mode
+
+| Mode | Where speed is read | Mechanism |
+|------|-------------------|-----------|
+| WASD / Joystick | `ControlState.speed` | CCT's built-in `update_movement` reads `state.speed * dt` each **physics** step |
+| Point-and-click | `_movement_speed_multiplier` | `PointClickAutoMover.update(dt)` — time budget `dt` × ease scale × `get_speed_multiplier()` × base **300 cm/s**; **120 cm** ease-in, **450 cm** ease-out (smoothstep, min 5% speed) |
+| Bird-eye | `_movement_speed_multiplier` | `BirdEyeUsdTranslateMover.drive(dt=…)` — `move_speed * dt` × base 10000 cm/s × bird-eye multiplier |
+
+### CCT speed initialization
+
+`setup_controls(speed)` is called once during CCT activation. It **must** receive the current slider value:
+
+```python
+initial_speed = BASE_CCT_SPEED * float(getattr(h, "_movement_speed_multiplier", 1.0))
+controller.setup_controls(initial_speed)
+```
+
+If you pass a hardcoded value, the CCT ignores the slider until the user moves it again.
+
+### Runtime speed changes
+
+`MovementSpeedTuner.set_movement_speed()` updates `control_state.speed` directly — this is the ONLY safe way to change CCT speed at runtime.
+
+**NEVER** call `setup_controls()` again to change speed — it calls `get_input_manager().clear()`, destroys all registered input bindings, creates new overlapping event subscriptions, and breaks all movement.
+
+### Video focus and the speed slider
+
+The speed slider is an `<input type="range">`. Interacting with it steals focus from the `<video>` element. The blur handler in `StreamOnlyWindow.tsx` must NOT skip refocusing for non-text inputs (range, checkbox, button), only for text-entry inputs (`text`, `search`, `email`, `password`) and `<textarea>`. If the blur handler blocks refocusing for all `<input>` types, dragging the slider permanently kills WASD.
+
+## Movement routing (`ManualMovementRouter.drive()`)
+
+Per-frame, reads `h._camera_view_type`:
+- `"birdEye"` → `BirdEyeUsdTranslateMover` (direct USD translate, locked height)
+- `"firstPerson"` → `FirstPersonCctMover` (PhysX CCT `control_state`)
+
+**NEVER** add diagnostic/logging code with f-string dict comprehensions inside `drive()` — the `_drive_manual_movement` caller wraps it in a `try/except: pass`, so syntax errors silently kill all movement (both WASD and joystick).
+
+## Key files
+
+| File | Purpose |
+|------|---------|
+| `physx_bootstrap.py` | CCT lifecycle: setup, activate, deactivate, teleport |
+| `keyboard_mouse_input.py` | Desktop WASD+Space via `carb.input` |
+| `web_input_wiring.py` | Subscribes to `joystickInput`, `lookInput` messages from mobile |
+| `web_joystick_input.py` | Stores current forward/right/yaw/pitch values |
+| `player_input_controller.py` | Aggregates desktop + mobile input into unified movement_state |
+| `manual_movement_router.py` | Routes movement to bird-eye or CCT mover per frame |
+| `runtime/update_loop.py` | Per-frame hub: reads `payload["dt"]`, calls auto-mover + input controller + framer |
+| `inputs/point_click/ease_helpers.py` | Shared smoothstep + coast helpers (walk, face-turn, bird-eye pan/yaw) |
+| `inputs/point_click/auto_mover.py` | `PointClickAutoMover` — polyline walk, ease-in/out (`EASE_*` class constants) |
+| `inputs/point_click/touch_look_handler.py` | Stream drag-look + FP/bird-eye release coast; see `touch-look.mdc` |
+| `inputs/point_click/navigation_orchestrator_service.py` | Face-turn ease + nav state; `_on_face_turn_update` uses `payload["dt"]` |
+| `movement_modes/bird_eye_yaw_service.py` | Bird-eye map rotation + `birdEyeYawEnd` coast |
+| `cct_driver.py` | `FirstPersonCctMover` — translates input to CCT control_state |
+| `speed_tuner.py` | Runtime CCT speed changes via `control_state.speed` |
+| `extension.py` (player_core) | `_on_movement_mode_changed`, `jump()`, creates all input controllers |
+| `setup.py` (setup_extension) | Hides non-Viewport windows after startup |
+| `StreamOnlyWindow.tsx` | Video focus management for WASD mode |
+| `younite.usd_viewer_streaming_dev.kit` | PhysX CCT deps, UI suppression settings, WebRTC input forwarding settings |
+
+## Troubleshooting WASD not working
+
+1. **Video element doesn't have focus** — Check browser DevTools: `document.activeElement` should be the `<video>` element. If not, the focus management `useEffect` in `StreamOnlyWindow.tsx` may not be running (wrong `controlMode`?).
+2. **`.kit` missing input settings** — Verify `transferKeyboardEvents = true` and `captureKeyboard = true` under `[settings.exts."omni.kit.livestream.webrtc"]`.
+3. **`ManualMovementRouter.drive()` throwing silently** — Any exception inside `drive()` is swallowed by `_drive_manual_movement`'s `try/except: pass`. Add temporary logging OUTSIDE the drive call to verify it's being reached.
+4. **CCT not activated** — Check Kit logs for `PhysX CCT activated for WASD mode`. If missing, `activate_cct()` failed.
+5. **Wrong view type** — `_camera_view_type` must be `"firstPerson"` for CCT routing. If it reads `"birdEye"`, the BirdEyeUsdTranslateMover handles input instead.
+6. **WASD dies after UI interaction (slider, button)** — A non-text `<input>` stole focus from the video. Check the blur handler in `StreamOnlyWindow.tsx` — it must only skip refocusing for text-entry inputs, not range sliders or buttons.
+7. **Speed resets when switching to WASD/joystick** — `setup_controls()` in `_setup_character_controller_inputs` must pass `BASE_CCT_SPEED * _movement_speed_multiplier`, not a hardcoded value.
+8. **Auto-move / bird-eye speed varies with FPS** — `update_loop.py` or a standalone `GLOBAL_EVENT_UPDATE` handler is reading `event.dt` instead of `event.payload["dt"]`. Symptom: faster at high FPS, slower at low FPS. Fix: use the pattern in `events-api.mdc` § Delta time.
+
+## Related topics
+
+- Touch/drag look + release coast: `.cursor/rules/topics/touch-look.mdc`
+- Camera view switching & spawnpoints: `.cursor/rules/topics/camera-teleport.mdc`
+- Stage init / loading phases: `.cursor/rules/topics/stage-init.mdc`
+- Events 2.0 patterns: `.cursor/rules/topics/events-api.mdc`
+- Streaming resolution & AppStream: `.cursor/rules/topics/resolution-streaming.mdc`

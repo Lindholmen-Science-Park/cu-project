@@ -1,0 +1,156 @@
+---
+description: Wet ground & terrain winter textures — wet salted pavement on rain/snow/winter, snow-cover natural terrain on winter only, multi-source reason tracking, generate_frost_textures.py offline tool. Read when working on ground appearance, rain/snow side-effects, terrain materials, or winter visuals.
+---
+
+# Wet Ground & Terrain Winter Textures
+
+## Overview
+
+Two terrain texture treatments are applied via session-layer `inputs:file` overrides at runtime:
+
+| Treatment | Surfaces | When active | Visual |
+|-----------|----------|-------------|--------|
+| **Wet salted pavement** | Roads, concrete, cobblestone (12 materials) | Rain, snow, or winter season | Darker, more saturated, cool-tinted — simulates salted wet Nordic pavement |
+| **Snow cover** | Grass, soil, forest, misc natural terrain (13 materials) | Winter season only | Heavy white wash with subtle original texture bleeding through |
+
+Both treatments are non-destructive — textures are overridden on the session layer and cleared when no longer needed.
+
+## Architecture
+
+```
+Weather preset change (sky_service.py)
+  → set_wet("weather", precipitation, stage)     ← wet_ground_service
+
+Season change (extension.py / SeasonsExtension)
+  → set_wet("season", is_winter, stage)           ← wet_ground_service
+  → _apply_snow_terrain(stage, season, snow_map)  ← extension.py (natural terrain only)
+```
+
+### Files
+
+| File | Role |
+|------|------|
+| `wet_ground_service.py` | Paved-surface wet texture overrides. Tracks reasons (`"weather"`, `"season"`), discovers paved shader prims, applies/clears textures. Lives in `younite.weather_and_seasons_extension`. |
+| `extension.py` | `SeasonsExtension` handles snow-cover natural terrain (winter only) and calls `set_wet("season", ...)` for paved surfaces. |
+| `sky_service.py` | After starting/stopping rain or snow, calls `set_wet("weather", ...)`. |
+| `generate_frost_textures.py` | Offline tool: generates both wet-pavement and snow-cover texture variants from Nucleus source textures. Lives in `data/Assets/Tools/`. |
+
+## Multi-source reason tracking
+
+`wet_ground_service` uses a `set[str]` of reasons:
+
+- `"weather"` — added when rain or snow weather effect is active
+- `"season"` — added when winter season is active
+
+Textures are applied when any reason is present and cleared only when **all** reasons are removed. This prevents:
+- Switching weather to clear sky during winter from removing wet ground
+- Switching from winter to summer during rain from removing wet ground
+
+## Material categories
+
+### Paved surfaces (wet_ground_service)
+
+12 materials handled by `wet_ground_service.py`:
+
+`mat_Asfalt`, `mat_Betong`, `mat_Betongplatta`, `mat_VG_Kantsten`, `mat_Smaagatsten`, `mat_Storgatsten`, `mat_Kullersten`, `mat_Natursten`, `mat_SF_sten`, `mat_Sinusplatta`, `mat_Trappa`, `mat_Mur`
+
+### Natural terrain (extension.py, winter only)
+
+13 materials handled by `SeasonsExtension._apply_snow_terrain()`:
+
+`mat_Graes`, `mat_Grus`, `mat_Sand`, `mat_Slaatter`, `mat_Skog`, `mat_aaker`, `mat_Jord`, `mat_Berg`, `mat_Kaerr`, `mat_Buskage`, `mat_Bollplan`, `mat_Fallskyddsmatta`, `mat_Gummi`
+
+## Shader discovery and original texture caching
+
+Both services traverse the composed stage looking for shader prims named `usduvtexture1` (shared Nucleus materials) or `Image_Texture` (edited-tile local materials). The parent prim name is matched against the material lists, with regex support for numeric suffixes (`mat_Asfalt_005` → `mat_Asfalt`).
+
+During discovery, both services also cache each prim's **original `inputs:file` path** (resolved or authored) in a dict (`_original_textures` in `wet_ground_service.py`, `_terrain_original_textures` in `extension.py`). This is critical for the restore-on-clear pattern (see below).
+
+Discovery results are cached on first use. Caches (including original texture paths) are cleared on extension shutdown (`invalidate_cache()`).
+
+### Edited tiles (`edited_tile_*.usdc`)
+
+The four edited tiles surrounding Skandinavium use local materials with numeric suffixes and `Image_Texture` shader names. Both services handle them automatically via the regex matching. When these tiles are eventually replaced by standard Nucleus tiles, the discovery simply finds fewer prims — no code changes needed.
+
+## Texture generation
+
+### Offline tool: `generate_frost_textures.py`
+
+Run after `pullnucleus.bat` so source textures are available.
+
+```bash
+python kit-app-template-main/source/data/Assets/Tools/generate_frost_textures.py
+```
+
+Also runs automatically via `runscripts.bat` / `preinstall.bat`.
+
+#### Wet pavement processing (`make_frost`)
+
+1. Darken by `WET_DARKEN` (35%)
+2. Boost saturation by `WET_SATURATION_BOOST` (20%)
+3. Apply cool tint via `WET_COOL_TINT` channel multiplier
+
+#### Snow cover processing (`make_snow_cover`)
+
+1. Desaturate by `SNOW_DESAT` (70%)
+2. Blend towards white by `SNOW_WHITE_BLEND` (65%)
+3. Apply cool blue tint via `SNOW_BLUE_TINT`
+
+### Tuning constants
+
+| Constant | Value | Category |
+|----------|-------|----------|
+| `WET_DARKEN` | 0.35 | Paved — darkening strength |
+| `WET_SATURATION_BOOST` | 0.20 | Paved — saturation increase |
+| `WET_COOL_TINT` | (0.93, 0.96, 1.0) | Paved — per-channel cold shift |
+| `SNOW_DESAT` | 0.70 | Natural — desaturation |
+| `SNOW_WHITE_BLEND` | 0.65 | Natural — white overlay opacity |
+| `SNOW_BLUE_TINT` | (0.90, 0.93, 1.0) | Natural — per-channel cold shift |
+
+### Output
+
+- Directory: `data/Assets/SeasonalTextures/Frost/`
+- Paved: `<Name>_winter_frost.jpg` (12 files)
+- Natural: `<Name>_winter_snow.jpg` (13 files)
+- Gitignored (generated content); `.gitkeep` tracked
+
+## Restore-on-clear pattern (anti-flash fix)
+
+When clearing texture overrides, both services explicitly **restore the original texture path** via `attr.Set(Sdf.AssetPath(original))` instead of `attr.Clear()`. This prevents a neon-blue flash from the RTX renderer's missing-texture fallback colour — `attr.Clear()` removes the session-layer opinion, creating a brief window where Hydra may display its default placeholder while re-resolving the underlying texture from the root layer.
+
+The original paths are cached during shader discovery (see above). If an original path is missing from the cache (shouldn't happen in practice), `attr.Clear()` is used as a fallback.
+
+This pattern applies to:
+- `wet_ground_service._clear()` — paved surface restore
+- `SeasonsExtension._apply_snow_terrain()` — natural terrain restore (non-winter case)
+
+## Weather change view transition
+
+Weather preset changes are wrapped in the shared `ViewTransitionOverlay` (fade to black → apply change → fade in). This provides additional protection against any residual texture-loading flash, especially during rapid toggling when the GPU texture cache may not have the original textures readily available.
+
+The weather view transition is frontend-only with a 500ms timer (no Kit-side completion event). See `.cursor/rules/topics/rain-effect.mdc` or `.cursor/rules/topics/snow-effect.mdc` for the full flow.
+
+## Behaviour matrix
+
+| Scenario | Paved surfaces | Natural terrain |
+|----------|---------------|-----------------|
+| Summer + clear sky | Normal | Normal |
+| Summer + rain or snow | Dark & wet | Normal |
+| Winter + clear sky | Dark & wet | Snow-covered |
+| Winter + rain or snow | Dark & wet | Snow-covered |
+| Rain off (still winter) | Still dark & wet | Still snow-covered |
+| Winter → summer (no rain) | Back to normal | Back to normal |
+
+## Adding a new material
+
+1. Add the source texture to Nucleus (`city_tiles/References/Materials/textures/`)
+2. Add the material name + output filename to `_WET_PAVED_MATERIALS` in `wet_ground_service.py` (paved) or `_SNOW_NATURAL_MATERIALS` in `extension.py` (natural)
+3. Add the material name to `FROST_MATERIALS` or `SNOW_MATERIALS` in `generate_frost_textures.py`
+4. Re-run `generate_frost_textures.py`
+
+## Related
+
+- Seasonal tree textures (same extension, same event flow): `.cursor/rules/topics/seasonal-trees.mdc`
+- Rain effect (triggers wet ground): `.cursor/rules/topics/rain-effect.mdc`
+- Snow effect (triggers wet ground): `.cursor/rules/topics/snow-effect.mdc`
+- Nucleus integration (source texture location): `.cursor/rules/topics/nucleus-integration.mdc`

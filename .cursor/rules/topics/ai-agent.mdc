@@ -1,0 +1,287 @@
+---
+description: AI Agent extension — external API chat for avatar NPCs, per-avatar sessions, search view AI bubble, event contract, credentials via .env, error handling, future commands/suggestions
+---
+
+# AI Agent Extension
+
+External API-backed AI chat for NPC avatars. Kit handles the API connection; the web frontend sends/receives messages via the livestream messaging bridge. Each avatar gets its own session so the API can maintain separate conversation histories per personality.
+
+**Extension**: `younite.ai_agent_extension`
+**Separate from**: `younite.ai_chat_extension` (local Ollama, dev/testing only, wired to `ChatWidget`)
+**Frontend components**: `AvatarChatOverlay.tsx` (avatar NPC chat panel), `CUControls.tsx` (search view AI bubble)
+**Depends on**: `younite.messaging_core_extension` (outbound event bridge), `younite.payload_orchestrator_core_extension` (avatar visibility)
+
+## Architecture overview
+
+```
+Web (AvatarChatOverlay | CUControls search input)
+  ──sendCustomMessage('ai.agent.request')──►
+    Kit: AiAgentExtension (extension.py)
+      → AgentService (agent_service.py)
+        → SessionManager: stores API-assigned sessionId per avatarId
+        → APIClient (background thread): HTTP POST to external API
+      ◄── ai.agent.typing / response / error / done
+  ◄──livestream bridge──
+Web: StreamOnlyWindow event handler updates conversation store
+  → AvatarChatOverlay renders full messages
+  → CUControls renders truncated latest response in bubble
+```
+
+## Event contract
+
+All events use Events 2.0 (`carb.eventdispatcher`). Outbound events are registered in `messaging_core_extension` for the livestream bridge.
+
+| Event | Direction | Payload | Description |
+|-------|-----------|---------|-------------|
+| `ai.agent.request` | Web → Kit | `{ text, avatarId, [quickActionId] }` | User sends a message |
+| `ai.agent.typing` | Kit → Web | `{ avatarId, sessionId }` | API call started, show typing indicator |
+| `ai.agent.response` | Kit → Web | `{ avatarId, sessionId, text, language, results[], [meta] }` | Successful API response — `language` is the code (`"en"`/`"sv"`) we asked the API to reply in; the frontend uses it to pick the matching TTS voice on the per-message "Listen" button so e.g. a Swedish reply is read with the Swedish voice |
+| `ai.agent.error` | Kit → Web | `{ avatarId, sessionId, text, errorType }` | API call failed |
+| `ai.agent.done` | Kit → Web | `{ avatarId, sessionId }` | Request complete (always sent, after response or error) |
+
+| `avatarPrim.hide` | Web → Kit | `{ primPath }` | Hide the NPC prim in the scene (chat opened via avatar click) |
+| `avatarPrim.show` | Web → Kit | `{ primPath }` | Show the NPC prim again (chat closed) |
+
+**Reserved for future use** (not yet implemented):
+- `ai.agent.command` — AI instructs Kit to perform an action (e.g. teleport)
+- `ai.agent.suggestion` — AI offers an interactive option (renders confirmation buttons)
+
+## NPC avatar visibility
+
+When the chat is opened by clicking an NPC avatar or its speech bubble (`chatOpenSource === 'npc'`), the 3D avatar prim and its projectable indicators are hidden from the scene so the frontend can display a static avatar image in the chat overlay instead. Everything is shown again when the chat closes. This does **not** apply when the chat is opened from the search view.
+
+- **Web side**: a `useEffect` in `StreamOnlyWindow.tsx` sends `avatarPrim.hide` / `avatarPrim.show` with `{ primPath }` — only when `chatOpenSource === 'npc'`
+- **Projectable hiding**: `InteractionBoxesOverlay` `hiddenStyles` includes both `'speechBubbleBottom'` and `'interactivePointer'` when `avatarChatOpen` is true — hides the speech bubble and the yellow triangle indicator
+- **Kit side**: `extension.py` handles these events via the payload orchestrator (`show_hide` with `Priority.HIGH`); stores `_hidden_avatar_path` for restore-on-reconnect
+- **Config**: `AvatarChatConfig.primPath` carries the USD prim path (e.g. `"/World/Red"`); derived automatically from `avatarName` in the `avatarChat.open` handler (`/World/{Name}`)
+- **Multi-avatar**: each avatar has its own `primPath`, so only the interacted avatar is hidden; others remain visible
+
+### Restore on browser refresh
+
+If the user refreshes the browser while the chat is open, the frontend cleanup `useEffect` can't send `avatarPrim.show` (page unloads abruptly). The Kit side handles this by subscribing to `ui.ready` — which fires reliably every time a (new) browser client connects. If `_hidden_avatar_path` is set when `ui.ready` arrives, the avatar is restored immediately.
+
+**Why not `omni.kit.livestream@connected` / `@disconnected`?** These WebRTC lifecycle events do not fire reliably for browser refreshes (the connection may time out rather than cleanly disconnect). The `ui.ready` message sent by the frontend on connect is the reliable signal. The WebRTC events are still subscribed for the session grace timer (`AgentService.on_client_connected/disconnected`) but are not used for avatar restoration.
+
+## Session management
+
+The API requires `session_id` and `language` with every request. Kit generates a client-side UUID for each avatar's first message and reuses it for subsequent messages. If the API reassigns a different `session_id` in its response, Kit updates its mapping automatically.
+
+- `SessionManager.get_or_create_session(avatar_id)` — returns existing UUID or generates a new one
+- `SessionManager.all_session_ids()` — used on shutdown/grace expiry to close all active sessions
+- `SessionManager.clear_all()` — discards all mappings after bulk close
+- On extension shutdown, `AgentService.shutdown()` sends `{ "action": "close_session", "session_id": "..." }` for each active session (best-effort)
+- The API response includes `session_new: bool` indicating whether a new session was created
+
+### Disconnect grace timer
+
+When the WebRTC client disconnects (`omni.kit.livestream@disconnected`), a configurable grace timer starts. If no reconnect within the window, all AI sessions are closed on the API side and cleared from the session manager. If the client reconnects (`omni.kit.livestream@connected`) before the timer fires, it is cancelled and sessions are preserved. This prevents orphaned sessions while tolerating short connection drops.
+
+- `AgentService.on_client_disconnected()` — starts `threading.Timer` for `AI_AGENT_DISCONNECT_GRACE` seconds
+- `AgentService.on_client_connected()` — cancels the timer if running
+- `AgentService.shutdown()` — cancels timer + closes all sessions (called on extension unload)
+- `extension.py` subscribes to `omni.kit.livestream@connected` / `@disconnected` and delegates to the service
+
+## Kit-side modules
+
+### `extension.py` — Entry point
+
+Thin `omni.ext.IExt` subclass. Subscribes to `ai.agent.request`, `avatarPrim.hide` / `avatarPrim.show`, `ui.ready`, and `omni.kit.livestream@connected` / `@disconnected` via Events 2.0. Delegates chat requests to `AgentService.process_request()`, avatar visibility to the payload orchestrator, and WebRTC connection state to the session grace timer. On `ui.ready`, restores any hidden avatar (handles browser refresh). On shutdown, any hidden avatar is automatically shown again.
+
+#### Player geolocation enrichment
+
+On each `ai.agent.request`, `_on_request()` resolves the player's current WGS84 position (main thread — safe for USD queries) via `PlayerLocationService.get_player_geo_position()`. The lat/lon values (rounded to 6 decimal places, ~11 cm precision) are logged to the Kit terminal and passed through `AgentService` → `APIClient` into the HTTP payload as `latitude` / `longitude` fields. When the geo service or player position is unavailable, the fields are simply omitted from the payload.
+
+### `agent_service.py` — Orchestrator
+
+1. Looks up existing API-assigned `sessionId` for the `avatarId` via `SessionManager`
+2. Emits `ai.agent.typing`
+3. Spawns a daemon thread calling `APIClient.send_message()`
+4. On success: stores any returned `session_id`, emits `ai.agent.response` with parsed `AgentResponse` payload
+5. On `APIError`: emits `ai.agent.error` with user-friendly text and `errorType`
+6. Always emits `ai.agent.done` in the `finally` block
+
+### `api_client.py` — HTTP client
+
+- Endpoint, credentials, timeout configured via environment variables
+- HTTP Basic Auth (`Authorization: Basic base64(user:pass)`)
+- Sends `{"prompt": "...", "session_id": "...", "language": "en"|"sv"}` (all three fields required by the API)
+- Optionally includes `latitude` and `longitude` (WGS84, 6 decimal places) when the player's geo position is available — resolved in `extension.py` via `PlayerLocationService.get_player_geo_position()`
+- `close_session(session_id)` sends `{"action": "close_session", "session_id": "..."}` (best-effort, errors swallowed)
+- Raises `APIError(message, error_type, cause)` for all failure modes
+- `error_type` values: `offline`, `http_error`, `connection_error`, `timeout`, `parse_error`
+- If credentials are missing at init time, client reports itself as offline; `send_message()` immediately raises `APIError` with `error_type="offline"`
+
+### `session_manager.py` — Per-avatar sessions
+
+In-memory `avatarId ↔ sessionId` mapping. Session IDs are generated client-side (UUID) on first contact and reused. If the API reassigns a different ID, `set_session()` updates the mapping. `all_session_ids()` returns active IDs for bulk close on shutdown.
+
+### `models.py` — Response data model
+
+Dataclasses mirroring the API response structure:
+
+- `AgentResponse` — `response_text`, `results[]`, `errors[]`, `meta`, `session_id`, `session_new`
+- `ResultItem` — `id`, `title`, `link`, images, `Location`
+- `ResponseMeta` — `confidence`, `retrieval_source`, `tokens_used`, `latency_ms`
+
+`AgentResponse.to_event_payload()` converts to the event dict sent to the frontend.
+
+## Credentials and configuration
+
+Credentials are **never** committed to version control.
+
+| Env var | Default | Purpose |
+|---------|---------|---------|
+| `AI_AGENT_API_URL` | `https://esbst.goteborg.se/citiverse/chat` | Chat endpoint |
+| `AI_AGENT_USERNAME` | *(none)* | HTTP Basic Auth username |
+| `AI_AGENT_PASSWORD` | *(none)* | HTTP Basic Auth password |
+| `AI_AGENT_TIMEOUT` | `30` | Request timeout in seconds |
+| `AI_AGENT_LANGUAGE` | `en` | Language for API responses (`"en"` or `"sv"`) |
+| `AI_AGENT_DISCONNECT_GRACE` | `300` | Seconds to wait after WebRTC disconnect before closing sessions |
+
+**Setup**: copy `.env.example` to `.env` at project root and fill in the values. The `.env` file is gitignored. Both `startstream.bat` and `startstream_prod.bat` load it and forward the variables to the Kit subprocess.
+
+## Frontend wiring
+
+### `StreamOnlyWindow.tsx`
+
+- Uses `useConversationStore` for persistent, per-avatar message history (survives chat open/close within a session)
+- `chatOpenSource` state tracks whether chat was opened from NPC interaction (`'npc'`) or search view (`'search'`)
+- Registers a child handler on `combinedHandleCustomEvent` to listen for `ai.agent.*` events
+- Passes `messages` and `typing` props to `AvatarChatOverlay`
+- `onSend` / `onQuickAction` call `sendCustomMessage('ai.agent.request', { text, avatarId })`
+- Sends `avatarPrim.hide` / `avatarPrim.show` when chat opens/closes from NPC interaction (`chatOpenSource === 'npc'`)
+- Hides `interactivePointer` and `speechBubbleBottom` projectable styles via `InteractionBoxesOverlay.hiddenStyles` when `avatarChatOpen` is true
+- Passes `showCharacterBackground={chatOpenSource === 'npc'}` to `AvatarChatOverlay` to show the full-body character image behind the chat
+- When chat opens from search view, `CUControls` stays mounted underneath with `AvatarChatOverlay` layered on top (no unmount/remount blink)
+
+### `AvatarChatOverlay.tsx`
+
+- Controlled component: receives `messages` and `onUserMessage` props from parent
+- Conversation history managed by `useConversationStore` hook (per-avatar, session-scoped)
+- Greeting message seeded into store on first open via `onUserMessage` callback
+- Error messages rendered with `.avatar-chat-bubble--error` class (red tint)
+- Typing indicator: three animated dots in a compact pill (`.avatar-chat-bubble--typing`)
+- Back arrow button (`onBack` prop) for returning from chat to search view
+- `hideBackdrop` prop: when true, renders a solid opaque backdrop (grey) instead of frosted glass
+- Chat messages area: dynamically fills available viewport height, scrollable with hidden scrollbar (appears only while actively scrolling), auto-scrolls to bottom on open and new messages
+- TTS (text-to-speech) per assistant bubble via Web Speech API
+
+### `useConversationStore.ts`
+
+Custom hook managing per-avatar message arrays in React state:
+- `getMessages(avatarId)` / `addMessage(avatarId, msg)` / `hasConversation(avatarId)` / `clearConversation(avatarId)`
+- Lives in `web-viewer-sample-main/src/features/streaming/hooks/useConversationStore.ts`
+
+### Search view integration (`CUControls.tsx`)
+
+The search view doubles as a lightweight AI chat entry point. Behaviour depends on user state:
+
+| State | Bubble | Content |
+|-------|--------|---------|
+| No conversation history, nothing sent | Hidden | *(bubble not rendered)* |
+| `hasActiveConversation` but reopening search | Visible | "Should we continue our conversation?" |
+| User sent a message from search, awaiting response | Visible | Typing indicator dots |
+| AI responded (sent from search) | Visible | Latest response, truncated to ~3 lines (`-webkit-line-clamp: 3`) |
+| AI response was an error | Visible | Error text in red (`.cu-controls-search-assistant-bubble-text--error`) |
+
+- **Search input**: typing still filters cards; pressing Enter or the send button calls `onSendToAI`, sends the message to the AI, and clears the input
+- **`sentFromSearchView`** state in `StreamOnlyWindow.tsx` tracks whether the last AI message was triggered from the search input; resets when `onOpenAssistantChat` is called (so reopening search shows "Should we continue..." instead of the last response)
+- **`lastAIResponse`** `useMemo` returns the latest assistant message (including errors) only when `sentFromSearchView` is true; drives bubble text and error styling
+- **"Open chat" button** inside the bubble opens the full `AvatarChatOverlay` on top (z-index layering) — search view stays mounted underneath (no unmount/remount blink)
+- **Back arrow** in chat returns to search view; X close button is hidden when chat is opened from search
+- **Props flow**: `StreamOnlyWindow` passes `onSendToAI`, `lastAIResponseText`, `lastAIResponseIsError`, and `aiTyping` to `CUControls`
+
+## Relationship to Ollama chat
+
+| | AI Agent (`ai.agent.*`) | Ollama chat (`ai.chat.*`) |
+|---|---|---|
+| **Purpose** | Avatar NPC conversations (production) | Dev/testing with local models |
+| **API** | External HTTP API with Basic Auth | Local Ollama (`localhost:11434`) |
+| **Frontend** | `AvatarChatOverlay` | `ChatWidget` |
+| **Extension** | `younite.ai_agent_extension` | `younite.ai_chat_extension` |
+| **Kit profile** | dev (future: also prod) | dev only |
+
+The two systems are completely independent; they share no code paths, events, or state.
+
+## Future extensibility
+
+The event contract and response model are designed to support:
+
+1. **Commands** — API returns an action for Kit to execute (e.g. `"command": "teleport"` with coordinates). Kit would handle `ai.agent.command` events to trigger `TeleportService`, `CameraService`, etc.
+2. **Suggestions** — API returns interactive options (e.g. "Would you like to go there?"). Frontend renders confirmation buttons; user choice dispatched back to Kit.
+3. **Result cards** — `results[]` in the response can carry structured data (links, images, locations) for richer UI rendering.
+
+## Kit-side viewport blur (backup — not active)
+
+`blur_service.py` provides a standalone `BlurService` that toggles RTX Depth of Field on the streamed viewport, so frames arrive pre-blurred when the avatar chat is open. This is a **backup** approach for cases where the frontend CSS `backdrop-filter: blur()` has issues (e.g. GPU compositing bugs in software-rendered browsers). It is **not wired in by default**.
+
+### How it works
+
+- Sets USD attributes on the **session layer** (no scene file changes):
+  - `omni:rtx:post:dof:enabled` on the RenderProduct (`OmniRtxPostDofAPI_1`)
+  - `fStop` and `focusDistance` on the active camera
+- Saves and restores original values on disable / shutdown
+- Responds to `chatBlur.enable` / `chatBlur.disable` events from the web frontend
+
+### How to activate
+
+**Kit side** — in `extension.py` `on_startup`, add:
+```python
+from .blur_service import BlurService
+self._blur = BlurService()
+self._blur.register_events()
+```
+And in `on_shutdown`:
+```python
+if getattr(self, "_blur", None):
+    self._blur.shutdown()
+```
+
+**Web side** — in `StreamOnlyWindow.tsx`, add a `useEffect`:
+```typescript
+useEffect(() => {
+    if (!stream.streamReady || !ctrl.avatarChatOpen) return;
+    const fn = (window as any).sendCustomMessage;
+    if (!fn) return;
+    fn('chatBlur.enable', {});
+    return () => { fn('chatBlur.disable', {}); };
+}, [ctrl.avatarChatOpen, stream.streamReady]);
+```
+
+**CSS** — in `AvatarChatOverlay.css`, remove `backdrop-filter: blur(8px)` from `.avatar-chat-backdrop` and keep a light transparent tint (`rgba(255, 255, 255, 0.15)`) since the blur comes from the stream.
+
+### Tuning
+
+The DOF parameters in `_apply_dof_blur()` control blur intensity:
+- `fStop` (default `0.02`) — lower = wider aperture = more blur
+- `focusDistance` (default `0.1`) — distance to focus plane in scene units; very small = nothing in focus
+
+### Known limitations
+
+- **1–3 frame latency** (~50–150 ms) before the blur appears in the stream; the CSS tint overlay masks the gap
+- DOF blurs based on depth — objects at the focus distance stay sharp; the extreme `focusDistance=0.1` with `fStop=0.02` should blur everything but may need per-scene tuning
+
+## Key files
+
+| File | Purpose |
+|------|---------|
+| `younite.ai_agent_extension/extension.py` | IExt entry point, event subscription |
+| `younite.ai_agent_extension/agent_service.py` | Request lifecycle orchestrator |
+| `younite.ai_agent_extension/api_client.py` | HTTP client, auth, error handling |
+| `younite.ai_agent_extension/session_manager.py` | avatarId ↔ sessionId mapping |
+| `younite.ai_agent_extension/models.py` | Response dataclasses |
+| `younite.ai_agent_extension/blur_service.py` | Kit-side DOF blur (backup, not active) |
+| `messaging_core_extension/extension.py` | Outbound event registration |
+| `StreamOnlyWindow.tsx` | Frontend event handler + state |
+| `AvatarChatOverlay.tsx` + `.css` | Chat UI, typing indicator, error styling, scrollable messages |
+| `CUControls.tsx` + `.css` | Search view AI bubble, typing dots, 3-line clamp, error styling |
+| `useConversationStore.ts` | Per-avatar message persistence hook |
+| `.env` / `.env.example` | API credentials (gitignored / template) |
+| `startstream.bat` / `startstream_prod.bat` | Credential loading + forwarding |
+
+## Related
+
+- NPC avatar interactions (chat overlay, click triggers): `.cursor/rules/topics/interactions-avatars.mdc`
+- General interactions framework: `.cursor/rules/topics/interactions.mdc`
+- Messaging bridge: `younite.messaging_core_extension`
+- Events API conventions: `.cursor/rules/topics/events-api.mdc`

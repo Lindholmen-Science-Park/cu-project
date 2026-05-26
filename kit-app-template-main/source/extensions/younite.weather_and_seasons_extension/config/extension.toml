@@ -1,0 +1,13 @@
+[package]
+title = "Younite Weather & Seasons Extension"
+description = "Weather effects (rain, snow, fog, sky control) and seasonal appearance (tree textures, fallen leaves, ground litter)"
+version = "0.1.0"
+authors = ["Younite"]
+keywords = ["seasons", "weather", "snow", "rain", "fog", "leaves", "sky"]
+category = "Feature"
+
+[dependencies]
+"omni.usd" = {}
+
+[[python.module]]
+name = "younite.weather_and_seasons_extension"

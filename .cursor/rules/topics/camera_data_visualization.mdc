@@ -1,0 +1,127 @@
+---
+description: Camera data visualization — heatmap and sphere tracker overlays on camera ground footprint, web UI toggles
+---
+
+# Camera Data Visualization
+
+Visual overlays (heatmap density map, sphere tracker) projected onto a camera's ground footprint area. Independent of the NavMesh camera area system — both can be active simultaneously.
+
+**Extension**: `younite.camera_data_visualization_extension`
+**Target camera**: `camera_main_entrance_exit` (hardcoded; prim path `/World/camera_main_entrance_exit`)
+
+## Architecture
+
+```
+Web UI  ──cameraDataVisualizationRequest──▶  extension.py
+                                               │
+                                     compute_camera_footprint()
+                                        (camera_footprint.py)
+                                               │
+                               ┌───────────────┴───────────────┐
+                          heatmap_runner.py              playback_runner.py
+                               │                               │
+                     /World/…_heatmap mesh          /World/Humans/… spheres
+```
+
+## Modes
+
+Two independent modes toggled from the web UI via `cameraDataVisualizationRequest`:
+
+| Mode | Payload | Runner | USD prim(s) | Status event |
+|------|---------|--------|-------------|--------------|
+| Heatmap | `{ action, mode: "heatmap" }` | `heatmap_runner.py` | `/World/camera_main_entrance_exit_heatmap` | `cameraDataVisualizationHeatmapStatus` |
+| Sphere Tracker | `{ action, mode: "tracker" }` | `playback_runner.py` | `/World/Humans/camera_main_entrance_exit/*` | `cameraDataVisualizationTrackerStatus` |
+
+Both modes can be active at the same time. Each is a toggle (start/stop).
+
+## Camera footprint computation
+
+`camera_footprint.py` → `compute_camera_footprint(camera_prim_path)` returns:
+
+```python
+{
+    "hull_xz": [(x, z), ...],   # convex hull vertices (XZ plane)
+    "ground_y": float,           # median ground height from raycasts
+    "centroid": (cx, cz),        # centroid of hull
+    "bbox": (min_x, max_x, min_z, max_z),
+}
+```
+
+Self-contained frustum ray-grid scanning (11×11 rays, PhysX raycasts, outlier filter, convex hull). Same algorithm as `camera_navmesh_areas.py` but no USD prim creation — pure geometry. The footprint is computed once per activation and cached until both modes are stopped.
+
+## Detection-to-world mapping (ray-plane intersection)
+
+`camera_footprint.py` → `build_detection_map(camera_prim_path, det_bounds, grid_res=64)`:
+
+Computes frustum ray directions on a 64×64 grid and intersects each with a **horizontal plane at `ground_y + 85cm`** (bbox center ≈ torso height, since trackers report bounding box center). This approach:
+
+1. **Eliminates wall hits** — rays that would hit walls at eye level instead land on the head-height plane, giving the correct foot (x, z) position.
+2. **Corrects parallax** — elevated cameras see a point on the person's body (bbox center ≈ torso), not their feet. By intersecting at torso height (85cm), the resulting (x, z) is where the person actually stands.
+
+Only `ground_y` requires PhysX (single downward raycast); the rest is pure geometry.
+
+Coordinate mapping: detection (x, y) → frustum (u, v):
+- Normalize to 0..1: `t_x = (det_x - min_x) / (max_x - min_x)`, same for y
+- Map to frustum: `u = (t_x - 0.5) * 2`, `v = -((t_y - 0.5) * 2)` (Y flipped for camera up)
+- This auto-adapts to any detection coordinate system (pixels, normalized, metric, etc.)
+
+`map_detection_to_world(det_x, det_y, detection_map)` → `(world_x, ground_y, world_z)`:
+Normalizes using stored det_bounds, then bilinear interpolation on the pre-computed grid. NaN cells (ray misses) are filled by nearest-neighbor dilation so interpolation always works.
+
+Both heatmap and sphere tracker use this mapping for accurate world placement.
+
+## Heatmap
+
+- 64×64 subdivided grid mesh dynamically created at the footprint's bounding box, `ground_y + 1.0` above ground.
+- Data source: `mqtt_messages.json` (detection messages with `x`, `y` coordinates per timestamp).
+- Each detection (x, y) is mapped to world (x, z) via `map_detection_to_world()` (ray-plane intersection at head height), then placed in the correct heatmap grid cell based on the footprint bounding box.
+- Density grid with exponential decay (`HEATMAP_DECAY = 0.92`), Gaussian smoothing, gamma correction.
+- `displayColor` primvar (vertex interpolation) — color ramp from blue (cold) → green → yellow → red (hot).
+- **Hull masking**: vertices outside the camera's convex hull get near-black color so the heatmap visually conforms to the camera's coverage shape.
+- Mesh prim removed on stop.
+
+## Sphere Tracker
+
+- Reads tracker rows from `mqtt_messages.json` (id, timestamp, x, y, active).
+- Creates one `UsdGeom.Sphere` per tracked human ID under `/World/Humans/camera_main_entrance_exit/`.
+- Each detection (x, y) is mapped to world position via `map_detection_to_world()` (ray-plane intersection at head height). Sphere is placed at `(world_x, ground_y + Y_HEIGHT, world_z)`.
+- Lerp-smoothed movement (`LERP_SPEED = 0.15`), looping playback.
+- Sends `cameraDataVisualizationStats` with occupancy metrics: current count, unique last 1 min, average concurrent, traffic level.
+- Sphere root prim removed on stop.
+
+## Scene layers
+
+- `heatmap_layer.usda` — empty placeholder; heatmap mesh created at runtime.
+- `camera_tracker_layer.usda` — empty placeholder; tracker spheres created at runtime under `/World/Humans`.
+
+## Frontend (web UI)
+
+Two independent toggle buttons under "Camera Data Visualization" heading in `UIControls.tsx`:
+
+- **Heatmap** button → sends `{ action: "start"/"stop", mode: "heatmap" }`
+- **Sphere Tracker** button → sends `{ action: "start"/"stop", mode: "tracker" }`
+
+Status bar shows "Heatmap ON" / "Tracker ON" indicators. Stats (occupancy, traffic level) shown when tracker is active.
+
+State managed in `StreamOnlyWindow.tsx` via `cameraDataHeatmapActive` and `cameraDataTrackerActive`.
+
+## Outbound events (messaging_core)
+
+- `cameraDataVisualizationHeatmapStatus` — `{ active: bool }`
+- `cameraDataVisualizationTrackerStatus` — `{ active: bool }`
+- `cameraDataVisualizationStats` — `{ current, unique_last_1m, avg_concurrent_1m, traffic_level }`
+
+## Interaction with other camera features
+
+These features in `younite.navmesh_route_extension` are completely independent:
+
+- **Show Camera Areas** (`showNavmeshCameraAreasRequest`) — frustum polygons from `camera_navmesh_areas.py`
+- **Camera Data → Pathfinding** (`cameraDataCalcToggle`) — creates NavMesh area prims, rebakes
+- **Per-camera cost sliders** (`navmeshCameraAreaCostUpdate`) — query-time cost changes
+
+The visualization overlay occupies the same ground area as the camera's frustum footprint but is a separate visual layer with no NavMesh impact.
+
+## Related
+
+- Camera NavMesh areas (frustum scanning for pathfinding): `.cursor/rules/topics/camera_navmesh_areas.mdc`
+- NavMesh area mechanics: `.cursor/rules/topics/navmesh-areas.mdc`

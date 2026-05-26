@@ -1,0 +1,82 @@
+#usda 1.0
+(
+    defaultPrim = "World"
+    doc = """Navigation shortcuts: Xform spawn / walk-up points for elevators and other future shortcut types.\r
+\r
+Each shortcut node is a simple Xform under /World/NavShortcuts/<group_id>/<node_id>.\r
+The Xform's world translation serves as both the walk-up target (NavMesh route\r
+endpoint when guiding the user toward this node) and the teleport spawn pose\r
+when arriving via the connected node.\r
+\r
+Connections, types, labels and edge structure live in source/data/shortcuts.json\r
+so non-USD config (i18n keys, traversal seconds, edge graphs) does not require\r
+USDA edits.\r
+\r
+Add shortcut nodes manually in Composer under /World/NavShortcuts/<group_id>/<node_id>\r
+and mirror their (group_id, node_id, primPath) in source/data/shortcuts.json.\r
+\r
+Naming convention: group folder = elevator_1, elevator_2, busstop_1, … and child\r
+Xforms = floor_1, floor_2, … (or stop_1, stop_2 for non-elevator types).\r
+"""
+)
+
+over "World"
+{
+    def Xform "NavShortcuts"
+    {
+        def Xform "elevator_1"
+        {
+            def Xform "floor_1"
+            {
+                float3 xformOp:rotateXYZ = (0, 90, 0)
+                float3 xformOp:scale = (1, 1, 1)
+                double3 xformOp:translate = (-187.06216430664062, 2261.800048828125, -5146.5771484375)
+                uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+            }
+
+            def Xform "floor_0"
+            {
+                float3 xformOp:rotateXYZ = (0, 97, 0)
+                float3 xformOp:scale = (1, 1, 1)
+                double3 xformOp:translate = (-152.30126953125, 1922.7998046875, -5121.2392578125)
+                uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+            }
+
+            def Xform "floor_2"
+            {
+                float3 xformOp:rotateXYZ = (0, 92, 0)
+                float3 xformOp:scale = (1, 1, 1)
+                double3 xformOp:translate = (-132.99493408203125, 2901.7998046875, -5114.8115234375)
+                uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+            }
+
+            def Xform "floor_3"
+            {
+                float3 xformOp:rotateXYZ = (0, 92, 0)
+                float3 xformOp:scale = (1, 1, 1)
+                double3 xformOp:translate = (-132.99493408203125, 3173.5091914216914, -5114.8115234375)
+                uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+            }
+        }
+
+        def Xform "elevator_2"
+        {
+            def Xform "floor_1"
+            {
+                double3 xformOp:rotateXYZ = (0, -90, 0)
+                double3 xformOp:scale = (1, 1, 1)
+                double3 xformOp:translate = (-4311.35595703125, 2371.801025390625, -684.416015625)
+                uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+            }
+
+            def Xform "floor_2"
+            {
+                double3 xformOp:rotateXYZ = (0, -95, 0)
+                double3 xformOp:scale = (1, 1, 1)
+                double3 xformOp:translate = (-4325.337890625, 2836.7998046875, -659.1033325195312)
+                uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+            }
+        }
+    }
+}
+

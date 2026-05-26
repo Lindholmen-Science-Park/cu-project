@@ -1,0 +1,248 @@
+e3baf5b4 Improved waypoint navigation and updated topic files related to it
+diff --git a/kit-app-template-main/source/extensions/younite.navmesh_route_extension/younite/navmesh_route_extension/scripts/navmesh_shortest_path.py b/kit-app-template-main/source/extensions/younite.navmesh_route_extension/younite/navmesh_route_extension/scripts/navmesh_shortest_path.py
+index 364f0605..9c0e5736 100644
+--- a/kit-app-template-main/source/extensions/younite.navmesh_route_extension/younite/navmesh_route_extension/scripts/navmesh_shortest_path.py
++++ b/kit-app-template-main/source/extensions/younite.navmesh_route_extension/younite/navmesh_route_extension/scripts/navmesh_shortest_path.py
+@@ -179,10 +179,15 @@ def get_ground_position(stage, prim_path: str) -> Gf.Vec3d:
+     return world_pos
+ 
+ 
+-def path_length_cm(points: List[Gf.Vec3f]) -> float:
++def path_length_cm(points: Union[List[Gf.Vec3f], List[Tuple[float, float, float]]]) -> float:
+     """
+-    Compute total path length in stage units (centimeters).
+-    Returns 0.0 if fewer than 2 points.
++    Compute total path length in stage units (centimeters) from a point
++    list.  Accepts ``Gf.Vec3f``, ``carb.Float3``, tuples, or any
++    ``[0]/[1]/[2]``-indexable type.  Returns 0.0 if fewer than 2 points.
++
++    For distance-only queries where the polyline itself is not needed,
++    prefer ``navmesh_path_length_cm`` which skips the heavy
++    ``calculate_path_points`` pipeline.
+     """
+     if len(points) < 2:
+         return 0.0
+@@ -196,6 +201,51 @@ def path_length_cm(points: List[Gf.Vec3f]) -> float:
+     return total
+ 
+ 
++def navmesh_path_length_cm(
++    start: Tuple[float, float, float],
++    end: Tuple[float, float, float],
++    *,
++    camera_area_costs: Optional[Dict[str, float]] = None,
++) -> float:
++    """Lightweight NavMesh distance query.
++
++    Skips the heavy ``calculate_path_points`` pipeline (position
++    resolution, stage access, ``Gf`` conversion) but performs the same
++    endpoint snap validation and distance calculation (extracted polyline
++    + ``path_length_cm``).
++
++    Returns the path length in stage units (cm), or ``float('inf')`` on
++    failure.
++    """
++    try:
++        inav = nav.acquire_interface()
++        if not inav:
++            return float("inf")
++        navmesh = inav.get_navmesh()
++        if not navmesh:
++            return float("inf")
++
++        s = carb.Float3(float(start[0]), float(start[1]), float(start[2]))
++        e = carb.Float3(float(end[0]), float(end[1]), float(end[2]))
++
++        if _endpoint_snap_errors_navmesh(navmesh, s, e):
++            return float("inf")
++
++        area_costs = _build_area_costs(inav, navmesh, camera_area_costs)
++
++        path = navmesh.query_shortest_path(
++            start_pos=s,
++            end_pos=e,
++            area_costs=area_costs if area_costs else [],
++            straighten=True,
++        )
++        if path is None or path.get_point_count() <= 1:
++            return float("inf")
++        return path_length_cm(path.get_points())
++    except Exception:
++        return float("inf")
++
++
+ def estimate_walk_time_seconds(length_cm: float, speed_m_per_s: float = 1.4) -> float:
+     """
+     Estimate walk time in seconds from path length.
+@@ -536,15 +586,35 @@ def _build_area_costs(inav, navmesh, camera_area_costs: Optional[Dict[str, float
+     return area_costs
+ 
+ 
++def _make_agent_desc(radius: float):
++    """Create a NavAgentDesc with the given radius for query-time agent filtering.
++
++    Returns None if NavAgentDesc is not available in this Kit version.
++    """
++    try:
++        desc = nav.NavAgentDesc()
++        desc.radius = float(radius)
++        return desc
++    except (AttributeError, TypeError) as e:
++        print(f"[NAVMESH_ROUTE] NavAgentDesc not available (radius={radius}): {e}")
++        return None
++
++
+ def _endpoint_snap_errors_navmesh(
+     navmesh,
+     start: carb.Float3,
+     end: carb.Float3,
++    agent_radius: Optional[float] = None,
+ ) -> Optional[str]:
+     """If either endpoint is too far from the NavMesh in XZ, return error; else None."""
+     tol_sq = PATHFIND_FAST_REJECT_XZ_CM * PATHFIND_FAST_REJECT_XZ_CM
++    snap_kwargs: dict = {}
++    if agent_radius is not None:
++        desc = _make_agent_desc(agent_radius)
++        if desc is not None:
++            snap_kwargs["agent"] = desc
+     try:
+-        r_end = navmesh.query_closest_point(target=end)
++        r_end = navmesh.query_closest_point(target=end, **snap_kwargs)
+         if r_end is None:
+             return "No NavMesh near target ÔÇö click closer to walkable ground."
+         ce, _ = r_end
+@@ -552,7 +622,7 @@ def _endpoint_snap_errors_navmesh(
+         dz = float(ce.z) - float(end.z)
+         if dx * dx + dz * dz > tol_sq:
+             return "Target is too far from walkable NavMesh."
+-        r_start = navmesh.query_closest_point(target=start)
++        r_start = navmesh.query_closest_point(target=start, **snap_kwargs)
+         if r_start is None:
+             return "No NavMesh near start position."
+         cs, _ = r_start
+@@ -573,6 +643,7 @@ def calculate_path_points(
+     camera_area_costs: Optional[Dict[str, float]] = None,
+     apply_navmesh_validated_straighten: bool = False,
+     is_stale: Optional[Callable[[], bool]] = None,
++    agent_radius: Optional[float] = None,
+ ) -> Tuple[bool, list[Gf.Vec3f], Optional[str]]:
+     """
+     Compute shortest-path polyline points (no drawing).
+@@ -584,6 +655,8 @@ def calculate_path_points(
+         is_stale: If provided, called before the expensive ``query_shortest_path``; if it
+             returns True the function bails early with a "superseded" error so stale clicks
+             never enter the heavy native call.
++        agent_radius: If provided, override the baked agent radius for this query via
++            NavAgentDesc. Smaller values allow paths through tighter spaces (e.g. seat rows).
+ 
+     Returns:
+         (success, points_gf, error_message)
+@@ -623,7 +696,7 @@ def calculate_path_points(
+     start = carb.Float3(float(start_pos[0]), float(start_pos[1]), float(start_pos[2]))
+     end = carb.Float3(float(end_pos[0]), float(end_pos[1]), float(end_pos[2]))
+ 
+-    snap_err = _endpoint_snap_errors_navmesh(navmesh, start, end)
++    snap_err = _endpoint_snap_errors_navmesh(navmesh, start, end, agent_radius=agent_radius)
+     if snap_err:
+         return False, [], snap_err
+ 
+@@ -633,7 +706,17 @@ def calculate_path_points(
+         return False, [], "superseded"
+ 
+     try:
+-        path = navmesh.query_shortest_path(start_pos=start, end_pos=end, area_costs=area_costs if area_costs else [], straighten=True)
++        query_kwargs = dict(
++            start_pos=start,
++            end_pos=end,
++            area_costs=area_costs if area_costs else [],
++            straighten=True,
++        )
++        if agent_radius is not None:
++            desc = _make_agent_desc(agent_radius)
++            if desc is not None:
++                query_kwargs["agent"] = desc
++        path = navmesh.query_shortest_path(**query_kwargs)
+         if path is None:
+             return False, [], "Path query returned None ÔÇö start or end may be outside the NavMesh."
+         count = path.get_point_count()
+c1d33844 added adjustable traffic zone for pathfinding calculations
+diff --git a/kit-app-template-main/source/extensions/younite.navmesh_route_extension/younite/navmesh_route_extension/scripts/navmesh_shortest_path.py b/kit-app-template-main/source/extensions/younite.navmesh_route_extension/younite/navmesh_route_extension/scripts/navmesh_shortest_path.py
+index 52e2ede1..11fd8f76 100644
+--- a/kit-app-template-main/source/extensions/younite.navmesh_route_extension/younite/navmesh_route_extension/scripts/navmesh_shortest_path.py
++++ b/kit-app-template-main/source/extensions/younite.navmesh_route_extension/younite/navmesh_route_extension/scripts/navmesh_shortest_path.py
+@@ -1,11 +1,13 @@
+ """
+ NavMesh Shortest Path Visualization
+-Creates a curve showing the shortest path between two points using NavMesh
++Creates a curve showing the shortest path between two points using NavMesh.
++Supports dynamic camera area costs (traffic/crowdness) to affect path scoring.
+ """
+ import carb
+ import omni.usd
+ import omni.anim.navigation.core as nav
+ from pxr import UsdGeom, Gf, Vt, Sdf, Usd
++from typing import Optional, Dict
+ 
+ # --------- CONFIG ---------
+ PATH_PRIM = "/World/ShortestPathCurve"
+@@ -196,7 +198,28 @@ def remove_path_curve(path_prim: str = PATH_PRIM) -> bool:
+         return False
+ 
+ 
+-def calculate_path(startpoint_path: str, endpoint_path: str, path_prim: str = PATH_PRIM, curve_width: float = CURVE_WIDTH, verbose: bool = True):
++def _build_area_costs(inav, navmesh, camera_area_costs: Optional[Dict[str, float]] = None) -> list:
++    """
++    Build area_costs array for query_shortest_path.
++    Uses camera_area_costs overrides for named areas (e.g. cctv1_navmesh_area),
++    otherwise uses default area costs from the stage.
++    """
++    area_count = navmesh.get_area_count()
++    area_costs = []
++    for i in range(area_count):
++        area_name = navmesh.get_area_name(i)
++        if camera_area_costs and area_name in camera_area_costs:
++            area_costs.append(float(camera_area_costs[area_name]))
++        else:
++            try:
++                default_cost = inav.get_area_default_cost(i)
++                area_costs.append(float(default_cost) if default_cost >= 0 else 1.0)
++            except Exception:
++                area_costs.append(1.0)
++    return area_costs
++
++
++def calculate_path(startpoint_path: str, endpoint_path: str, path_prim: str = PATH_PRIM, curve_width: float = CURVE_WIDTH, verbose: bool = True, camera_area_costs: Optional[Dict[str, float]] = None):
+     """
+     Calculate and visualize shortest path between two points using NavMesh.
+     
+@@ -206,6 +229,8 @@ def calculate_path(startpoint_path: str, endpoint_path: str, path_prim: str = PA
+         path_prim: USD path where the path curve will be created/updated (default: "/World/ShortestPathCurve")
+         curve_width: Width of the curve visualization (default: 10.0)
+         verbose: Whether to print progress messages (default: True)
++        camera_area_costs: Optional dict mapping area name -> cost (e.g. {"cctv1_navmesh_area": 5.0})
++                          Higher cost = pathfinder prefers avoiding that area (traffic/crowdness).
+     
+     Returns:
+         tuple: (success: bool, point_count: int, error_message: str or None)
+@@ -290,11 +315,20 @@ def calculate_path(startpoint_path: str, endpoint_path: str, path_prim: str = PA
+     start = carb.Float3(float(start_pos[0]), float(start_pos[1]), float(start_pos[2]))
+     end   = carb.Float3(float(end_pos[0]), float(end_pos[1]), float(end_pos[2]))
+ 
++    # Build area costs (camera traffic/crowdness overrides)
++    area_costs = _build_area_costs(inav, navmesh, camera_area_costs)
++    if verbose and camera_area_costs:
++        print(f"   Using camera area costs: {camera_area_costs}")
++
+     # Query shortest path
+     if verbose:
+         print(f"\n3. Querying shortest path...")
+     try:
+-        path = navmesh.query_shortest_path(start_pos=start, end_pos=end)
++        path = navmesh.query_shortest_path(
++            start_pos=start,
++            end_pos=end,
++            area_costs=area_costs if area_costs else []
++        )
+         
+         count = path.get_point_count()
+         if verbose:

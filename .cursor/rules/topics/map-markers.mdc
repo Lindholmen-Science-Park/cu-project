@@ -1,0 +1,112 @@
+---
+description: Map marker overlays — bird's eye view markers, spawn point teleport, mapMarker projectable style, adding new markers
+---
+
+# Map Marker Overlays
+
+Clickable map markers projected onto spawn point positions in the bird's eye view. Uses the interactions extension projectable overlay system with a custom `mapMarker` style renderer. Clicking a marker teleports the player to that spawn point.
+
+**Bird's eye only**: Map markers are filtered out when not in bird's eye camera mode. `StreamOnlyWindow.tsx` passes `hiddenStyles={['mapMarker']}` to `InteractionBoxesOverlay` when `currentCamera !== 'bird_eye'`. The `hiddenStyles` prop filters items by their `ui.style` before rendering.
+
+## Visibility gotcha — `_auto_move_active` gating
+
+Markers can also disappear for a much subtler reason: the **interactions extension** (`younite.interactions_extension`) gates its entire `_on_update` tick on a `_auto_move_active` flag. While that flag is `True` the projectables loop never runs, so no `uiInteractionBoxesUpdate` events reach the web — and both POI map markers **and** the bird-eye user-location arrow stay invisible even when `currentCamera === 'bird_eye'`.
+
+The flag is set on scene-load init (which dispatches `navigationStateSet { autoMove: true, routeId: 'player' }` so the auto-mover can drive the entry sequence) and is cleared by any subsequent `navigationStateSet { autoMove: false }`.
+
+**Required clear**: every web-side path that lands the player in bird's-eye must dispatch `navigationStateSet { autoMove: false, movementMode: 'pointClick', routeId: 'player', endPos: null, endpointPath: null }` before/with the camera switch. This is **centralised in `useEnvironmentHandlers.handleCameraChange`** so individual entry points (CU view toggle, dev `CamerasSubmenu` Bird's Eye button, globe pin exit) cannot forget. Idempotent — safe to send when already cleared.
+
+Historical bug: a direct `street level → dev → space → globe pin → bird_eye` sequence skipped every other bird-eye entry point and never cleared the flag, leaving markers and the user-location arrow invisible until the user manually toggled to first-person and back. Fixed by moving the clear into `handleCameraChange`. See `camera-teleport.mdc` § "Centralized bird-eye autoMove clear".
+
+**Config**: `source/data/interactions.json` (map marker entries with `"style": "mapMarker"`)
+**Marker images**: `web-viewer-sample-main/src/features/cu/figma-export-icons/*.svg` — basenames referenced in `interactions.json` `ui.icon`; globbed at build time in `InteractionBoxesOverlay.tsx`
+**Spawn points**: `source/data/scenes/sublayers/player_spawnpoints_layer.usda`
+**Frontend**: `InteractionBoxesOverlay.tsx` (mapMarker style renderer), `InteractionBoxesOverlay.css`
+
+## Data flow
+
+1. Spawn point Xforms defined in `player_spawnpoints_layer.usda` (sublayer)
+2. `interactions.json` entries reference spawn points via `"primName"`, with `"style": "mapMarker"` and no `radiusMeters` (always visible)
+3. Kit interactions extension resolves world position, projects to screen coords, sends `uiInteractionBoxesUpdate` to web
+4. `InteractionBoxesOverlay` renders the `mapMarker` style: icon image + label, with pointer arrow
+5. On click, the overlay element sends `teleportToSpawnpoint` with `{ spawnpointName, viewType: 'firstPerson' }` via `sendMessage()` (existing messaging infra)
+6. Kit `FeatureCommandsService` receives the event → `CameraService.switch_camera_view("firstPerson", spawn_point=name)` — single call that teleports to the named spawnpoint, sets carb settings, dispatches `younite.camera.viewTypeChanged`, and rebinds the viewport camera (same code path as the First Person / Bird's Eye camera buttons)
+7. Web side: `onMapMarkerTeleport` callback updates `currentCamera` to `'first_person'`, which hides markers and syncs UI controls
+
+## interactions.json entry format
+
+Example (stadium entrance pin — SVG icon from CU Figma exports):
+
+```json
+{
+  "id": "map_marker_stadium_entrance",
+  "label": "Entrance",
+  "interactionType": "area",
+  "category": "mapMarker",
+  "scene": ["main_scene", "main_scene_light"],
+  "position": {
+    "type": "xform",
+    "primName": "PlayerSpawnPoint_Entrance",
+    "positionOffset": [0, 300, 0]
+  },
+  "trigger": { "type": "proximity", "activation": "always" },
+  "behaviors": [
+    {
+      "type": "projectable",
+      "ui": {
+        "title": "Entrance",
+        "titleI18nKey": "interactions.map_marker_stadium_entrance.title",
+        "style": "mapMarker",
+        "icon": "Entrance.svg",
+        "spawnPoint": "PlayerSpawnPoint_Entrance",
+        "markerVariant": "entrance"
+      }
+    }
+  ]
+}
+```
+
+**Spawn without a pin**: default first-person spawn uses `PlayerSpawnPoint_01` from `world_conventions.py` / `CameraService`. There is **no** requirement to add a `mapMarker` interaction for every spawn Xform — omit the interaction if the pin should not appear (e.g. default `PlayerSpawnPoint_01` has no bird-eye marker).
+
+Key fields:
+- `"style": "mapMarker"` — selects the mapMarker renderer in `InteractionBoxesOverlay.tsx`
+- `"markerVariant": "pinOnly"` (optional) — render **only** the pin graphic (no white bubble, no label). Use for avatar-style markers where the Figma pin SVG is the full affordance; keep `"title"` for `aria-label` / sheet context.
+- `"markerVariant": "findSeat"` — bird-eye cluster UX shared with Foyer / Find my seat: off-white bubble, peer fade when another marker sheet is open, lime highlight when this marker’s sheet is selected. `"markerVariant": "entrance"` uses the same cluster behavior plus entrance-specific root class for label rules.
+- `"title"` — English fallback string (also used if the i18n key is missing).
+- `"titleI18nKey"` (optional) — i18next key for the visible label (e.g. `interactions.map_marker_stadium_entrance.title`, or reuse `search.findSeat` for the arena pin). Translations live in `web-viewer-sample-main/src/i18n/locales/*.json`. If omitted, legacy `title_sv` / `title_fr` / … from Kit are still supported by `resolveLocalized`.
+- `"icon"` — basename of an SVG in `web-viewer-sample-main/src/features/cu/figma-export-icons/` (e.g. `Entrance.svg`, `arena.svg`, `Find seat.svg`, `Pin_scandinavium.svg`). Registered in `InteractionBoxesOverlay.tsx` via `import.meta.glob('.../figma-export-icons/*.svg')`.
+- `"spawnPoint"` — spawn point prim **leaf name** (e.g. `PlayerSpawnPoint_Foyer`) passed to `teleportToSpawnpoint` / bird-eye routing; Kit resolves nested paths such as `/World/Red/PlayerSpawnPoint_Red` when the spawn is not a direct child of `/World`.
+- `"routingPrimPath"` (optional) — full USD path used as the map-marker sheet / **Get directions** destination (`primPath` on the web). Use when `position` anchors the pin on one prim (e.g. avatar `/World/Red`) but walking routes should end at another (e.g. `.../PlayerSpawnPoint_Red`). If omitted, `primPath` defaults to the projectable `path` from Kit (same as the position prim).
+- No `radiusMeters` / `radius` in trigger — skips range gating, marker is always visible when in camera view
+- `"positionOffset": [0, 300, 0]` — raises the overlay anchor above the ground-level spawn point
+
+## Adding a new map marker
+
+1. **Spawn point**: Add a new `def Xform` to `player_spawnpoints_layer.usda` with the desired position/rotation
+2. **Marker image**: Add an SVG under `features/cu/figma-export-icons/` — referenced by basename in `interactions.json` `ui.icon`
+3. **interactions.json**: Add an entry following the format above, with matching `primName`, `icon`, and `spawnPoint`
+
+Most markers are **data-only**. Shared label typography for CU bird-eye pins (Entrance + Foyer + Find my seat) is in `InteractionBoxesOverlay.css` (classes `ibox-map-marker--entrance`, `ibox-map-marker--cu-poi-label`); `InteractionBoxesOverlay.tsx` assigns `cu-poi-label` by interaction id for foyer/arena.
+
+## Marker image serving
+
+Map marker icons are **SVG files** next to other CU Figma exports. `InteractionBoxesOverlay.tsx` uses `import.meta.glob('../../../cu/figma-export-icons/*.svg', { eager: true, import: 'default' })` and keys the resulting URLs by **filename** so `interactions.json` can use `"icon": "Entrance.svg"` etc. Vite bundles them at build time (not loaded from Kit at runtime).
+
+## Key files
+
+| File | Purpose |
+|------|---------|
+| `source/data/interactions.json` | Map marker interaction point definitions |
+| `web-viewer-sample-main/src/features/cu/figma-export-icons/*.svg` | Map marker (and other CU) icons — basename in `interactions.json` |
+| `source/data/scenes/sublayers/player_spawnpoints_layer.usda` | Spawn point Xform prims |
+| `InteractionBoxesOverlay.tsx` + `.css` | mapMarker renderer; `resolveLocalized` + `titleI18nKey` / `subtitleI18nKey` / `bodyI18nKey` |
+| `web-viewer-sample-main/src/i18n/locales/*.json` | Map marker titles via `interactions.map_marker_*` (or shared keys e.g. `search.findSeat`) |
+| `messaging.ts` | `sendMessage` helper used for teleport |
+
+## Related
+
+- Interactions extension: `.cursor/rules/topics/interactions.mdc`
+- USD sublayers: `.cursor/rules/topics/sublayers.mdc`
+- Teleport service: `younite.usd_viewer_stage_core_extension/.../teleport_service.py`
+- User location marker (player position pin in bird's eye, same overlay system): `.cursor/rules/topics/camera-teleport.mdc` § "User location marker"
+- Bird-eye pin anywhere (ad-hoc pin dropped by tap + directions panel integration): `.cursor/rules/topics/bird-eye-pin-anywhere.mdc`

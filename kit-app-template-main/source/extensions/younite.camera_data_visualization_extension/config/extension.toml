@@ -1,0 +1,23 @@
+[package]
+title = "Younite Camera Data Visualization Extension"
+description = "Camera data visualization playback for multiple cameras"
+version = "0.1.0"
+authors = ["Younite"]
+keywords = ["camera", "visualization", "playback", "tracking"]
+category = "Feature"
+
+[dependencies]
+"younite.messaging_core_extension" = {}
+"younite.usd_viewer_stage_core_extension" = {}
+"younite.payload_orchestrator_core_extension" = {}
+"omni.usd" = {}
+
+[[python.module]]
+name = "younite.camera_data_visualization_extension"
+
+[build]
+include = [
+    "younite/**/*.py",
+    "data/**/*.json",
+    "*.toml",
+]

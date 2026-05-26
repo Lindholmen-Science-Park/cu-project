@@ -1,0 +1,117 @@
+/*
+ * Full-screen brand loading overlay — used for boot, scene loading, and as the
+ * "solid" middle frame of view transitions. Background = Dark Purple (#351A84)
+ * with the lemon-stroke decorative arc artwork bled off the top-right.
+ */
+.loading-screen {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    background-color: #351A84;
+    overflow: hidden;
+    /*
+     * Two-row grid: the center block fills row 1 and self-centers, the footer
+     * sits in row 2 (its natural height). This keeps a symmetric gap between
+     * the label and the footer regardless of aspect ratio — important on short
+     * landscape viewports where an absolutely-positioned footer would crowd
+     * the label.
+     */
+    display: grid;
+    grid-template-rows: 1fr auto;
+    color: #FFFFFF;
+}
+
+/*
+ * Arcs SVG ships sized 390×844 with the artwork already positioned to bleed
+ * off-screen. Stretch to cover the viewport (so the curves sit roughly where
+ * Figma shows them on any aspect ratio); pin top-left so the rotation/offset
+ * baked into the SVG is preserved.
+ */
+.loading-screen__arcs {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center;
+    pointer-events: none;
+    user-select: none;
+}
+
+.loading-screen__center {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 24px;
+    text-align: center;
+    /* Fills the 1fr grid row; flex centering handles vertical placement. */
+    min-height: 0;
+}
+
+/* Lexend H1-24 per Figma. */
+.loading-screen__label {
+    margin-top: 8px;
+    font-family: Lexend, system-ui, sans-serif;
+    font-weight: 500;
+    font-size: 24px;
+    line-height: 1.1;
+    letter-spacing: 0;
+    color: #FFFFFF;
+    max-width: 280px;
+}
+
+.loading-screen__action {
+    margin-top: 16px;
+    padding: 10px 20px;
+    background-color: #FFFFFF;
+    color: #351A84;
+    border: none;
+    border-radius: 80px;
+    font-family: Lexend, system-ui, sans-serif;
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+    pointer-events: auto;
+}
+
+.loading-screen__action:hover {
+    background-color: #DCFF7D;
+}
+
+.loading-screen__action:focus-visible {
+    outline: 3px solid #DCFF7D;
+    outline-offset: 2px;
+}
+
+/*
+ * Short viewports (typical desktop landscape, mobile landscape): tighten the
+ * center block so the label still has breathing room above the footer. The
+ * spinner shrinks ~33%, label ~17%, gap halves. Scoped to ≤520px height so
+ * the portrait layout (Figma 390×844) is unchanged.
+ */
+@media (max-height: 520px) {
+    .loading-screen__center {
+        gap: 4px;
+        padding: 16px 24px;
+    }
+
+    /* Inline width/height on <LoadingSpinner> requires !important to override. */
+    .loading-screen__center .loading-spinner {
+        width: 120px !important;
+        height: 120px !important;
+    }
+
+    .loading-screen__label {
+        margin-top: 4px;
+        font-size: 20px;
+    }
+
+    .loading-screen__action {
+        margin-top: 12px;
+    }
+}

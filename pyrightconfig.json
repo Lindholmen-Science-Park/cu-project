@@ -1,0 +1,29 @@
+{
+  "typeCheckingMode": "basic",
+  "reportMissingImports": "none",
+  "reportAttributeAccessIssue": "none",
+  "reportMissingModuleSource": "none",
+  "reportOptionalMemberAccess": "none",
+  "reportRedeclaration": "warning",
+  "useLibraryCodeForTypes": true,
+  "extraPaths": [
+    "kit-app-template-main/_build/target-deps/carb_sdk_plugins/_build/windows-x86_64/release/bindings-python",
+    "kit-app-template-main/_build/target-deps/carb_sdk_plugins/_build/windows-x86_64/debug/bindings-python",
+    "kit-app-template-main/source/extensions"
+  ],
+  "executionEnvironments": [
+    {
+      "root": "kit-app-template-main",
+      "extraPaths": [
+        "kit-app-template-main/_build/target-deps/carb_sdk_plugins/_build/windows-x86_64/release/bindings-python",
+        "kit-app-template-main/_build/target-deps/carb_sdk_plugins/_build/windows-x86_64/debug/bindings-python",
+        "kit-app-template-main/source/extensions"
+      ]
+    }
+  ],
+  "exclude": [
+    "kit-app-template-main/templates"
+  ],
+  "stubPath": "typings"
+}
+

@@ -1,0 +1,63 @@
+[
+	{
+		"_comment": "Floor exit anchors: prim exit_point_* in exit_points_layer. Coin prims coin_exit_point_* in coins_layer (+1.5m Y). Loader maps exit → emergency_exit registry type.",
+		"xform_id": "exit_point_01",
+		"in_use": true,
+		"display_name": "Emergency Exit"
+	},
+	{
+		"xform_id": "exit_point_02",
+		"in_use": true,
+		"display_name": "Emergency Exit"
+	},
+	{
+		"xform_id": "exit_point_03",
+		"in_use": true,
+		"display_name": "Emergency Exit"
+	},
+	{
+		"xform_id": "exit_point_04",
+		"in_use": true,
+		"display_name": "Emergency Exit"
+	},
+	{
+		"xform_id": "exit_point_05",
+		"in_use": true,
+		"display_name": "Emergency Exit"
+	},
+	{
+		"xform_id": "exit_point_06",
+		"in_use": true,
+		"display_name": "Emergency Exit"
+	},
+	{
+		"xform_id": "exit_point_07",
+		"in_use": true,
+		"display_name": "Emergency Exit"
+	},
+	{
+		"xform_id": "exit_point_08",
+		"in_use": true,
+		"display_name": "Emergency Exit"
+	},
+	{
+		"xform_id": "exit_point_09",
+		"in_use": true,
+		"display_name": "Emergency Exit"
+	},
+	{
+		"xform_id": "exit_point_10",
+		"in_use": true,
+		"display_name": "Emergency Exit"
+	},
+	{
+		"xform_id": "exit_point_11",
+		"in_use": true,
+		"display_name": "Emergency Exit"
+	},
+	{
+		"xform_id": "exit_point_12",
+		"in_use": true,
+		"display_name": "Emergency Exit"
+	}
+]

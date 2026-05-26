@@ -1,0 +1,360 @@
+.iot-air-stations-backdrop {
+    position: fixed;
+    inset: 0;
+    /* Above dev controls (1001) and shared overlays at ~10051 so the panel receives clicks reliably */
+    z-index: 10060;
+    display: flex;
+    align-items: flex-end;
+    justify-content: flex-end;
+    padding: 16px;
+    /* No dimming layer — it made the stream look different; pass clicks through so the map pans */
+    pointer-events: none;
+    background: transparent;
+}
+
+.iot-air-stations-panel {
+    pointer-events: auto;
+    max-width: min(520px, 100vw - 32px);
+    width: 100%;
+    max-height: min(85vh, 720px);
+    display: flex;
+    flex-direction: column;
+    border-radius: 14px;
+    padding: 16px 18px 18px;
+    color: #f4f4f4;
+    background: rgba(18, 18, 22, 0.94);
+    border: 1px solid rgba(118, 185, 0, 0.45);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.06) inset;
+    backdrop-filter: blur(12px);
+}
+
+.iot-air-stations-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    flex-shrink: 0;
+}
+
+.iot-air-stations-title {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 700;
+    line-height: 1.25;
+    color: #e8ffc8;
+}
+
+.iot-air-stations-sub {
+    margin: 6px 0 0;
+    font-size: 12px;
+    line-height: 1.4;
+    color: rgba(255, 255, 255, 0.65);
+}
+
+.iot-air-stations-close {
+    flex-shrink: 0;
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
+    font-size: 22px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.iot-air-stations-close:hover {
+    background: rgba(255, 255, 255, 0.16);
+}
+
+.iot-air-stations-close:focus-visible {
+    outline: 2px solid #76b900;
+    outline-offset: 2px;
+}
+
+.iot-air-metric-toggle {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+    flex-shrink: 0;
+}
+
+.iot-air-metric-toggle button {
+    flex: 1;
+    min-height: 44px;
+    padding: 8px 12px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.06);
+    color: rgba(255, 255, 255, 0.85);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.iot-air-metric-toggle button:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.iot-air-metric-toggle button[aria-pressed='true'] {
+    border-color: rgba(118, 185, 0, 0.65);
+    background: rgba(118, 185, 0, 0.22);
+    color: #f2ffe8;
+}
+
+.iot-air-metric-toggle button:focus-visible {
+    outline: 2px solid #76b900;
+    outline-offset: 2px;
+}
+
+.iot-air-stations-body {
+    margin-top: 14px;
+    display: grid;
+    grid-template-columns: 1fr 1.1fr;
+    gap: 14px;
+    min-height: 0;
+    flex: 1;
+    overflow: hidden;
+}
+
+@media (max-width: 560px) {
+    .iot-air-stations-body {
+        grid-template-columns: 1fr;
+        max-height: 70vh;
+        overflow-y: auto;
+    }
+}
+
+.iot-air-stations-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    overflow-y: auto;
+    min-height: 0;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 10px;
+    background: rgba(0, 0, 0, 0.25);
+}
+
+.iot-air-stations-li {
+    margin: 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.iot-air-stations-li:last-child {
+    border-bottom: none;
+}
+
+.iot-air-stations-row {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 12px 14px;
+    text-align: left;
+    border: none;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    font-size: 13px;
+    min-height: 48px;
+}
+
+.iot-air-stations-row:hover {
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.iot-air-stations-row--selected {
+    background: rgba(118, 185, 0, 0.18);
+    box-shadow: inset 3px 0 0 #76b900;
+}
+
+.iot-air-stations-row:focus-visible {
+    outline: 2px solid #76b900;
+    outline-offset: -2px;
+}
+
+.iot-air-stations-row-name {
+    font-weight: 600;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.iot-air-stations-row-aqi {
+    flex-shrink: 0;
+    font-variant-numeric: tabular-nums;
+    color: rgba(255, 255, 255, 0.75);
+}
+
+.iot-air-stations-detail {
+    overflow-y: auto;
+    min-height: 0;
+    padding: 4px 2px 0;
+}
+
+.iot-air-stations-detail-name {
+    margin: 0 0 10px;
+    font-size: 15px;
+    font-weight: 600;
+}
+
+.iot-air-stations-dl {
+    margin: 0 0 12px;
+    display: grid;
+    gap: 8px;
+    font-size: 13px;
+}
+
+.iot-air-stations-dl > div {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 8px 12px;
+    align-items: baseline;
+}
+
+.iot-air-stations-dl dt {
+    margin: 0;
+    color: rgba(255, 255, 255, 0.65);
+    font-weight: 500;
+}
+
+.iot-air-stations-dl dd {
+    margin: 0;
+    text-align: right;
+    font-weight: 600;
+    color: #e8f5e0;
+}
+
+.iot-air-stations-mono {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.iot-air-stations-hint {
+    margin: 12px 0 0;
+    font-size: 11px;
+    line-height: 1.45;
+    color: rgba(255, 255, 255, 0.55);
+}
+
+.iot-air-stations-note {
+    margin: 0 0 10px;
+    font-size: 11px;
+    line-height: 1.45;
+    color: rgba(255, 255, 255, 0.58);
+}
+
+/* ── Mobile bottom sheet (IotPanelLayout + useIotPanelDrag) ── */
+.iot-air-stations-sheet-outer {
+    display: contents;
+}
+
+.iot-air-stations-sheet-outer--mobile {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    will-change: transform;
+}
+
+.iot-air-stations-drag-handle {
+    display: none;
+}
+
+.iot-air-stations-sheet-outer--mobile .iot-air-stations-drag-handle {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    flex-shrink: 0;
+    width: 100%;
+    min-height: 28px;
+    padding: 8px 0 4px;
+    margin: 0;
+    border: none;
+    background: transparent;
+    cursor: grab;
+    touch-action: none;
+    -webkit-tap-highlight-color: transparent;
+    color: inherit;
+}
+
+.iot-air-stations-sheet-outer--mobile .iot-air-stations-drag-handle:active {
+    cursor: grabbing;
+}
+
+.iot-air-stations-drag-handle-pill {
+    display: block;
+    width: 40px;
+    height: 5px;
+    border-radius: 3px;
+    background: rgba(255, 255, 255, 0.35);
+}
+
+.iot-air-stations-sheet-outer--mobile .iot-air-stations-drag-handle:focus-visible {
+    outline: 2px solid #76b900;
+    outline-offset: 2px;
+}
+
+/* Bottom sheet + drag handle: used by IotPanelLayout for IoT list panels (air, bike, OSM, transit). */
+@media (max-width: 639px) {
+    .iot-air-stations-backdrop {
+        padding: 0;
+        align-items: flex-end;
+        justify-content: stretch;
+    }
+
+    .iot-air-stations-panel {
+        max-width: none;
+        width: 100%;
+        max-height: min(52vh, 520px);
+        border-radius: 18px 18px 0 0;
+        padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+        margin: 0;
+    }
+
+    .iot-air-stations-header {
+        padding-top: 2px;
+    }
+
+    .iot-air-metric-toggle {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        overflow-y: hidden;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        gap: 6px;
+        padding-bottom: 4px;
+    }
+
+    .iot-air-metric-toggle::-webkit-scrollbar {
+        display: none;
+    }
+
+    .iot-air-metric-toggle button {
+        flex: 0 0 auto;
+        min-width: max-content;
+    }
+
+    .iot-air-stations-body {
+        grid-template-columns: 1fr;
+        max-height: min(38vh, 360px);
+        overflow: hidden;
+    }
+
+    .iot-air-stations-list {
+        max-height: min(22vh, 220px);
+    }
+
+    .iot-air-stations-detail {
+        max-height: min(28vh, 280px);
+    }
+}

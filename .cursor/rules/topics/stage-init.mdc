@@ -1,0 +1,82 @@
+---
+description: Stage initialization flow, loading phases, readyForPlayer, scene.loaded, default view type, USD stage time range — read when working on stage load, UI loading states, or timeline length
+---
+
+# Stage initialization flow
+
+Single source of truth for how the stage becomes "ready". Coordinator: **StageWatcher** (`stage_watcher.py`). All steps notify the client via **loading.phase** so the UI can show "Opening scene...", "Loading assets...", etc.
+
+## Default view type
+
+The initial camera mode is configured via carb setting `/younite/camera/defaultViewType` (set in the `.kit` app config). Supported values: `"firstPerson"` or `"birdEye"`. This setting drives:
+- Which spawnpoint the player is placed at during startup (`PlayerSpawnPoint_01` for first-person, `PlayerSpawnPoint_02` for bird's-eye)
+- Which LOD variant the stadium loads with (the LOD extension reads `/younite/camera/viewType` which player_core writes from this default)
+- Whether NavMesh is pre-baked on player ready (skipped for bird's-eye, baked for first-person)
+- The `viewType` field in the `scene.loaded` event sent to the web client
+
+The helper `get_default_view_type()` in `world_conventions.py` reads this setting with a `"firstPerson"` fallback.
+
+## Event-driven steps (SDK signals)
+
+| Step | Trigger | Action | loading.phase |
+|------|---------|--------|----------------|
+| 1 | **OPENED** | mark_opened, set phase | `loading_assets` "Loading assets..." |
+| 2 | **ASSETS_LOADED** | mark_assets_loaded | (then settle) |
+| 3 | (no SDK signal) | Wait up to N frames for Hydra/instancers | `loading_assets` "Preparing scene (15/60)" … |
+| 4 | — | Simulation on, terrain load, wait for instanced geometry | `initializing` "Initializing simulation (30/120)" … |
+| 5 | — | Timeline play, one frame | — |
+| 6 | — | Set readyForPlayer | `ready_for_player` "Preparing player..." |
+| 7 | **PlayerCore** | Reads defaultViewType, writes to viewType, places player at matching spawnpoint, sets /younite/player/ready | — |
+| 8 | **PlayerReadyService** | sky control, schedule _finalize_scene_load | `preparing_lights` "Preparing lights..." |
+| 9 | **_finalize_scene_load** | Wait 3 s for MDL, cycle lights off→on, mark_initialized | — |
+| 9a | **_finalize_scene_load** (first-person only) | Await dual-mode NavMesh bake via first-person navmesh bridge | `preparing_navmesh` "Preparing navigation (walking + wheelchair)..." |
+| 10 | **_finalize_scene_load** | Dispatch scene.loaded (includes viewType) | `ready` "Ready" |
+
+## Bounded waits (no "ready" API)
+
+- After **ASSETS_LOADED**: wait up to `SETTLE_FRAMES_AFTER_ASSETS` (60) with progress every 15 frames.
+- Before **readyForPlayer**: wait up to `SETTLE_FRAMES_BEFORE_PLAYER` (120) with progress.
+
+Constants and progress interval are in `stage_watcher.py`. Replace with event-driven steps when the SDK exposes a readiness signal.
+
+## First-person NavMesh gate (`preparing_navmesh`)
+
+For first-person view types, `scene.loaded` is **gated on dual-mode NavMesh readiness**. After lights are initialised, `_finalize_scene_load` sets phase `preparing_navmesh` and awaits `await_first_person_navmesh_prepare()` (the first-person navmesh bridge). This bridge is backed by `NavMeshRouteExtension._ensure_dual_mode_ready`, which either awaits the in-flight initial bake task or triggers one if none is running. Only once both walking and wheelchair meshes are cached does the phase flip to `ready` and `scene.loaded` fire.
+
+This prevents the onboarding overlay from opening while the user could already click ground and route against a half-baked or wrong-mode NavMesh. Bird's-eye startup skips this wait entirely (no NavMesh needed). See `navmesh-dual-mode.mdc`.
+
+## USD stage time range (`startTimeCode` / `endTimeCode`)
+
+The **root scene** layer (e.g. `main_scene.usda`) sets **`startTimeCode`**, **`endTimeCode`**, and **`timeCodesPerSecond`**. Kit’s timeline advances time within that interval (subject to **`omni.timeline`** loop/stop defaults).
+
+- **Real-time duration** of one full pass from start to end: **`(endTimeCode - startTimeCode) / timeCodesPerSecond`** seconds. Example: **0–3600** at **60** tc/s → **60 seconds**.
+- **Time-sampled** USD (SkelAnimation, many effects, some sky/material clocks) evaluates at **current stage time**. If authored keys **do not cover** the full **[start, end]** range, content **holds** after the last key until time resets or loops.
+- **Streaming viewport** target rate is configured in **`younite.usd_viewer_streaming_base.kit`** (`viewport.defaults.tickRate`, typically **60**); the **web** streamer also requests **60 fps** in `AppStream.tsx`. That is **display/update** rate; **animation phase** still follows **USD time codes** and `timeCodesPerSecond`.
+
+For the **Red** player avatar clip length vs `endTimeCode`, see **`avatar-red-asset.mdc`**.
+
+## Late-connecting or re-requesting client
+
+- **ui.ready**: Backend always sends current **loading.phase** (phase + message), then **scene.loaded** if already initialized. Client sees the correct step and can leave loading when ready.
+- **scene.loaded** is re-dispatched once after ~1.5 s when the player becomes ready, so a missed first delivery can be caught.
+- **Periodic web-side retry**: `useStreamConnection` retries `ui.ready` every 3 s while `sceneLoading` is true (up to 20 retries = 60 s). This handles the case where the initial `ui.ready` is silently dropped because the WebRTC data channel isn't bidirectional yet (the video stream starts before the data channel is fully ready).
+- The retry interval self-clears the moment `scene.loaded` or `loading.phase: ready` arrives.
+
+## Client connectivity gate (`/younite/client/connected`)
+
+`UiStageService._on_ui_ready` sets carb setting `/younite/client/connected = true` when the first `ui.ready` message arrives from the web client. The setting is initialized to `false` in `StageCoreExtension.on_startup`.
+
+**Purpose**: High-frequency outbound events (e.g. `uiInteractionBoxesUpdate` from the interactions extension) check this flag and skip dispatching when no client is connected. This prevents flooding the NVST WebRTC data channel with failed sends (`NVST_R_INVALID_STATE` errors) during the window between Kit readiness and client connection. The flood can degrade the WebRTC plugin state and make late-connect / reconnection unreliable.
+
+**Rules**:
+- New per-frame or high-frequency outbound dispatchers should check `/younite/client/connected` before sending.
+- The flag is **not** cleared on disconnect (Kit restarts per session anyway). It is refreshed on each new `ui.ready`.
+
+## Key modules (younite.usd_viewer_stage_core_extension)
+
+- **stage_watcher.py** — Subscribes via `get_stage_event_stream().create_subscription_to_pop` (Events 2.0 `omni.usd@stage_event` does not deliver OPENED/ASSETS_LOADED here; do not switch). Runs init sequence, drives loading.phase.
+- **stage_loading_phase.py** — Singleton phase state + dispatch to client.
+- **stage_readiness.py** — opened / assetsLoaded / timelineStarted / initialized (consumed by SkyControlService, etc.).
+- **services/core_services/initial_stage_open_service.py** — Opens initial stage, sets phase "Opening scene...".
+- **services/core_services/player_ready_service.py** — Watches /younite/player/ready, marks initialized, dispatches scene.loaded.
+- **services/core_services/ui_stage_service.py** — On ui.ready, sets `/younite/client/connected`, sends current phase + scene.loaded if ready. Logs receipt with `[ui_stage]` tag. Also runs a streaming watchdog: if 5+ `ui.ready` messages arrive within 30 seconds (`_WD_THRESHOLD` / `_WD_WINDOW_SEC`), it resets all livestream extensions to recover poisoned sessions. See `resolution-streaming.mdc` → "Reconnection cooldown" for how the web side stays under this threshold.

@@ -1,0 +1,46 @@
+---
+description: Camera NavMesh areas — frustum scanning, ground footprint polygons, NavMesh cost areas, frontend camera area UI
+---
+
+# Camera NavMesh Areas (Frustum Ground Footprints)
+
+Automatically computes the ground coverage area of each fixed camera and creates flat NavMesh area polygons for pathfinding cost modifiers.
+
+**Implementation**: `younite.navmesh_route_extension/.../scripts/camera_navmesh_areas.py`
+
+## Pipeline
+
+1. **Discover cameras**: all `UsdGeom.Camera` prims directly under `/World`.
+2. **Frustum ray grid**: per camera, uses `focalLength`, `horizontalAperture`, `verticalAperture`; 11×11 grid of ray directions (U: -1..1, V: -0.9..1.0, biased downward).
+3. **Raycast**: `omni.physx.get_physx_scene_query_interface().raycast_closest()`, max 15 m (`MAX_RAY_DISTANCE = 1500` cm). Classification by hit normal:
+   - **Floor** (normal Y ≥ 0.5): XZ + Y for ground height.
+   - **Wall** (|normal Y| < 0.5): XZ for footprint boundary.
+   - **Ceiling** (normal Y ≤ -0.5): discard.
+   - **Miss**: discard.
+4. **Ground Y**: median of floor-hit Y; fallback = straight-down ray from camera.
+5. **Outlier filter**: drop points whose lateral distance (perpendicular to camera forward) exceeds 5× median lateral distance.
+6. **Convex hull**: 2D convex hull (Andrew's monotone chain) of cleaned XZ points.
+7. **Mesh**: flat triangulated polygon on the **navigation sublayer** with `NavMeshAreaAPI`, `nav:area = "<camera_name>_area"`, `subdivisionScheme = "none"`, upward normals, `GROUND_OFFSET = 0.5` cm above ground. Unique emissive material per camera.
+
+## Constants to tweak
+
+- `MAX_RAY_DISTANCE` (1500.0 = 15 m): how far cameras "see".
+- `MIN_GROUND_NORMAL_Y` (0.5): floor vs wall threshold.
+- `GROUND_OFFSET` (0.5 cm): polygon height above ground (keep minimal for walkable NavMesh).
+- `_filter_outliers` factor (5.0): lateral tolerance; lower = more filtering, higher = more corners but risk of window leaks.
+- Ray grid: `_U_STEPS` / `_V_STEPS` (11 each = 121 rays); more = more accurate, slower.
+
+## Frontend integration
+
+- **Show Camera Areas**: `showNavmeshCameraAreasRequest` with `{ visible: bool }`.
+- **Camera Data Affects Calculations**: `cameraDataCalcToggle` with `{ active: bool }`. On: create area meshes (if needed) → rebake NavMesh → hide areas. Off: remove mesh prims → rebake.
+- **Per-camera cost**: `navmeshCameraAreaCostUpdate` with `{ areaName, cost }`. Query-time only; no rebake. Frontend debounce 150 ms per area.
+- Area names: `<camera_prim_name>_area` (e.g. `camera_vip_entrance_area`).
+
+## Related
+
+- NavMesh area mechanics: `.cursor/rules/topics/navmesh-areas.mdc`
+- Bake orchestrator + provider protocol: `.cursor/rules/topics/bake-orchestrator.mdc`
+- Sound areas (same NavMesh pattern): `.cursor/rules/topics/sound-areas.mdc`
+- Camera data visualization (heatmap / sphere tracker): `.cursor/rules/topics/camera_data_visualization.mdc`
+- Camera switch + teleport service: `CameraService` in `younite.usd_viewer_stage_core_extension/.../camera_service.py`

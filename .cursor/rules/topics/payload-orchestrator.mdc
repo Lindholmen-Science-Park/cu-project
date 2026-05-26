@@ -1,0 +1,131 @@
+---
+description: Payload Orchestrator — centralised queue for payload/visibility operations, frame-budgeted execution
+globs:
+  - "**/payload_orchestrator_core_extension/**"
+  - "**/payload_orchestrator*"
+alwaysApply: false
+---
+
+# Payload Orchestrator
+
+**Extension:** `younite.payload_orchestrator_core_extension` (order 955)
+
+Centralises all USD payload load/unload and prim visibility mutations
+behind a priority queue with a per-frame time budget.  Extensions
+submit requests instead of calling `MakeVisible()` / `MakeInvisible()`
+/ `prim.Load()` / `prim.Unload()` directly.
+
+## Why
+
+- Prevents frame spikes: multiple extensions no longer race to mutate the stage in the same frame.
+- Single place to throttle, batch, and monitor all visibility/payload work.
+
+## Convenience helpers (preferred)
+
+```python
+from younite.payload_orchestrator_core_extension import show, hide, show_hide, batch_show_hide, Priority
+
+show("/World/SomePrim", Priority.HIGH, source="my_ext")          # returns True/False
+hide("/World/SomePrim", Priority.HIGH, source="my_ext")
+show_hide("/World/SomePrim", visible, Priority.MEDIUM, source="my_ext")
+
+# Batch of (prim_path, visible) pairs
+batch_show_hide([(p, True) for p in paths], source="my_ext", group="cleanup")
+```
+
+All helpers return `True` if the orchestrator accepted the request, `False` if it
+wasn't running yet. This replaces the try/except `RuntimeError` boilerplate.
+
+`load_prim()` and `unload_prim()` work the same way for payload operations.
+
+## Low-level API
+
+```python
+from younite.payload_orchestrator_core_extension import (
+    PayloadOrchestrator, PayloadOperation, OpType, Priority,
+)
+
+orch = PayloadOrchestrator.instance()
+
+# Single operation
+orch.request(PayloadOperation("/World/SomePrim", OpType.SHOW, Priority.HIGH, source="my_ext"))
+
+# Batch of related operations (spread across frames)
+ops = [PayloadOperation(p, OpType.HIDE, source="my_ext") for p in paths]
+orch.batch(ops, group="cleanup")
+
+# Cancel a pending operation
+request_id = orch.request(...)
+orch.cancel(request_id)
+```
+
+## OpType
+
+| Value   | USD call                            |
+|---------|-------------------------------------|
+| `LOAD`  | `prim.Load()`                       |
+| `UNLOAD`| `prim.Unload()`                     |
+| `SHOW`  | `UsdGeom.Imageable(prim).MakeVisible()` |
+| `HIDE`  | `UsdGeom.Imageable(prim).MakeInvisible()` |
+
+## Priority
+
+| Level      | Value | Behaviour                              |
+|------------|-------|----------------------------------------|
+| `CRITICAL` | 0     | Bypasses frame budget, always executes  |
+| `HIGH`     | 1     | Next available frame                    |
+| `MEDIUM`   | 2     | Normal (default)                        |
+| `LOW`      | 3     | Deferred / cleanup                      |
+| `BACKGROUND`| 4    | Only when frame has spare budget        |
+
+## Lifecycle
+
+- Starts/stops automatically on `StageEventType.OPENED` / `CLOSED`.
+- Singleton: `PayloadOrchestrator.instance()`.
+- Consumer extensions declare `"younite.payload_orchestrator_core_extension" = {}` in their `extension.toml` `[dependencies]`.
+
+## Frame Scheduler
+
+Each frame the scheduler:
+1. Checks `PerformanceMonitor.frame_budget_ms` (default 4 ms, adaptive 2–6 ms).
+2. Pops highest-priority operations.
+3. Executes USD mutations until budget exhausted.
+4. CRITICAL operations always execute regardless of budget.
+
+## Migrated Extensions
+
+These extensions now route visibility changes through the orchestrator:
+
+| Extension | What changed |
+|-----------|-------------|
+| `people_toggle` | SHOW/HIDE people + density batch |
+| `markers` | SHOW marker cube on placement |
+| `incident` | SHOW incident root + shape |
+| `geo_poi` | SHOW/HIDE POI markers (batch) |
+| `camera_depth` | SHOW/HIDE point cloud |
+| `camera_data_viz` | SHOW/HIDE tracker spheres |
+| `camera_navmesh_areas` | SHOW/HIDE camera area root |
+| `sound_navmesh_areas` | SHOW/HIDE sound area root |
+| `navmesh_bake_orchestrator` | camera depth obstacle areas (batch) |
+
+**Not migrated:** `stage_core` light cycling (requires session-layer `EditContext` + `Sdf.ChangeBlock` + precise frame timing).
+
+## Adding new features
+
+Any new extension that needs to show/hide prims or load/unload payloads
+should use the orchestrator:
+
+1. Add `"younite.payload_orchestrator_core_extension" = {}` to `extension.toml` dependencies.
+2. Use the convenience helpers: `from younite.payload_orchestrator_core_extension import show, hide, show_hide, batch_show_hide, Priority`.
+3. Choose appropriate `Priority` (CRITICAL for player-facing, MEDIUM for normal, BACKGROUND for deferred).
+4. Use `batch_show_hide()` when toggling many prims at once.
+
+## Integrated tile management
+
+`distance_culling_extension` (v2) routes all tile visibility and payload
+load/unload operations through the orchestrator using hybrid distance/frustum
+culling. See `.cursor/rules/topics/tile-management.mdc`.
+
+## Deprecated extensions
+
+`lod_management_extension` is deprecated and not integrated with the orchestrator.
